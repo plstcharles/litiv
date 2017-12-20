@@ -23,79 +23,105 @@
 
 /////////////////////////////////
 #define USE_FLIR_SENSOR         1
+#define USE_NIR_SENSOR          0
 /////////////////////////////////
 #define DISPLAY_OUTPUT          2
-#define WRITE_OUTPUT            0
+#define WRITE_OUTPUT            1
+#define WRITE_OUTPUT_PREFIX     "test"
 /////////////////////////////////
 #define DEFAULT_QUEUE_BUFFER_SIZE   1024*1024*50  // max = 50MB per queue (default)
 #define HIGHDEF_QUEUE_BUFFER_SIZE   1024*1024*1024 // max = 1GB per queue (high-defition stream)
-#define VIDEO_FILE_PREALLOC_SIZE    1024*1024*1024 // tot = 1GB per video file
-#define STRUCT_FILE_PREALLOC_SIZE   1024*1024*20 // tot = 200MB per struct file
+//#define VIDEO_FILE_PREALLOC_SIZE    1024*1024*1024 // tot = 1GB per video file
+//#define STRUCT_FILE_PREALLOC_SIZE   1024*1024*20 // tot = 200MB per struct file
 /////////////////////////////////
-//// cv::VideoWriter params /////          filename           fourcc  framerate       frame size      is color
-#define FLIR_OUTPUT_VIDEO_PARAMS    "c:/temp/test_flir.avi",    -1,     30.0,     cv::Size(320,240),   false    // ffdshow?
-#define BODYIDX_OUTPUT_VIDEO_PARAMS "c:/temp/test_bodyidx.avi", -1,     30.0,     cv::Size(512,424),   false    // save as png?
-#define NIR_OUTPUT_VIDEO_PARAMS     "c:/temp/test_nir.avi",     -1,     30.0,     cv::Size(512,424),   false    // toggle off via define?
-#define DEPTH_OUTPUT_VIDEO_PARAMS   "c:/temp/test_depth.avi",   -1,     30.0,     cv::Size(512,424),   false    // save as png?
-#define COLOR_OUTPUT_VIDEO_PARAMS   "e:/temp/test_color.avi",   -1,     30.0,     cv::Size(1920,1080), true     // x264/mpeg4?
+//// cv::VideoWriter params /////                      filename                  fourcc  framerate       frame size       is color
+#define FLIR_OUTPUT_VIDEO_PARAMS    "c:/temp/" WRITE_OUTPUT_PREFIX "/flir.avi",    -1,     30.0,     cv::Size(320,240),    false    // ffdshow mpeg4/xvid w/ 'grayscale' preset
+#define NIR_OUTPUT_VIDEO_PARAMS     "c:/temp/" WRITE_OUTPUT_PREFIX "/nir.avi",     -1,     30.0,     cv::Size(512,424),    false    // ffdshow mpeg4/xvid w/ 'grayscale' preset
+#define RGB_OUTPUT_VIDEO_PARAMS     "e:/temp/" WRITE_OUTPUT_PREFIX "/rgb.avi",     -1,     30.0,     cv::Size(1920,1080),  true     // x264/mpeg4 w/ 'superfast' preset
 /////////////////////////////////
-#define BODY_DATA_OUTPUT_PARAMS     "c:/temp/test_body.bin",     std::ios::out|std::ios::binary
-#define META_DATA_OUTPUT_PARAMS     "c:/temp/test_metadata.yml", cv::FileStorage::WRITE
+//////// custom params //////////                     folder name                  filename  fileext       frame size         compr params
+#define BODYIDX_OUTPUT_IMGSEQ_PARAMS  "e:/temp/" WRITE_OUTPUT_PREFIX "/bodyidx/",  "%05d",   ".bin",   cv::Size(512,424),  std::vector<int>{}
+#define DEPTH_OUTPUT_IMGSEQ_PARAMS    "e:/temp/" WRITE_OUTPUT_PREFIX "/depth/",    "%05d",   ".bin",   cv::Size(512,424),  std::vector<int>{}
+#define COORDMAP_OUTPUT_IMGSEQ_PARAMS "e:/temp/" WRITE_OUTPUT_PREFIX "/coordmap/", "%05d",   ".bin"
+/////////////////////////////////
+#define BODY_DATA_OUTPUT_PARAMS     "c:/temp/" WRITE_OUTPUT_PREFIX "/body.bin",     std::ios::out|std::ios::binary
+#define META_DATA_OUTPUT_PARAMS     "c:/temp/" WRITE_OUTPUT_PREFIX "/metadata.yml", cv::FileStorage::WRITE
 /////////////////////////////////
 
 std::atomic_bool g_bIsActive = true;
 
 int main() {
     try {
+    #if WRITE_OUTPUT
+        lv::createDirIfNotExist("c:/temp/" WRITE_OUTPUT_PREFIX);
+        lv::createDirIfNotExist("e:/temp/" WRITE_OUTPUT_PREFIX);
+    #endif //WRITE_OUTPUT
         lv::registerAllConsoleSignals([](int){g_bIsActive = false;});
-        const auto lEncodeAndSaveFrame = [](const cv::Mat& oImage, size_t nIndex, cv::VideoWriter& oWriter, size_t& nLastSavedIndex) {
-            lvAssert(!oImage.empty() && oWriter.isOpened());
-            lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
-            oWriter.write(oImage);
-            nLastSavedIndex = nIndex;
+        const auto lEncodeAndSaveImage = [](const cv::Mat& oImage, size_t nRealIndex, const std::string& sPath, const std::vector<int>& vComprParams, size_t& nLastSavedIndex) {
+            lvAssert(!oImage.empty() && !sPath.empty());
+            lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nRealIndex);
+            std::string sRealPath = sPath;
+            if(sRealPath.find("%")!=std::string::npos)
+                sRealPath = lv::putf(sRealPath.c_str(),(int)++nLastSavedIndex);
+            if(sRealPath.size()>=4 && sRealPath.compare(sRealPath.size()-4,sRealPath.size(),".bin")==0)
+                lv::write(sRealPath,oImage);
+            else
+                cv::imwrite(sRealPath,oImage,vComprParams);
             return (size_t)0;
         };
-        const auto lEncodeAndSaveBodyFrame = [](const cv::Mat& oBodyFrame, size_t nIndex, std::ofstream* pWriter, size_t& nLastSavedIndex){
+        const auto lEncodeAndSaveFrame = [](const cv::Mat& oImage, size_t nRealIndex, cv::VideoWriter& oWriter, size_t& nLastSavedIndex) {
+            lvAssert(!oImage.empty() && oWriter.isOpened());
+            lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nRealIndex);
+            oWriter.write(oImage);
+            ++nLastSavedIndex;
+            return (size_t)0;
+        };
+        const auto lEncodeAndSaveBodyFrame = [](const cv::Mat& oBodyFrame, size_t nRealIndex, std::ofstream* pWriter, size_t& nLastSavedIndex){
             lvAssert(!oBodyFrame.empty() && oBodyFrame.total()*oBodyFrame.elemSize()==sizeof(lv::KinectBodyFrame));
             lvAssert(pWriter && pWriter->is_open());
-            lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
-            ((lv::KinectBodyFrame*)oBodyFrame.data)->nFrameIdx = nIndex;
+            lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nRealIndex);
+            ((lv::KinectBodyFrame*)oBodyFrame.data)->nFrameIdx = ++nLastSavedIndex;
             pWriter->write((char*)oBodyFrame.data,sizeof(lv::KinectBodyFrame));
-            nLastSavedIndex = nIndex;
             return (size_t)0;
         };
-#if USE_FLIR_SENSOR
+    #if USE_FLIR_SENSOR
         std::cout << "Setting up FLIR device..." << std::endl;
         lvAssertHR(CoInitializeEx(0,COINIT_MULTITHREADED|COINIT_DISABLE_OLE1DDE));
         std::unique_ptr<lv::DShowCameraGrabber> pFLIRSensor = std::make_unique<lv::DShowCameraGrabber>("FLIR ThermaCAM");
         lvAssertHR(pFLIRSensor->Connect());
         cv::Mat oFLIRFrame;
         const cv::Size oFLIRFrameSize = std::get<3>(std::make_tuple(FLIR_OUTPUT_VIDEO_PARAMS));
-#if WRITE_OUTPUT
+    #if WRITE_OUTPUT
         std::cout << "Setting up FLIR video writer..." << std::endl;
         size_t nLastSavedFLIRFrameIdx = SIZE_MAX;
         cv::VideoWriter oFLIRVideoWriter(FLIR_OUTPUT_VIDEO_PARAMS);
         lvAssert(oFLIRVideoWriter.isOpened());
         lv::DataWriter oFLIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oFLIRVideoWriter,nLastSavedFLIRFrameIdx));
         lvAssert(oFLIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
-#endif //WRITE_OUTPUT
-#endif //USE_FLIR_SENSOR
+    #endif //WRITE_OUTPUT
+    #endif //USE_FLIR_SENSOR
         std::cout << "Setting up Kinect device..." << std::endl;
         CComPtr<IKinectSensor> pKinectSensor;
         lvAssertHR(GetDefaultKinectSensor(&pKinectSensor));
         lvAssert(pKinectSensor);
         lvAssertHR(pKinectSensor->Open());
         CComPtr<IMultiSourceFrameReader> pMultiFrameReader;
+    #if USE_NIR_SENSOR
         lvAssertHR(pKinectSensor->OpenMultiSourceFrameReader(FrameSourceTypes_Color|FrameSourceTypes_Depth|FrameSourceTypes_Infrared|FrameSourceTypes_Body|FrameSourceTypes_BodyIndex,&pMultiFrameReader));
-        constexpr size_t nStreamCount = 5;
+    #else //!USE_NIR_SENSOR
+        lvAssertHR(pKinectSensor->OpenMultiSourceFrameReader(FrameSourceTypes_Color|FrameSourceTypes_Depth|FrameSourceTypes_Body|FrameSourceTypes_BodyIndex,&pMultiFrameReader));
+    #endif //!USE_NIR_SENSOR
+        constexpr size_t nStreamCount = size_t(USE_NIR_SENSOR?5:4);
         lv::KinectBodyFrame oBodyFrame;
         const cv::Mat oBodyFrameWrapper(1,(int)sizeof(lv::KinectBodyFrame),CV_8UC1,&oBodyFrame);
-        cv::Mat oBodyIdxFrame,oNIRFrame,oDepthFrame,oColorFrame;
-        const cv::Size oBodyIdxFrameSize = std::get<3>(std::make_tuple(BODYIDX_OUTPUT_VIDEO_PARAMS));
+        cv::Mat oBodyIdxFrame,oNIRFrame,oDepthFrame,oCoordMapFrame,oRGBFrame;
+        const cv::Size oBodyIdxFrameSize = std::get<3>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS));
         const cv::Size oNIRFrameSize = std::get<3>(std::make_tuple(NIR_OUTPUT_VIDEO_PARAMS));
-        const cv::Size oDepthFrameSize = std::get<3>(std::make_tuple(DEPTH_OUTPUT_VIDEO_PARAMS));
-        const cv::Size oColorFrameSize = std::get<3>(std::make_tuple(COLOR_OUTPUT_VIDEO_PARAMS));
-#if WRITE_OUTPUT
+        const cv::Size oDepthFrameSize = std::get<3>(std::make_tuple(DEPTH_OUTPUT_IMGSEQ_PARAMS));
+        const cv::Size oRGBFrameSize = std::get<3>(std::make_tuple(RGB_OUTPUT_VIDEO_PARAMS));
+        CComPtr<ICoordinateMapper> pCoordMapper;
+        lvAssertHR(pKinectSensor->get_CoordinateMapper(&pCoordMapper));
+    #if WRITE_OUTPUT
         std::cout << "Setting up Kinect body data writer..." << std::endl;
         size_t nLastSavedBodyFrameIdx = SIZE_MAX;
         std::ofstream oBodyStructWriter(BODY_DATA_OUTPUT_PARAMS);
@@ -104,52 +130,70 @@ int main() {
         lvAssert(oBodyStructAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up BODYINDEX video writer..." << std::endl;
         size_t nLastSavedBodyIdxFrameIdx = SIZE_MAX;
-        cv::VideoWriter oBodyIdxVideoWriter(BODYIDX_OUTPUT_VIDEO_PARAMS);
-        lvAssert(oBodyIdxVideoWriter.isOpened());
-        lv::DataWriter oBodyIdxVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oBodyIdxVideoWriter,nLastSavedBodyIdxFrameIdx));
+        lv::createDirIfNotExist(std::get<0>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS)));
+        const std::string sBodyIdxFramePath = lv::addDirSlashIfMissing(std::get<0>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS)))+std::get<1>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS))+std::get<2>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS));
+        const std::vector<int> vnBodyIdxComprParams = std::get<4>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS));
+        lv::DataWriter oBodyIdxVideoAsyncWriter(std::bind(lEncodeAndSaveImage,std::placeholders::_1,std::placeholders::_2,sBodyIdxFramePath,vnBodyIdxComprParams,nLastSavedBodyIdxFrameIdx));
         lvAssert(oBodyIdxVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+    #if USE_NIR_SENSOR
         std::cout << "Setting up NIR video writer..." << std::endl;
         size_t nLastSavedNIRFrameIdx = SIZE_MAX;
         cv::VideoWriter oNIRVideoWriter(NIR_OUTPUT_VIDEO_PARAMS);
         lvAssert(oNIRVideoWriter.isOpened());
         lv::DataWriter oNIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oNIRVideoWriter,nLastSavedNIRFrameIdx));
         lvAssert(oNIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+    #else //!USE_NIR_SENSOR
+        lvIgnore(oNIRFrameSize);
+        lvIgnore(oNIRFrame);
+    #endif //!USE_NIR_SENSOR
         std::cout << "Setting up DEPTH video writer..." << std::endl;
         size_t nLastSavedDepthFrameIdx = SIZE_MAX;
-        cv::VideoWriter oDepthVideoWriter(DEPTH_OUTPUT_VIDEO_PARAMS);
-        lvAssert(oDepthVideoWriter.isOpened());
-        lv::DataWriter oDepthVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oDepthVideoWriter,nLastSavedDepthFrameIdx));
+        lv::createDirIfNotExist(std::get<0>(std::make_tuple(DEPTH_OUTPUT_IMGSEQ_PARAMS)));
+        const std::string sDepthFramePath = lv::addDirSlashIfMissing(std::get<0>(std::make_tuple(DEPTH_OUTPUT_IMGSEQ_PARAMS)))+std::get<1>(std::make_tuple(DEPTH_OUTPUT_IMGSEQ_PARAMS))+std::get<2>(std::make_tuple(DEPTH_OUTPUT_IMGSEQ_PARAMS));
+        const std::vector<int> vnDepthComprParams = std::get<4>(std::make_tuple(DEPTH_OUTPUT_IMGSEQ_PARAMS));
+        lv::DataWriter oDepthVideoAsyncWriter(std::bind(lEncodeAndSaveImage,std::placeholders::_1,std::placeholders::_2,sDepthFramePath,vnDepthComprParams,nLastSavedDepthFrameIdx));
         lvAssert(oDepthVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
-        std::cout << "Setting up COLOR video writer..." << std::endl;
-        size_t nLastSavedColorFrameIdx = SIZE_MAX;
-        lvAssert(lv::CreateBinFileWithPrealloc(std::get<0>(std::make_tuple(COLOR_OUTPUT_VIDEO_PARAMS)),VIDEO_FILE_PREALLOC_SIZE));
-        cv::VideoWriter oColorVideoWriter(COLOR_OUTPUT_VIDEO_PARAMS);
-        lvAssert(oColorVideoWriter.isOpened());
-        lv::DataWriter oColorVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oColorVideoWriter,nLastSavedColorFrameIdx));
-        lvAssert(oColorVideoAsyncWriter.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
-#if WRITE_OUTPUT>1
+        std::cout << "Setting up COORDMAP video writer..." << std::endl;
+        size_t nLastSavedCoordMapFrameIdx = SIZE_MAX;
+        lv::createDirIfNotExist(std::get<0>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS)));
+        const std::string sCoordMapFramePath = lv::addDirSlashIfMissing(std::get<0>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS)))+std::get<1>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS))+std::get<2>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS));
+        lv::DataWriter oCoordMapVideoAsyncWriter(std::bind(lEncodeAndSaveImage,std::placeholders::_1,std::placeholders::_2,sCoordMapFramePath,std::vector<int>(),nLastSavedCoordMapFrameIdx));
+        lvAssert(oCoordMapVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+        std::cout << "Setting up RGB video writer..." << std::endl;
+        size_t nLastSavedRGBFrameIdx = SIZE_MAX;
+        //lvAssert(lv::createBinFileWithPrealloc(std::get<0>(std::make_tuple(RGB_OUTPUT_VIDEO_PARAMS)),VIDEO_FILE_PREALLOC_SIZE));
+        cv::VideoWriter oRGBVideoWriter(RGB_OUTPUT_VIDEO_PARAMS);
+        lvAssert(oRGBVideoWriter.isOpened());
+        lv::DataWriter oRGBVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oRGBVideoWriter,nLastSavedRGBFrameIdx));
+        lvAssert(oRGBVideoAsyncWriter.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
         std::mutex oMetadataStorageMutex;
         cv::FileStorage oMetadataStorage(META_DATA_OUTPUT_PARAMS);
         oMetadataStorage << "htag" << lv::getVersionStamp();
         oMetadataStorage << "date" << lv::getTimeStamp();
-#endif //WRITE_OUTPUT>1
-#endif //WRITE_OUTPUT
-#if DISPLAY_OUTPUT
-#if DISPLAY_OUTPUT>1
+    #endif //WRITE_OUTPUT
+    #if DISPLAY_OUTPUT
+    #if DISPLAY_OUTPUT>1
         lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create("DISPLAY","c:/temp/",cv::Size(1920,1200),cv::WINDOW_NORMAL);
-        CComPtr<ICoordinateMapper> pCoordMapper;
-        lvAssertHR(pKinectSensor->get_CoordinateMapper(&pCoordMapper));
         std::map<UINT64,cv::Scalar_<uchar>> mBodyColors;
-#else //!(DISPLAY_OUTPUT>1)
-#if USE_FLIR_SENSOR
+    #else //!(DISPLAY_OUTPUT>1)
+    #if USE_FLIR_SENSOR
         cv::namedWindow("oFLIRFrame",cv::WINDOW_NORMAL);
-#endif //USE_FLIR_SENSOR
+    #endif //USE_FLIR_SENSOR
         cv::namedWindow("oBodyIdxFrame",cv::WINDOW_NORMAL);
+    #if USE_NIR_SENSOR
         cv::namedWindow("oNIRFrame",cv::WINDOW_NORMAL);
+    #endif //USE_NIR_SENSOR
         cv::namedWindow("oDepthFrame",cv::WINDOW_NORMAL);
-#endif //!(DISPLAY_OUTPUT>1)
-        cv::namedWindow("oColorFrame",cv::WINDOW_NORMAL);
-#endif //DISPLAY_OUTPUT
+    #endif //!(DISPLAY_OUTPUT>1)
+        cv::namedWindow("oRGBFrame",cv::WINDOW_NORMAL);
+    #else //!DISPLAY_OUTPUT
+        // still need to display at least one window for visual feedback
+    #if USE_FLIR_SENSOR
+        cv::namedWindow("oFLIRFrame",cv::WINDOW_NORMAL);
+    #else //!USE_FLIR_SENSOR
+        cv::namedWindow("oRGBFrame",cv::WINDOW_NORMAL);
+    #endif //!USE_FLIR_SENSOR
+    #endif //!DISPLAY_OUTPUT
         CComPtr<IMultiSourceFrame> pMultiFrame;
         lv::WorkerPool<nStreamCount> oPool;
         std::array<std::future<bool>,nStreamCount> abGrabResults;
@@ -202,7 +246,7 @@ int main() {
                         uint nFrameBytesPerPixel;
                         lvAssertHR(pFrameDesc->get_BytesPerPixel(&nFrameBytesPerPixel));
                         lvAssert_(nFrameBytesPerPixel==1,"bodyidx frame not one byte per pixel");
-#if WRITE_OUTPUT>1
+                    #if WRITE_OUTPUT
                         float fHorizFOV,fVertiFOV;
                         lvAssertHR(pFrameDesc->get_HorizontalFieldOfView(&fHorizFOV));
                         lvAssertHR(pFrameDesc->get_VerticalFieldOfView(&fVertiFOV));
@@ -215,13 +259,14 @@ int main() {
                             oMetadataStorage << "vfov" << fVertiFOV;
                             oMetadataStorage << "}";
                         }
-#endif //WRITE_OUTPUT>1
+                    #endif //WRITE_OUTPUT
                         oBodyIdxFrame.create(oBodyIdxFrameSize,CV_8UC1);
                     }
                     lvAssertHR(pFrame->CopyFrameDataToArray((UINT)oBodyIdxFrame.total(),oBodyIdxFrame.data));
                 }
                 return bGotFrame;
             },
+        #if USE_NIR_SENSOR
             [&]{
                 CComPtr<IInfraredFrameReference> pFrameRef;
                 lvAssertHR(pMultiFrame->get_InfraredFrameReference(&pFrameRef));
@@ -239,7 +284,7 @@ int main() {
                         uint nFrameBytesPerPixel;
                         lvAssertHR(pFrameDesc->get_BytesPerPixel(&nFrameBytesPerPixel));
                         lvAssert_(nFrameBytesPerPixel==2,"nir frame not two bytes per pixel");
-#if WRITE_OUTPUT>1
+                    #if WRITE_OUTPUT
                         float fHorizFOV,fVertiFOV;
                         lvAssertHR(pFrameDesc->get_HorizontalFieldOfView(&fHorizFOV));
                         lvAssertHR(pFrameDesc->get_VerticalFieldOfView(&fVertiFOV));
@@ -252,13 +297,14 @@ int main() {
                             oMetadataStorage << "vfov" << fVertiFOV;
                             oMetadataStorage << "}";
                         }
-#endif //WRITE_OUTPUT>1
+                    #endif //WRITE_OUTPUT
                         oNIRFrame.create(oNIRFrameSize,CV_16UC1);
                     }
                     lvAssertHR(pFrame->CopyFrameDataToArray((UINT)oNIRFrame.total(),(uint16_t*)oNIRFrame.data));
                 }
                 return bGotFrame;
             },
+        #endif //USE_NIR_SENSOR
             [&]{
                 CComPtr<IDepthFrameReference> pFrameRef;
                 lvAssertHR(pMultiFrame->get_DepthFrameReference(&pFrameRef));
@@ -276,13 +322,15 @@ int main() {
                         uint nFrameBytesPerPixel;
                         lvAssertHR(pFrameDesc->get_BytesPerPixel(&nFrameBytesPerPixel));
                         lvAssert_(nFrameBytesPerPixel==2,"depth frame not two bytes per pixel");
-#if WRITE_OUTPUT>1
+                    #if WRITE_OUTPUT
                         float fHorizFOV,fVertiFOV;
                         lvAssertHR(pFrameDesc->get_HorizontalFieldOfView(&fHorizFOV));
                         lvAssertHR(pFrameDesc->get_VerticalFieldOfView(&fVertiFOV));
                         USHORT nMaxReliableDist,nMinReliableDist;
                         lvAssertHR(pFrame->get_DepthMaxReliableDistance(&nMaxReliableDist));
                         lvAssertHR(pFrame->get_DepthMinReliableDistance(&nMinReliableDist));
+                        CameraIntrinsics oIntrinsics;
+                        lvAssertHR(pCoordMapper->GetDepthCameraIntrinsics(&oIntrinsics));
                         {
                             std::lock_guard<std::mutex> oMetadataStorageLock(oMetadataStorageMutex);
                             oMetadataStorage << "depth_metadata" << "{";
@@ -293,11 +341,24 @@ int main() {
                             oMetadataStorage << "max_reliable_dist" << nMaxReliableDist;
                             oMetadataStorage << "min_reliable_dist" << nMinReliableDist;
                             oMetadataStorage << "}";
+                            oMetadataStorage << "coordmap_metadata" << "{";
+                            oMetadataStorage << "fx" << oIntrinsics.FocalLengthX;
+                            oMetadataStorage << "fy" << oIntrinsics.FocalLengthY;
+                            oMetadataStorage << "cx" << oIntrinsics.PrincipalPointX;
+                            oMetadataStorage << "cy" << oIntrinsics.PrincipalPointY;
+                            oMetadataStorage << "k1" << oIntrinsics.RadialDistortionSecondOrder;
+                            oMetadataStorage << "k2" << oIntrinsics.RadialDistortionFourthOrder;
+                            oMetadataStorage << "k3" << oIntrinsics.RadialDistortionSixthOrder;
+                            oMetadataStorage << "}";
                         }
-#endif //WRITE_OUTPUT>1
+                    #endif //WRITE_OUTPUT
                         oDepthFrame.create(oDepthFrameSize,CV_16UC1);
+                        oCoordMapFrame.create(1,oDepthFrameSize.area(),CV_32FC2);
                     }
-                    lvAssertHR(pFrame->CopyFrameDataToArray((UINT)oDepthFrame.total(),(uint16_t*)oDepthFrame.data));
+                    const UINT nDepthPts = (UINT)oDepthFrame.total();
+                    lvAssertHR(pFrame->CopyFrameDataToArray(nDepthPts,(uint16_t*)oDepthFrame.data));
+                    static_assert(sizeof(ColorSpacePoint[3])==sizeof(float)*6,"cannot properly fit color space point data into ocv mat");
+                    lvAssertHR(pCoordMapper->MapDepthFrameToColorSpace(nDepthPts,(uint16_t*)oDepthFrame.data,nDepthPts,(ColorSpacePoint*)oCoordMapFrame.data));
                 }
                 return bGotFrame;
             },
@@ -308,17 +369,17 @@ int main() {
                 const bool bGotFrame = SUCCEEDED(pFrameRef->AcquireFrame(&pFrame));
                 if(bGotFrame) {
                     pFrameRef.Release();
-                    if(oColorFrame.empty()) { // must enter only once
+                    if(oRGBFrame.empty()) { // must enter only once
                         CComPtr<IFrameDescription> pFrameDesc;
                         lvAssertHR(pFrame->get_FrameDescription(&pFrameDesc));
                         int nFrameHeight,nFrameWidth;
                         lvAssertHR(pFrameDesc->get_Height(&nFrameHeight));
                         lvAssertHR(pFrameDesc->get_Width(&nFrameWidth));
-                        lvAssert(cv::Size(nFrameWidth,nFrameHeight)==oColorFrameSize);
+                        lvAssert(cv::Size(nFrameWidth,nFrameHeight)==oRGBFrameSize);
                         uint nFrameBytesPerPixel;
                         lvAssertHR(pFrameDesc->get_BytesPerPixel(&nFrameBytesPerPixel));
                         lvAssert_(nFrameBytesPerPixel==2,"raw color frame not two bytes per pixel");
-#if WRITE_OUTPUT>1
+                    #if WRITE_OUTPUT
                         float fHorizFOV,fVertiFOV;
                         lvAssertHR(pFrameDesc->get_HorizontalFieldOfView(&fHorizFOV));
                         lvAssertHR(pFrameDesc->get_VerticalFieldOfView(&fVertiFOV));
@@ -335,8 +396,8 @@ int main() {
                         lvAssertHR(pColorCameraSettings->get_Gamma(&fGamma));
                         {
                             std::lock_guard<std::mutex> oMetadataStorageLock(oMetadataStorageMutex);
-                            oMetadataStorage << "color_metadata" << "{";
-                            oMetadataStorage << "orig_size" << oColorFrameSize;
+                            oMetadataStorage << "rgb_metadata" << "{";
+                            oMetadataStorage << "orig_size" << oRGBFrameSize;
                             oMetadataStorage << "cv_type" << (int)CV_8UC3;
                             oMetadataStorage << "hfov" << fHorizFOV;
                             oMetadataStorage << "vfov" << fVertiFOV;
@@ -346,15 +407,15 @@ int main() {
                             oMetadataStorage << "init_gamma" << (double)fGamma;
                             oMetadataStorage << "}";
                         }
-#endif //WRITE_OUTPUT>1
-                        oColorFrame.create(oColorFrameSize,CV_8UC3);
+                    #endif //WRITE_OUTPUT
+                        oRGBFrame.create(oRGBFrameSize,CV_8UC3);
                     }
                     UINT nBufferSize;
                     BYTE* pBuffer;
                     lvAssertHR(pFrame->AccessRawUnderlyingBuffer(&nBufferSize,&pBuffer));
-                    const cv::Mat oRawColorFrame(oColorFrame.size(),CV_8UC2,pBuffer);
-                    lvAssert(nBufferSize<=oRawColorFrame.total()*oRawColorFrame.elemSize());
-                    cv::cvtColor(oRawColorFrame,oColorFrame,cv::COLOR_YUV2BGR_YUY2);
+                    const cv::Mat oRawRGBFrame(oRGBFrame.size(),CV_8UC2,pBuffer);
+                    lvAssert(nBufferSize<=oRawRGBFrame.total()*oRawRGBFrame.elemSize());
+                    cv::cvtColor(oRawRGBFrame,oRGBFrame,cv::COLOR_YUV2BGR_YUY2);
                 }
                 return bGotFrame;
             },
@@ -369,17 +430,17 @@ int main() {
             for(size_t n=0; n<alGrabTasks.size(); ++n)
                 abGrabResults[n] = oPool.queueTask(alGrabTasks[n]);
             bool bFinalGrabResult = true;
-#if USE_FLIR_SENSOR
+        #if USE_FLIR_SENSOR
             bFinalGrabResult &= (pFLIRSensor->GetLatestFrame(oFLIRFrame,true)>=0);
-#endif //USE_FLIR_SENSOR
+        #endif //USE_FLIR_SENSOR
             for(size_t n=0; n<abGrabResults.size(); ++n)
                 bFinalGrabResult &= abGrabResults[n].get();
             if(bFinalGrabResult) {
-#if USE_FLIR_SENSOR
+            #if USE_FLIR_SENSOR
                 static std::once_flag s_oFLIRMetadataWriteFlag;
                 std::call_once(s_oFLIRMetadataWriteFlag,[&]() {
                     lvAssert(oFLIRFrame.size()==oFLIRFrameSize);
-#if WRITE_OUTPUT>1
+                #if WRITE_OUTPUT
                     {
                         std::lock_guard<std::mutex> oMetadataStorageLock(oMetadataStorageMutex);
                         oMetadataStorage << "flir_metadata" << "{";
@@ -387,16 +448,26 @@ int main() {
                         oMetadataStorage << "cv_type" << oFLIRFrame.type();
                         oMetadataStorage << "}";
                     }
-#endif //WRITE_OUTPUT>1
+                #endif //WRITE_OUTPUT
                 });
-#endif //USE_FLIR_SENSOR
-#if DISPLAY_OUTPUT
-#if DISPLAY_OUTPUT>1
+            #endif //USE_FLIR_SENSOR
+            #if DISPLAY_OUTPUT
+            #if DISPLAY_OUTPUT>1
                 cv::Mat oBodyIdxFrameTemp = oBodyIdxFrame<UCHAR_MAX;
-                std::vector<std::vector<cv::Point>> vvBodyIdxContours;
+                std::vector<std::vector<cv::Point>> vvBodyIdxContours,vvBodyIdxContours_ColorSpace;
                 cv::findContours(oBodyIdxFrameTemp,vvBodyIdxContours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
+                vvBodyIdxContours_ColorSpace.resize(vvBodyIdxContours.size());
+                for(size_t nBodyIdx=0u; nBodyIdx<vvBodyIdxContours.size(); ++nBodyIdx) {
+                    for (size_t nBodyContourPtIdx = 0u; nBodyContourPtIdx < vvBodyIdxContours[nBodyIdx].size(); ++nBodyContourPtIdx) {
+                        const cv::Point& oContourPt = vvBodyIdxContours[nBodyIdx][nBodyContourPtIdx];
+                        const UINT nDepthPtIdx = UINT(oContourPt.y*oDepthFrameSize.width+oContourPt.x);
+                        const ColorSpacePoint& oContourPt_ColorSpace = ((ColorSpacePoint*)oCoordMapFrame.data)[nDepthPtIdx];
+                        vvBodyIdxContours_ColorSpace[nBodyIdx].emplace_back((int)std::round(oContourPt_ColorSpace.X),(int)std::round(oContourPt_ColorSpace.Y));
+                    }
+                }
                 std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvImageNamePairs(2);
                 const cv::Size oSuggestedTileSize = oDepthFrame.size();
+            #if USE_NIR_SENSOR
                 cv::Mat oNIRFrameRaw,oNIRFrameDisplay;
                 oNIRFrame.convertTo(oNIRFrameRaw,CV_32F,1.0/USHRT_MAX);
                 cv::Scalar vNIRFrameMean,vNIRFrameStdDev;
@@ -406,23 +477,26 @@ int main() {
                 cv::drawContours(oNIRFrameDisplay,vvBodyIdxContours,-1,cv::Scalar(USHRT_MAX),3);
                 cv::flip(oNIRFrameDisplay,oNIRFrameDisplay,1);
                 vvImageNamePairs[0].emplace_back(oNIRFrameDisplay,"NIR");
+            #else //!USE_NIR_SENSOR
+                vvImageNamePairs[0].emplace_back(cv::Mat(oNIRFrameSize,CV_16UC1,cv::Scalar_<ushort>(0)),"NIR");
+            #endif //!USE_NIR_SENSOR
                 cv::Mat oDepthFrameRaw,oDepthFrameDisplay;
                 cv::normalize(oDepthFrame,oDepthFrameRaw,1.0,0.0,cv::NORM_MINMAX,CV_32FC1);
                 cv::applyColorMap(oDepthFrameRaw,oDepthFrameDisplay,cv::COLORMAP_BONE);
                 cv::drawContours(oDepthFrameDisplay,vvBodyIdxContours,-1,cv::Scalar(USHRT_MAX),3);
                 cv::flip(oDepthFrameDisplay,oDepthFrameDisplay,1);
                 vvImageNamePairs[0].emplace_back(oDepthFrameDisplay,"Depth");
-#if USE_FLIR_SENSOR
+            #if USE_FLIR_SENSOR
                 cv::Mat oFLIRFrameDisplay;
                 cv::applyColorMap(oFLIRFrame,oFLIRFrameDisplay,cv::COLORMAP_HOT);
                 vvImageNamePairs[1].emplace_back(oFLIRFrameDisplay,"Thermal");
-#else //!(USE_FLIR_SENSOR)
+            #else //!(USE_FLIR_SENSOR)
                 vvImageNamePairs[1].emplace_back(cv::Mat(oDepthFrameDisplay.size(),CV_8UC3,cv::Scalar_<uchar>::all(128)),"Thermal");
-#endif //!(USE_FLIR_SENSOR)
-                cv::Mat oBodyFrameDisplay(oDepthFrameDisplay.size(),CV_8UC3,cv::Scalar_<uchar>::all(88));
+            #endif //!(USE_FLIR_SENSOR)
+                cv::Mat oBodyFrameDisplay(oBodyIdxFrameSize,CV_8UC3,cv::Scalar_<uchar>::all(88));
                 const auto lBodyToScreen = [&](const CameraSpacePoint& oInputPt) {
                     DepthSpacePoint depthPoint = {0};
-                    pCoordMapper->MapCameraPointToDepthSpace(oInputPt, &depthPoint);
+                    lvAssertHR(pCoordMapper->MapCameraPointToDepthSpace(oInputPt, &depthPoint));
                     return cv::Point2i((int)depthPoint.X,(int)depthPoint.Y);
                 };
                 const auto lDrawBone = [&](const Joint& i, const Joint& j, const cv::Scalar_<uchar>& vBodyColor) {
@@ -463,35 +537,48 @@ int main() {
                 cv::flip(oBodyFrameDisplay,oBodyFrameDisplay,1);
                 vvImageNamePairs[1].emplace_back(oBodyFrameDisplay,"Skeleton");
                 pDisplayHelper->display(vvImageNamePairs,oSuggestedTileSize);
-                cv::imshow("oColorFrame",oColorFrame);
-#else //DISPLAY_OUTPUT<=1
-#if USE_FLIR_SENSOR
+                cv::Mat oRGBFrameDisplay = oRGBFrame.clone();
+                cv::drawContours(oRGBFrameDisplay,vvBodyIdxContours_ColorSpace,-1,cv::Scalar(0,0,255),3);
+                cv::imshow("oRGBFrame",oRGBFrameDisplay);
+            #else //DISPLAY_OUTPUT<=1
+            #if USE_FLIR_SENSOR
                 cv::imshow("oFLIRFrame",oFLIRFrame);
-#endif //USE_FLIR_SENSOR
+            #endif //USE_FLIR_SENSOR
                 cv::imshow("oBodyIdxFrame",oBodyIdxFrame);
-                cv::imshow("oColorFrame",oColorFrame);
+                cv::imshow("oRGBFrame",oRGBFrame);
+            #if USE_NIR_SENSOR
                 cv::imshow("oNIRFrame",oNIRFrame);
+            #endif //USE_NIR_SENSOR
                 cv::imshow("oDepthFrame",oDepthFrame);
-#endif //DISPLAY_OUTPUT<=1
+            #endif //DISPLAY_OUTPUT<=1
+            #else //!DISPLAY_OUTPUT
+            #if USE_FLIR_SENSOR
+                cv::imshow("oFLIRFrame",oFLIRFrame);
+            #else //!USE_FLIR_SENSOR
+                cv::imshow("oRGBFrame",oRGBFrame);
+            #endif //!USE_FLIR_SENSOR
+            #endif //DISPLAY_OUTPUT
                 const char c = (char)cv::waitKey(1);
                 if(c=='q' || c==27)
                     break;
-#endif //DISPLAY_OUTPUT
-#if WRITE_OUTPUT
-                if(oColorVideoAsyncWriter.queue(oColorFrame,nRealFrameIdx)!=SIZE_MAX) {
-                    // color queue is the only one might really overflow, so other queues depend only on that one
-#if USE_FLIR_SENSOR
+            #if WRITE_OUTPUT
+                if(oRGBVideoAsyncWriter.queue(oRGBFrame,nRealFrameIdx)!=SIZE_MAX) {
+                    // RGB queue is the only one might really overflow, so other queues depend only on that one
+                #if USE_FLIR_SENSOR
                     lvAssert(oFLIRVideoAsyncWriter.queue(oFLIRFrame,nRealFrameIdx)!=SIZE_MAX);
-#endif //USE_FLIR_SENSOR
+                #endif //USE_FLIR_SENSOR
                     lvAssert(oBodyStructAsyncWriter.queue(oBodyFrameWrapper,nRealFrameIdx)!=SIZE_MAX);
                     lvAssert(oBodyIdxVideoAsyncWriter.queue(oBodyIdxFrame,nRealFrameIdx)!=SIZE_MAX);
+                #if USE_NIR_SENSOR
                     lvAssert(oNIRVideoAsyncWriter.queue(oNIRFrame,nRealFrameIdx)!=SIZE_MAX);
+                #endif //USE_NIR_SENSOR
                     lvAssert(oDepthVideoAsyncWriter.queue(oDepthFrame,nRealFrameIdx)!=SIZE_MAX);
+                    lvAssert(oCoordMapVideoAsyncWriter.queue(oCoordMapFrame,nRealFrameIdx)!=SIZE_MAX);
                     ++nGoodFrameIdx;
                 }
                 else
-                    std::cout << "The color stream is dropping frames!" << std::endl;
-#endif //WRITE_OUTPUT
+                    std::cout << "The RGB stream is dropping frames!" << std::endl;
+            #endif //WRITE_OUTPUT
             }
             ++nTempFrameIdx;
             ++nRealFrameIdx;
