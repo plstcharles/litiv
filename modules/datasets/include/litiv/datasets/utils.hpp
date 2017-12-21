@@ -774,12 +774,16 @@ namespace lv {
         DataWriter(std::function<size_t(const cv::Mat&,size_t)> lDataArchiverCallback);
         /// default destructor (joins the writing thread, if still running)
         ~DataWriter();
+        /// returns whether the given packet could be added to the queue (true), or it would be dropped (false)
+        bool queue_check(const cv::Mat& oPacket, size_t nIdx);
         /// queues a packet, with or without async writing enabled, and returns its position in queue
         size_t queue(const cv::Mat& oPacket, size_t nIdx);
         /// returns the current queue size, in packets
         inline size_t getCurrentQueueCount() const {return m_nQueueCount;}
         /// returns the current queue size, in bytes
         inline size_t getCurrentQueueSize() const {return m_nQueueSize;}
+        /// returns the maximum queue size, in bytes
+        inline size_t getMaxQueueSize() const {return m_nQueueMaxSize;}
         /// initializes async writing with a given queue size (in bytes) and a number of threads
         bool startAsyncWriting(size_t nSuggestedQueueSize, bool bDropPacketsIfFull=false, size_t nWorkers=1);
         /// joins writing thread and clears all internal buffers

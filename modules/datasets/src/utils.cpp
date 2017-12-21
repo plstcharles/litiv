@@ -1239,26 +1239,50 @@ lv::DataWriter::~DataWriter() {
     stopAsyncWriting();
 }
 
+bool lv::DataWriter::queue_check(const cv::Mat& oPacket, size_t nIdx) {
+    lvDbgExceptionWatch;
+    if(!m_bIsActive)
+        return true;
+    const size_t nPacketSize = oPacket.total()*oPacket.elemSize();
+    lvAssert_(nPacketSize<=m_nQueueMaxSize,"packet too large for queue, max cache size must be incrased");
+    if(!m_bAllowPacketDrop)
+        return true; // since this config blocks, packet will never be dropped
+    lv::mutex_unique_lock sync_lock(m_oSyncMutex);
+    const auto pOldPacketIter = m_mQueue.find(nIdx);
+    const bool bIsNewPacket = pOldPacketIter==m_mQueue.end();
+    const size_t nOldPacketSize = bIsNewPacket?0u:(pOldPacketIter->second.total()*pOldPacketIter->second.elemSize());
+    return (m_nQueueSize+nPacketSize-nOldPacketSize<=m_nQueueMaxSize);
+}
+
 size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
     lvDbgExceptionWatch;
     if(!m_bIsActive)
         return m_lCallback(oPacket,nIdx);
     const size_t nPacketSize = oPacket.total()*oPacket.elemSize();
-    if(nPacketSize>m_nQueueMaxSize)
-        return m_lCallback(oPacket,nIdx);
-    cv::Mat oPacketCopy = oPacket.clone();
+    lvAssert_(nPacketSize<=m_nQueueMaxSize,"packet too large for queue, max cache size must be incrased");
     size_t nPacketPosition;
     {
         lvLog_(4,"data writer [%" PRIxPTR "] received packet at idx = %zu...",uintptr_t(this),nIdx);
         lv::mutex_unique_lock sync_lock(m_oSyncMutex);
-        if(!m_bAllowPacketDrop)
-            m_oClearCondVar.wait(sync_lock,[&]{return m_nQueueSize+nPacketSize<=m_nQueueMaxSize;});
-        if(m_nQueueSize+nPacketSize<=m_nQueueMaxSize) {
-            m_mQueue[nIdx] = std::move(oPacketCopy);
-            m_nQueueSize += nPacketSize;
+        if(!m_bAllowPacketDrop) {
+            m_oClearCondVar.wait(sync_lock,[&]{
+                const auto pOldPacketIter = m_mQueue.find(nIdx);
+                const bool bIsNewPacket = pOldPacketIter==m_mQueue.end();
+                const size_t nOldPacketSize = bIsNewPacket?0u:(pOldPacketIter->second.total()*pOldPacketIter->second.elemSize());
+                lvDbgAssert(m_nQueueSize>=nOldPacketSize);
+                return m_nQueueSize+nPacketSize-nOldPacketSize<=m_nQueueMaxSize;
+            });
+        }
+        const auto pOldPacketIter = m_mQueue.find(nIdx);
+        const bool bIsNewPacket = pOldPacketIter==m_mQueue.end();
+        const size_t nOldPacketSize = bIsNewPacket?0u:(pOldPacketIter->second.total()*pOldPacketIter->second.elemSize());
+        if(m_nQueueSize+nPacketSize-nOldPacketSize<=m_nQueueMaxSize) {
+            m_mQueue[nIdx] = oPacket.clone(); // local copy passed to writing thread; provider can recycle memory following this call
+            m_nQueueSize = m_nQueueSize+nPacketSize-nOldPacketSize;
             // @@@ could cut a find operation here using C++17's map::insert_or_assign above
             nPacketPosition = std::distance(m_mQueue.begin(),m_mQueue.find(nIdx));
-            ++m_nQueueCount;
+            if(bIsNewPacket)
+                ++m_nQueueCount;
             m_oQueueCondVar.notify_one();
         }
         else {
