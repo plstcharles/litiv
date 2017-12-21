@@ -26,7 +26,7 @@
 #define USE_NIR_SENSOR          0
 /////////////////////////////////
 #define DISPLAY_OUTPUT          2
-#define WRITE_OUTPUT            1
+#define WRITE_OUTPUT            0
 #define WRITE_OUTPUT_PREFIX     "test"
 /////////////////////////////////
 #define DEFAULT_QUEUE_BUFFER_SIZE   1024*1024*50  // max = 50MB per queue (default)
@@ -55,6 +55,8 @@ int main() {
     #if WRITE_OUTPUT
         lv::createDirIfNotExist("c:/temp/" WRITE_OUTPUT_PREFIX);
         lv::createDirIfNotExist("e:/temp/" WRITE_OUTPUT_PREFIX);
+        std::vector<std::reference_wrapper<lv::DataWriter>> vWriters;
+        std::vector<std::reference_wrapper<cv::Mat>> vPackets;
     #endif //WRITE_OUTPUT
         lv::registerAllConsoleSignals([](int){g_bIsActive = false;});
         const auto lEncodeAndSaveImage = [](const cv::Mat& oImage, size_t nRealIndex, const std::string& sPath, const std::vector<int>& vComprParams, size_t& nLastSavedIndex) {
@@ -98,6 +100,8 @@ int main() {
         lvAssert(oFLIRVideoWriter.isOpened());
         lv::DataWriter oFLIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oFLIRVideoWriter,nLastSavedFLIRFrameIdx));
         lvAssert(oFLIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+        vWriters.push_back(oFLIRVideoAsyncWriter);
+        vPackets.push_back(oFLIRFrame);
     #endif //WRITE_OUTPUT
     #endif //USE_FLIR_SENSOR
         std::cout << "Setting up Kinect device..." << std::endl;
@@ -113,7 +117,7 @@ int main() {
     #endif //!USE_NIR_SENSOR
         constexpr size_t nStreamCount = size_t(USE_NIR_SENSOR?5:4);
         lv::KinectBodyFrame oBodyFrame;
-        const cv::Mat oBodyFrameWrapper(1,(int)sizeof(lv::KinectBodyFrame),CV_8UC1,&oBodyFrame);
+        cv::Mat oBodyFrameWrapper(1,(int)sizeof(lv::KinectBodyFrame),CV_8UC1,&oBodyFrame);
         cv::Mat oBodyIdxFrame,oNIRFrame,oDepthFrame,oCoordMapFrame,oRGBFrame;
         const cv::Size oBodyIdxFrameSize = std::get<3>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS));
         const cv::Size oNIRFrameSize = std::get<3>(std::make_tuple(NIR_OUTPUT_VIDEO_PARAMS));
@@ -128,6 +132,8 @@ int main() {
         lvAssert(oBodyStructWriter && oBodyStructWriter.is_open());
         lv::DataWriter oBodyStructAsyncWriter(std::bind(lEncodeAndSaveBodyFrame,std::placeholders::_1,std::placeholders::_2,&oBodyStructWriter,nLastSavedBodyFrameIdx));
         lvAssert(oBodyStructAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+        vWriters.push_back(oBodyStructAsyncWriter);
+        vPackets.push_back(oBodyFrameWrapper);
         std::cout << "Setting up BODYINDEX video writer..." << std::endl;
         size_t nLastSavedBodyIdxFrameIdx = SIZE_MAX;
         lv::createDirIfNotExist(std::get<0>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS)));
@@ -135,6 +141,8 @@ int main() {
         const std::vector<int> vnBodyIdxComprParams = std::get<4>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS));
         lv::DataWriter oBodyIdxVideoAsyncWriter(std::bind(lEncodeAndSaveImage,std::placeholders::_1,std::placeholders::_2,sBodyIdxFramePath,vnBodyIdxComprParams,nLastSavedBodyIdxFrameIdx));
         lvAssert(oBodyIdxVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+        vWriters.push_back(oBodyIdxVideoAsyncWriter);
+        vPackets.push_back(oBodyIdxFrame);
     #if USE_NIR_SENSOR
         std::cout << "Setting up NIR video writer..." << std::endl;
         size_t nLastSavedNIRFrameIdx = SIZE_MAX;
@@ -142,6 +150,8 @@ int main() {
         lvAssert(oNIRVideoWriter.isOpened());
         lv::DataWriter oNIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oNIRVideoWriter,nLastSavedNIRFrameIdx));
         lvAssert(oNIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+        vWriters.push_back(oNIRVideoAsyncWriter);
+        vPackets.push_back(oNIRFrame);
     #else //!USE_NIR_SENSOR
         lvIgnore(oNIRFrameSize);
         lvIgnore(oNIRFrame);
@@ -153,12 +163,16 @@ int main() {
         const std::vector<int> vnDepthComprParams = std::get<4>(std::make_tuple(DEPTH_OUTPUT_IMGSEQ_PARAMS));
         lv::DataWriter oDepthVideoAsyncWriter(std::bind(lEncodeAndSaveImage,std::placeholders::_1,std::placeholders::_2,sDepthFramePath,vnDepthComprParams,nLastSavedDepthFrameIdx));
         lvAssert(oDepthVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+        vWriters.push_back(oDepthVideoAsyncWriter);
+        vPackets.push_back(oDepthFrame);
         std::cout << "Setting up COORDMAP video writer..." << std::endl;
         size_t nLastSavedCoordMapFrameIdx = SIZE_MAX;
         lv::createDirIfNotExist(std::get<0>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS)));
         const std::string sCoordMapFramePath = lv::addDirSlashIfMissing(std::get<0>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS)))+std::get<1>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS))+std::get<2>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS));
         lv::DataWriter oCoordMapVideoAsyncWriter(std::bind(lEncodeAndSaveImage,std::placeholders::_1,std::placeholders::_2,sCoordMapFramePath,std::vector<int>(),nLastSavedCoordMapFrameIdx));
-        lvAssert(oCoordMapVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+        lvAssert(oCoordMapVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE/**4*/,true));
+        vWriters.push_back(oCoordMapVideoAsyncWriter);
+        vPackets.push_back(oCoordMapFrame);
         std::cout << "Setting up RGB video writer..." << std::endl;
         size_t nLastSavedRGBFrameIdx = SIZE_MAX;
         //lvAssert(lv::createBinFileWithPrealloc(std::get<0>(std::make_tuple(RGB_OUTPUT_VIDEO_PARAMS)),VIDEO_FILE_PREALLOC_SIZE));
@@ -166,6 +180,8 @@ int main() {
         lvAssert(oRGBVideoWriter.isOpened());
         lv::DataWriter oRGBVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oRGBVideoWriter,nLastSavedRGBFrameIdx));
         lvAssert(oRGBVideoAsyncWriter.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
+        vWriters.push_back(oRGBVideoAsyncWriter);
+        vPackets.push_back(oRGBFrame);
         std::mutex oMetadataStorageMutex;
         cv::FileStorage oMetadataStorage(META_DATA_OUTPUT_PARAMS);
         oMetadataStorage << "htag" << lv::getVersionStamp();
@@ -179,11 +195,6 @@ int main() {
     #if USE_FLIR_SENSOR
         cv::namedWindow("oFLIRFrame",cv::WINDOW_NORMAL);
     #endif //USE_FLIR_SENSOR
-        cv::namedWindow("oBodyIdxFrame",cv::WINDOW_NORMAL);
-    #if USE_NIR_SENSOR
-        cv::namedWindow("oNIRFrame",cv::WINDOW_NORMAL);
-    #endif //USE_NIR_SENSOR
-        cv::namedWindow("oDepthFrame",cv::WINDOW_NORMAL);
     #endif //!(DISPLAY_OUTPUT>1)
         cv::namedWindow("oRGBFrame",cv::WINDOW_NORMAL);
     #else //!DISPLAY_OUTPUT
@@ -544,12 +555,7 @@ int main() {
             #if USE_FLIR_SENSOR
                 cv::imshow("oFLIRFrame",oFLIRFrame);
             #endif //USE_FLIR_SENSOR
-                cv::imshow("oBodyIdxFrame",oBodyIdxFrame);
                 cv::imshow("oRGBFrame",oRGBFrame);
-            #if USE_NIR_SENSOR
-                cv::imshow("oNIRFrame",oNIRFrame);
-            #endif //USE_NIR_SENSOR
-                cv::imshow("oDepthFrame",oDepthFrame);
             #endif //DISPLAY_OUTPUT<=1
             #else //!DISPLAY_OUTPUT
             #if USE_FLIR_SENSOR
@@ -562,8 +568,13 @@ int main() {
                 if(c=='q' || c==27)
                     break;
             #if WRITE_OUTPUT
-                if(oRGBVideoAsyncWriter.queue(oRGBFrame,nRealFrameIdx)!=SIZE_MAX) {
-                    // RGB queue is the only one might really overflow, so other queues depend only on that one
+                lvDbgAssert(!vWriters.empty() && vWriters.size()==vPackets.size());
+                std::vector<bool> vQueueAvailabilities(vWriters.size());
+                for(size_t nWriterIdx=0; nWriterIdx<vWriters.size(); ++nWriterIdx)
+                    vQueueAvailabilities[nWriterIdx] = vWriters[nWriterIdx].get().queue_check(vPackets[nWriterIdx].get(),nRealFrameIdx);
+                const bool bCanProcess = std::all_of(vQueueAvailabilities.begin(),vQueueAvailabilities.end(),[](bool b){return b;});
+                if(bCanProcess) {
+                    lvAssert(oRGBVideoAsyncWriter.queue(oRGBFrame,nRealFrameIdx)!=SIZE_MAX);
                 #if USE_FLIR_SENSOR
                     lvAssert(oFLIRVideoAsyncWriter.queue(oFLIRFrame,nRealFrameIdx)!=SIZE_MAX);
                 #endif //USE_FLIR_SENSOR
@@ -576,8 +587,10 @@ int main() {
                     lvAssert(oCoordMapVideoAsyncWriter.queue(oCoordMapFrame,nRealFrameIdx)!=SIZE_MAX);
                     ++nGoodFrameIdx;
                 }
-                else
-                    std::cout << "The RGB stream is dropping frames!" << std::endl;
+                else {
+                    // could add notification of which stream dropped frame here using vQueueAvailablities content
+                    std::cout << "dropped a frame!" << std::endl;
+                }
             #endif //WRITE_OUTPUT
             }
             ++nTempFrameIdx;
