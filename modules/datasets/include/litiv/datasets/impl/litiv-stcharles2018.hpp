@@ -28,6 +28,12 @@
 #define DATASETS_LITIV2018_LOAD_CALIB_DATA 0
 #endif //ndef(DATASETS_LITIV2018_LOAD_CALIB_DATA)
 #define DATASETS_LITIV2018_RECTIFIED_SIZE cv::Size(640,480)
+#ifndef DATASETS_LITIV2018_VERSION
+#define DATASETS_LITIV2018_VERSION "-v1"
+#endif //ndef(DATASETS_LITIV2018_VERSION)
+#ifndef DATASETS_LITIV2018_FLIP_RGB
+#define DATASETS_LITIV2018_FLIP_RGB 1
+#endif //ndef(DATASETS_LITIV2018_FLIP_RGB)
 
 namespace lv {
 
@@ -85,11 +91,11 @@ namespace lv {
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
                 IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_LITIV_stcharles2018,lv::getDatasetEval<eDatasetTask,Dataset_LITIV_stcharles2018>(),eEvalImpl>(
-                        "LITIV-stcharles2018",
-                        lv::datasets::getRootPath()+"litiv/stcharles2018/",
-                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"litiv/stcharles2018/results/",sOutputDirName),
+                        "LITIV-stcharles2018" DATASETS_LITIV2018_VERSION,
+                        lv::datasets::getRootPath()+"litiv/stcharles2018" DATASETS_LITIV2018_VERSION "/",
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"litiv/stcharles2018" DATASETS_LITIV2018_VERSION "/results/",sOutputDirName),
                         getWorkBatchDirNames(),
-                        std::vector<std::string>(),//std::vector<std::string>("calib"),
+                        std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
                         false,
@@ -107,7 +113,7 @@ namespace lv {
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames() {
         #if DATASETS_LITIV2018_LOAD_CALIB_DATA
-            static const std::vector<std::string> s_vsWorkBatchDirs = {"calib"};
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"calib02"};
         #else //!DATASETS_LITIV2018_LOAD_CALIB_DATA
             static const std::vector<std::string> s_vsWorkBatchDirs = {"vid01","vid02","vid03"};
         #endif //!DATASETS_LITIV2018_LOAD_CALIB_DATA
@@ -276,6 +282,7 @@ namespace lv {
             const ILITIVStCharles2018Dataset& oDataset = dynamic_cast<const ILITIVStCharles2018Dataset&>(*this->getRoot());
             const bool bLoadFrameSubset = this->isLoadingFrameSubset();
             const bool bEvalOnlyFrameSubset = this->isEvaluatingOnlyFrameSubset();
+            const bool bIsLoadingCalibData = bool(DATASETS_LITIV2018_LOAD_CALIB_DATA);
             const int nEvalTemporalWindowSize = this->getEvalTemporalWindowSize();
             lvAssert_(nEvalTemporalWindowSize>=0,"bad temporal window size");
             this->m_bLoadDepth = oDataset.isLoadingDepth();
@@ -300,12 +307,16 @@ namespace lv {
             const size_t nGTDepthStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_Depth);
             const double dScale = this->getScaleFactor();
             ////////////////////////////////
-            lvAssert_(!DATASETS_LITIV2018_LOAD_CALIB_DATA || !bLoadFrameSubset,"calib data must not be loaded with subset flag on (it is already sampled)");
-            const std::string sDirNameSuffix = DATASETS_LITIV2018_LOAD_CALIB_DATA?"_subset":"";
+            if(bIsLoadingCalibData) {
+                lvAssert_(!bLoadFrameSubset && !bEvalOnlyFrameSubset,"calib data must not be loaded with subset flag on (it is already sampled)");
+                lvAssert_(!this->m_bLoadDepth,"calib data cannot be loaded with depth frames");
+                lvAssert_(!this->m_nLoadInputMasks,"calib data cannot be loaded with input masks");
+            }
+            const std::string sDirNameSuffix = bIsLoadingCalibData?"_subset":"";
             const std::vector<std::string> vsSubDirs = lv::getSubDirsFromDir(this->getDataPath());
-            auto psRGBGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+(bEvalDisparityMaps?"color_gt_disp":"color_gt_masks"));
-            auto psRGBMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"color_masks"+sDirNameSuffix);
-            auto psRGBFramesDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"color_frames"+sDirNameSuffix);
+            auto psRGBGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+(bEvalDisparityMaps?"rgb_gt_disp":"rgb_gt_masks"));
+            auto psRGBMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"rgb_masks"+sDirNameSuffix);
+            auto psRGBFramesDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"rgb"+sDirNameSuffix);
             if(psRGBFramesDir==vsSubDirs.end())
                 lvError_("LITIV-stcharles2018 sequence '%s' did not possess the required RGB frame subdirectory in folder '%s'",this->getName().c_str(),this->getDataPath().c_str());
             std::vector<std::string> vsRGBFramePaths = lv::getFilesFromDir(*psRGBFramesDir);
@@ -314,11 +325,10 @@ namespace lv {
             lv::filterFilePaths(vsRGBFramePaths,{},{".jpg"});
             lv::filterFilePaths(vsRGBMaskPaths,{},{".png"});
             lv::filterFilePaths(vsRGBGTPaths,{},{".png"});
-            const size_t nTotInputPackets = vsRGBFramePaths.size();
-            lvAssert__(nTotInputPackets>0u && vsRGBMaskPaths.size()<=nTotInputPackets && vsRGBGTPaths.size()<=nTotInputPackets,"bad input color packet size for sequence '%s'",this->getName().c_str());
+            lvAssert__(vsRGBFramePaths.size()>0u && vsRGBMaskPaths.size()<=vsRGBFramePaths.size() && vsRGBGTPaths.size()<=vsRGBFramePaths.size(),"bad input rgb packet count for sequence '%s'",this->getName().c_str());
             auto psLWIRGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+(bEvalDisparityMaps?"lwir_gt_disp":"lwir_gt_masks"));
             auto psLWIRMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"lwir_masks"+sDirNameSuffix);
-            auto psLWIRFramesDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"lwir_frames"+sDirNameSuffix);
+            auto psLWIRFramesDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"lwir"+sDirNameSuffix);
             if(psLWIRFramesDir==vsSubDirs.end())
                 lvError_("LITIV-stcharles2018 sequence '%s' did not possess the required LWIR frame subdirectory",this->getName().c_str());
             std::vector<std::string> vsLWIRFramePaths = lv::getFilesFromDir(*psLWIRFramesDir);
@@ -327,12 +337,13 @@ namespace lv {
             lv::filterFilePaths(vsLWIRFramePaths,{},{".jpg"});
             lv::filterFilePaths(vsLWIRMaskPaths,{},{".png"});
             lv::filterFilePaths(vsLWIRGTPaths,{},{".png"});
-            lvAssert__(vsLWIRFramePaths.size()==nTotInputPackets && vsLWIRMaskPaths.size()<=nTotInputPackets && vsLWIRGTPaths.size()<=nTotInputPackets,"bad LWIR frame packet count for sequence '%s'",this->getName().c_str());
+            lvAssert__(vsLWIRFramePaths.size()>0u && vsLWIRMaskPaths.size()<=vsLWIRFramePaths.size() && vsLWIRGTPaths.size()<=vsLWIRFramePaths.size(),"bad input lwir packet count for sequence '%s'",this->getName().c_str());
+            const size_t nTotInputPackets = bIsLoadingCalibData?std::max(vsRGBFramePaths.size(),vsLWIRFramePaths.size()):vsRGBFramePaths.size();
             auto psDepthGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+(bEvalDisparityMaps?"depth_gt_disp":"depth_gt_masks"));
             auto psDepthMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depth_masks"+sDirNameSuffix);
-            auto psDepthFramesDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depth_frames"+sDirNameSuffix);
+            auto psDepthFramesDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depth"+sDirNameSuffix);
             std::vector<std::string> vsDepthFramePaths,vsDepthMaskPaths,vsDepthGTPaths;
-            if(m_bLoadDepth) {
+            if(this->m_bLoadDepth) {
                 if(psDepthFramesDir==vsSubDirs.end())
                     lvError_("LITIV-stcharles2018 sequence '%s' did not possess the required depth frame subdirectory",this->getName().c_str());
                 vsDepthFramePaths = lv::getFilesFromDir(*psDepthFramesDir);
@@ -341,45 +352,73 @@ namespace lv {
                 lv::filterFilePaths(vsDepthFramePaths,{},{".png"});
                 lv::filterFilePaths(vsDepthMaskPaths,{},{".png"});
                 lv::filterFilePaths(vsDepthGTPaths,{},{".png"});
-                lvAssert__(vsDepthFramePaths.size()==nTotInputPackets && vsDepthMaskPaths.size()<=nTotInputPackets && vsDepthGTPaths.size()<=nTotInputPackets,"bad depth frame packet count for sequence '%s'",this->getName().c_str());
+                lvAssert__(vsDepthFramePaths.size()>0u && vsDepthMaskPaths.size()<=vsDepthFramePaths.size() && vsDepthGTPaths.size()<=vsDepthFramePaths.size(),"bad input depth packet count for sequence '%s'",this->getName().c_str());
             }
             ////////////////////////////////
-            this->m_mRealSubset.clear();
-            this->m_mSubset.clear();
-            if(bLoadFrameSubset || bEvalOnlyFrameSubset) {
-                const std::string sSubsetFilePath = this->getDataPath()+"subset.txt";
-                std::ifstream oSubsetFile(sSubsetFilePath);
-                lvAssert__(oSubsetFile.is_open(),"could not open frame subset file at '%s'",sSubsetFilePath.c_str());
-                std::string sLineBuffer;
-                while(oSubsetFile) {
-                    lvDbgExceptionWatch;
-                    if(!std::getline(oSubsetFile,sLineBuffer))
-                        break;
-                    if(sLineBuffer[0]=='#')
-                        continue;
-                    const int nCurrIdx = std::stoi(sLineBuffer);
-                    lvAssert(nCurrIdx>=0 && nCurrIdx<(int)nTotInputPackets);
-                    this->m_mRealSubset.insert(size_t(nCurrIdx));
-                    for(int nOffsetIdx=nCurrIdx-nEvalTemporalWindowSize; nOffsetIdx<=nCurrIdx+nEvalTemporalWindowSize; ++nOffsetIdx)
-                        if(nOffsetIdx>=0 && nOffsetIdx<(int)nTotInputPackets)
-                            this->m_mSubset.insert(size_t(nOffsetIdx));
-                }
-                lvAssert(this->m_mSubset.size()>0);
-            }
-            const size_t nInputPackets = bLoadFrameSubset?this->m_mSubset.size():nTotInputPackets;
             const auto lIndexExtractor = [&](const std::string& sFilePath) {
                 const size_t nLastInputSlashPos = sFilePath.find_last_of("/\\");
                 const std::string sInputFileNameExt = nLastInputSlashPos==std::string::npos?sFilePath:sFilePath.substr(nLastInputSlashPos+1);
                 const size_t nLastInputDotPos = sInputFileNameExt.find_last_of('.');
                 const std::string sInputFileName = (nLastInputDotPos==std::string::npos)?sInputFileNameExt:sInputFileNameExt.substr(0,nLastInputDotPos);
-            #if DATASETS_LITIV2018_LOAD_CALIB_DATA
-                const size_t nCalibPacketIdx = (size_t)std::stoi(sInputFileName);
-                lvAssert(nCalibPacketIdx>0u);
-                return nCalibPacketIdx-1u;
-            #else //!DATASETS_LITIV2018_LOAD_CALIB_DATA
                 return (size_t)std::stoi(sInputFileName);
-            #endif //!DATASETS_LITIV2018_LOAD_CALIB_DATA
             };
+            this->m_mRealSubset.clear();
+            this->m_mSubset.clear();
+            if(!bIsLoadingCalibData) {
+                lvAssert_(vsLWIRFramePaths.size()==nTotInputPackets && (!this->m_bLoadDepth || vsDepthFramePaths.size()==nTotInputPackets),"input packet array sizes mismatch");
+                for(size_t nCurrIdx=0u; nCurrIdx<nTotInputPackets; ++nCurrIdx) {
+                    lvAssert(lIndexExtractor(vsRGBFramePaths[nCurrIdx])==nCurrIdx);
+                    lvAssert(lIndexExtractor(vsLWIRFramePaths[nCurrIdx])==nCurrIdx);
+                    lvAssert(!this->m_bLoadDepth || lIndexExtractor(vsDepthFramePaths[nCurrIdx])==nCurrIdx);
+                }
+                lvAssert(vsRGBMaskPaths.empty() || lIndexExtractor(vsRGBMaskPaths.back())<nTotInputPackets);
+                lvAssert(vsRGBGTPaths.empty() || lIndexExtractor(vsRGBGTPaths.back())<nTotInputPackets);
+                lvAssert(vsLWIRMaskPaths.empty() || lIndexExtractor(vsLWIRMaskPaths.back())<nTotInputPackets);
+                lvAssert(vsLWIRGTPaths.empty() || lIndexExtractor(vsLWIRGTPaths.back())<nTotInputPackets);
+                lvAssert(!this->m_bLoadDepth || vsDepthMaskPaths.empty() || lIndexExtractor(vsDepthMaskPaths.back())<nTotInputPackets);
+                lvAssert(!this->m_bLoadDepth || vsDepthGTPaths.empty() || lIndexExtractor(vsDepthGTPaths.back())<nTotInputPackets);
+                if(bLoadFrameSubset || bEvalOnlyFrameSubset) {
+                    const std::string sSubsetFilePath = this->getDataPath()+"subset.txt";
+                    std::ifstream oSubsetFile(sSubsetFilePath);
+                    lvAssert__(oSubsetFile.is_open(),"could not open frame subset file at '%s'",sSubsetFilePath.c_str());
+                    std::string sLineBuffer;
+                    while(oSubsetFile) {
+                        lvDbgExceptionWatch;
+                        if(!std::getline(oSubsetFile,sLineBuffer))
+                            break;
+                        if(sLineBuffer[0]=='#')
+                            continue;
+                        const int nCurrIdx = std::stoi(sLineBuffer);
+                        lvAssert(nCurrIdx>=0 && nCurrIdx<(int)nTotInputPackets);
+                        this->m_mRealSubset.insert(size_t(nCurrIdx));
+                        for(int nOffsetIdx=nCurrIdx-nEvalTemporalWindowSize; nOffsetIdx<=nCurrIdx+nEvalTemporalWindowSize; ++nOffsetIdx)
+                            if(nOffsetIdx>=0 && nOffsetIdx<(int)nTotInputPackets)
+                                this->m_mSubset.insert(size_t(nOffsetIdx));
+                    }
+                    lvAssert(this->m_mSubset.size()>0);
+                }
+                else {
+                    for(size_t nCurrIdx=0u; nCurrIdx<nTotInputPackets; ++nCurrIdx) {
+                        this->m_mRealSubset.insert(nCurrIdx);
+                        this->m_mSubset.insert(nCurrIdx);
+                    }
+                }
+            }
+            else {
+                for(size_t nCurrIdx=0u; nCurrIdx<nTotInputPackets; ++nCurrIdx) {
+                    const size_t nRGBIdx = (nCurrIdx<vsRGBFramePaths.size())?lIndexExtractor(vsRGBFramePaths[nCurrIdx]):SIZE_MAX;
+                    if(nRGBIdx!=SIZE_MAX) {
+                        this->m_mRealSubset.insert(nRGBIdx);
+                        this->m_mSubset.insert(nRGBIdx);
+                    }
+                    const size_t nLWIRIdx = (nCurrIdx<vsLWIRFramePaths.size())?lIndexExtractor(vsLWIRFramePaths[nCurrIdx]):SIZE_MAX;
+                    if(nLWIRIdx!=SIZE_MAX) {
+                        this->m_mRealSubset.insert(nLWIRIdx);
+                        this->m_mSubset.insert(nLWIRIdx);
+                    }
+                }
+            }
+            const size_t nInputPackets = this->m_mSubset.size();
             const auto lSubsetCleaner = [&](std::vector<std::string>& vsPaths, const std::set<size_t>& mSubset, bool bMustIncludeAll=true) {
                 lvAssert(!mSubset.empty());
                 std::vector<std::string> vsKeptPaths;
@@ -591,15 +630,17 @@ namespace lv {
                         lSubsetCleaner(vsDepthMaskPaths,this->m_mSubset);
                 }
             }
-            lvAssert_(vsRGBFramePaths.size()==nInputPackets,"missing RGB frame indices");
-            lvAssert_(vsLWIRFramePaths.size()==nInputPackets,"missing LWIR frame indices");
-            if(this->m_bLoadDepth)
-                lvAssert_(vsDepthFramePaths.size()==nInputPackets,"missing depth frame indices");
-            if(bUseInterlacedMasks) {
-                lvAssert_(vsRGBFramePaths.size()==vsRGBMaskPaths.size(),"bad RGB frame/mask index overlap");
-                lvAssert_(vsLWIRFramePaths.size()==vsLWIRMaskPaths.size(),"bad LWIR frame/mask index overlap");
+            if(!bIsLoadingCalibData) {
+                lvAssert_(vsRGBFramePaths.size()==nInputPackets,"missing RGB frame indices");
+                lvAssert_(vsLWIRFramePaths.size()==nInputPackets,"missing LWIR frame indices");
                 if(this->m_bLoadDepth)
-                    lvAssert_(vsDepthFramePaths.size()==vsDepthMaskPaths.size(),"bad depth frame/mask index overlap");
+                    lvAssert_(vsDepthFramePaths.size()==nInputPackets,"missing depth frame indices");
+                if(bUseInterlacedMasks) {
+                    lvAssert_(vsRGBFramePaths.size()==vsRGBMaskPaths.size(),"bad RGB frame/mask index overlap");
+                    lvAssert_(vsLWIRFramePaths.size()==vsLWIRMaskPaths.size(),"bad LWIR frame/mask index overlap");
+                    if(this->m_bLoadDepth)
+                        lvAssert_(vsDepthFramePaths.size()==vsDepthMaskPaths.size(),"bad depth frame/mask index overlap");
+                }
             }
             //////////////////////////////////////////////////////////////////////////////////////////////////
             if(!vsRGBGTPaths.empty() && lv::MatInfo(cv::imread(vsRGBGTPaths[0],cv::IMREAD_GRAYSCALE))!=this->m_vOrigGTInfos[nGTRGBStreamIdx])
@@ -623,27 +664,44 @@ namespace lv {
             //////////////////////////////////////////////////////////////////////////////////////////////////
             this->m_vvsInputPaths.resize(nInputPackets);
             for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx) {
-                const size_t nOrigPacketIdx = bLoadFrameSubset?*std::next(this->m_mSubset.begin(),nInputPacketIdx):nInputPacketIdx;
+                const size_t nOrigPacketIdx = *std::next(this->m_mSubset.begin(),nInputPacketIdx);
                 this->m_vvsInputPaths[nInputPacketIdx].resize(nInputStreamCount);
-                lvAssert(lIndexExtractor(vsRGBFramePaths[nInputPacketIdx])==nOrigPacketIdx);
-                this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx] = vsRGBFramePaths[nInputPacketIdx];
-                //const size_t nLastInputSlashPos = this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx].find_last_of("/\\");
-                //const std::string sInputFileNameExt = nLastInputSlashPos==std::string::npos?this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx]:this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx].substr(nLastInputSlashPos+1);
-                //cv::imwrite(this->getDataPath()+"color_frames_subset/"+sInputFileNameExt,cv::imread(this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx]));
-                lvAssert(lIndexExtractor(vsLWIRFramePaths[nInputPacketIdx])==nOrigPacketIdx);
-                this->m_vvsInputPaths[nInputPacketIdx][nInputLWIRStreamIdx] = vsLWIRFramePaths[nInputPacketIdx];
-                if(this->m_bLoadDepth) {
-                    lvAssert(lIndexExtractor(vsDepthFramePaths[nInputPacketIdx])==nOrigPacketIdx);
-                    this->m_vvsInputPaths[nInputPacketIdx][nInputDepthStreamIdx] = vsDepthFramePaths[nInputPacketIdx];
+                if(bIsLoadingCalibData) {
+                    const auto lIndexMatcher = [&](const std::string& sFilePath) {
+                        return sFilePath.find(lv::putf("%05d",(int)nOrigPacketIdx))!=std::string::npos;
+                    };
+                    auto pRGBFramePath = std::find_if(vsRGBFramePaths.begin(),vsRGBFramePaths.end(),lIndexMatcher);
+                    if(pRGBFramePath!=vsRGBFramePaths.end())
+                        this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx] = *pRGBFramePath;
+                    else
+                        this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx] = std::string();
+                    auto pLWIRFramePath = std::find_if(vsLWIRFramePaths.begin(),vsLWIRFramePaths.end(),lIndexMatcher);
+                    if(pLWIRFramePath!=vsLWIRFramePaths.end())
+                        this->m_vvsInputPaths[nInputPacketIdx][nInputLWIRStreamIdx] = *pLWIRFramePath;
+                    else
+                        this->m_vvsInputPaths[nInputPacketIdx][nInputLWIRStreamIdx] = std::string();
                 }
-                if(bUseInterlacedMasks) {
-                    lvAssert(lIndexExtractor(vsRGBMaskPaths[nInputPacketIdx])==nOrigPacketIdx);
-                    this->m_vvsInputPaths[nInputPacketIdx][nInputRGBMaskStreamIdx] = vsRGBMaskPaths[nInputPacketIdx];
-                    lvAssert(lIndexExtractor(vsLWIRMaskPaths[nInputPacketIdx])==nOrigPacketIdx);
-                    this->m_vvsInputPaths[nInputPacketIdx][nInputLWIRMaskStreamIdx] = vsLWIRMaskPaths[nInputPacketIdx];
+                else {
+                    lvAssert(lIndexExtractor(vsRGBFramePaths[nInputPacketIdx])==nOrigPacketIdx);
+                    this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx] = vsRGBFramePaths[nInputPacketIdx];
+                    //const size_t nLastInputSlashPos = this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx].find_last_of("/\\");
+                    //const std::string sInputFileNameExt = nLastInputSlashPos==std::string::npos?this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx]:this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx].substr(nLastInputSlashPos+1);
+                    //cv::imwrite(this->getDataPath()+"rgb_subset/"+sInputFileNameExt,cv::imread(this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx]));
+                    lvAssert(lIndexExtractor(vsLWIRFramePaths[nInputPacketIdx])==nOrigPacketIdx);
+                    this->m_vvsInputPaths[nInputPacketIdx][nInputLWIRStreamIdx] = vsLWIRFramePaths[nInputPacketIdx];
                     if(this->m_bLoadDepth) {
-                        lvAssert(lIndexExtractor(vsDepthMaskPaths[nInputPacketIdx])==nOrigPacketIdx);
-                        this->m_vvsInputPaths[nInputPacketIdx][nInputDepthMaskStreamIdx] = vsDepthMaskPaths[nInputPacketIdx];
+                        lvAssert(lIndexExtractor(vsDepthFramePaths[nInputPacketIdx])==nOrigPacketIdx);
+                        this->m_vvsInputPaths[nInputPacketIdx][nInputDepthStreamIdx] = vsDepthFramePaths[nInputPacketIdx];
+                    }
+                    if(bUseInterlacedMasks) {
+                        lvAssert(lIndexExtractor(vsRGBMaskPaths[nInputPacketIdx])==nOrigPacketIdx);
+                        this->m_vvsInputPaths[nInputPacketIdx][nInputRGBMaskStreamIdx] = vsRGBMaskPaths[nInputPacketIdx];
+                        lvAssert(lIndexExtractor(vsLWIRMaskPaths[nInputPacketIdx])==nOrigPacketIdx);
+                        this->m_vvsInputPaths[nInputPacketIdx][nInputLWIRMaskStreamIdx] = vsLWIRMaskPaths[nInputPacketIdx];
+                        if(this->m_bLoadDepth) {
+                            lvAssert(lIndexExtractor(vsDepthMaskPaths[nInputPacketIdx])==nOrigPacketIdx);
+                            this->m_vvsInputPaths[nInputPacketIdx][nInputDepthMaskStreamIdx] = vsDepthMaskPaths[nInputPacketIdx];
+                        }
                     }
                 }
             }
@@ -681,6 +739,7 @@ namespace lv {
             if(nPacketIdx>=this->m_vvsInputPaths.size())
                 return std::vector<cv::Mat>(this->getInputStreamCount());
             const cv::Size oRGBSize(1920,1080),oLWIRSize(320,240),oDepthSize(512,424);
+            const bool bIsLoadingCalibData = bool(DATASETS_LITIV2018_LOAD_CALIB_DATA);
             const bool bUseInterlacedMasks = this->m_nLoadInputMasks!=0;
             const bool bFlipDisparities = this->isFlippingDisparities();
             const size_t nInputRGBStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_RGB*(bUseInterlacedMasks?2:1));
@@ -695,8 +754,12 @@ namespace lv {
             lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
             std::vector<cv::Mat> vInputs(getInputStreamCount());
             ///////////////////////////////////////////////////////////////////////////////////
-            cv::Mat oRGBPacket = cv::imread(vsInputPaths[nInputRGBStreamIdx],cv::IMREAD_COLOR);
+            lvAssert__(bIsLoadingCalibData || !vsInputPaths[nInputRGBStreamIdx].empty(),"could not open RGB input frame #%d (empty path)",(int)nPacketIdx);
+            cv::Mat oRGBPacket = vsInputPaths[nInputRGBStreamIdx].empty()?cv::Mat(oRGBSize,CV_8UC3,cv::Scalar::all(0)):cv::imread(vsInputPaths[nInputRGBStreamIdx],cv::IMREAD_COLOR);
             lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==oRGBSize);
+        #if DATASETS_LITIV2018_FLIP_RGB
+            cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
+        #endif //DATASETS_LITIV2018_FLIP_RGB
             if(oRGBPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
                 cv::resize(oRGBPacket,oRGBPacket,vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_CUBIC);
             if(this->m_bUndistort || this->m_bHorizRectify)
@@ -713,9 +776,9 @@ namespace lv {
                 vInputs[nInputRGBMaskStreamIdx] = oRGBMaskPacket;
             }
             ///////////////////////////////////////////////////////////////////////////////////
-            cv::Mat oLWIRPacket = cv::imread(vsInputPaths[nInputLWIRStreamIdx],cv::IMREAD_GRAYSCALE);
+            lvAssert__(bIsLoadingCalibData || !vsInputPaths[nInputLWIRStreamIdx].empty(),"could not open LWIR input frame #%d (empty path)",(int)nPacketIdx);
+            cv::Mat oLWIRPacket = vsInputPaths[nInputLWIRStreamIdx].empty()?cv::Mat(oLWIRSize,CV_8UC1,cv::Scalar::all(0)):cv::imread(vsInputPaths[nInputLWIRStreamIdx],cv::IMREAD_GRAYSCALE);
             lvAssert(!oLWIRPacket.empty() && oLWIRPacket.type()==CV_8UC1 && oLWIRPacket.size()==oLWIRSize);
-            //cv::flip(oLWIRPacket,oLWIRPacket,1); // must pre-flip lwir frames due to original camera flip
             if(oLWIRPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
                 cv::resize(oLWIRPacket,oLWIRPacket,vInputInfos[nInputLWIRStreamIdx].size(),0,0,cv::INTER_CUBIC);
             if(this->m_bUndistort || this->m_bHorizRectify) {
@@ -809,7 +872,9 @@ namespace lv {
                     }
                 }
                 else {
-                    //cv::flip(oLWIRPacket,oLWIRPacket,1); // must pre-flip lwir frames due to original camera flip
+                #if DATASETS_LITIV2018_FLIP_RGB
+                    cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
+                #endif //DATASETS_LITIV2018_FLIP_RGB
                     if(oRGBPacket.size()!=vGTInfos[nGTRGBStreamIdx].size())
                         cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBStreamIdx].size(),0,0,cv::INTER_LINEAR);
                     if(this->m_bUndistort || this->m_bHorizRectify)
@@ -855,6 +920,25 @@ namespace lv {
         cv::Mat m_oRGBCalibMap1,m_oRGBCalibMap2;
         cv::Mat m_oLWIRCalibMap1,m_oLWIRCalibMap2;
         std::vector<lv::MatInfo> m_vOrigInputInfos,m_vOrigGTInfos;
+    public:
+    #if DATASETS_LITIV2018_LOAD_CALIB_DATA
+        std::vector<bool> isCalibInputValid(size_t nPacketIdx) {
+            lvDbgExceptionWatch;
+            if(nPacketIdx>=this->m_vvsInputPaths.size())
+                return std::vector<bool>(this->getInputStreamCount(),false);
+            const bool bUseInterlacedMasks = this->m_nLoadInputMasks!=0;
+            const size_t nInputRGBStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_RGB*(bUseInterlacedMasks?2:1));
+            const size_t nInputLWIRStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_LWIR*(bUseInterlacedMasks?2:1));
+            const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
+            lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==this->getInputStreamCount());
+            const std::vector<lv::MatInfo>& vInputInfos = this->m_vInputInfos;
+            lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
+            std::vector<bool> vValid(getInputStreamCount(),false);
+            vValid[nInputRGBStreamIdx] = !(vsInputPaths[nInputRGBStreamIdx].empty()?cv::Mat():cv::imread(vsInputPaths[nInputRGBStreamIdx])).empty();
+            vValid[nInputLWIRStreamIdx] = !(vsInputPaths[nInputLWIRStreamIdx].empty()?cv::Mat():cv::imread(vsInputPaths[nInputLWIRStreamIdx])).empty();
+            return vValid;
+        }
+    #endif //DATASETS_LITIV2018_LOAD_CALIB_DATA
     };
 
 } // namespace lv
