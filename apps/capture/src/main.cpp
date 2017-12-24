@@ -22,7 +22,7 @@
 #include <fstream>
 
 /////////////////////////////////
-#define USE_FLIR_SENSOR         1
+#define USE_LWIR_SENSOR         1
 #define USE_NIR_SENSOR          0
 /////////////////////////////////
 #define DISPLAY_OUTPUT          2
@@ -35,7 +35,7 @@
 //#define STRUCT_FILE_PREALLOC_SIZE   1024*1024*20 // tot = 200MB per struct file
 /////////////////////////////////
 //// cv::VideoWriter params /////                      filename                  fourcc  framerate       frame size       is color
-#define FLIR_OUTPUT_VIDEO_PARAMS    "c:/temp/" WRITE_OUTPUT_PREFIX "/flir.avi",    -1,     30.0,     cv::Size(320,240),    false    // ffdshow mpeg4/xvid w/ 'grayscale' preset
+#define LWIR_OUTPUT_VIDEO_PARAMS    "c:/temp/" WRITE_OUTPUT_PREFIX "/lwir.avi",    -1,     30.0,     cv::Size(320,240),    false    // ffdshow mpeg4/xvid w/ 'grayscale' preset
 #define NIR_OUTPUT_VIDEO_PARAMS     "c:/temp/" WRITE_OUTPUT_PREFIX "/nir.avi",     -1,     30.0,     cv::Size(512,424),    false    // ffdshow mpeg4/xvid w/ 'grayscale' preset
 #define RGB_OUTPUT_VIDEO_PARAMS     "e:/temp/" WRITE_OUTPUT_PREFIX "/rgb.avi",     -1,     30.0,     cv::Size(1920,1080),  true     // x264/mpeg4 w/ 'superfast' preset
 /////////////////////////////////
@@ -86,24 +86,24 @@ int main() {
             pWriter->write((char*)oBodyFrame.data,sizeof(lv::KinectBodyFrame));
             return (size_t)0;
         };
-    #if USE_FLIR_SENSOR
-        std::cout << "Setting up FLIR device..." << std::endl;
+    #if USE_LWIR_SENSOR
+        std::cout << "Setting up LWIR device..." << std::endl;
         lvAssertHR(CoInitializeEx(0,COINIT_MULTITHREADED|COINIT_DISABLE_OLE1DDE));
-        std::unique_ptr<lv::DShowCameraGrabber> pFLIRSensor = std::make_unique<lv::DShowCameraGrabber>("FLIR ThermaCAM");
-        lvAssertHR(pFLIRSensor->Connect());
-        cv::Mat oFLIRFrame;
-        const cv::Size oFLIRFrameSize = std::get<3>(std::make_tuple(FLIR_OUTPUT_VIDEO_PARAMS));
+        std::unique_ptr<lv::DShowCameraGrabber> pLWIRSensor = std::make_unique<lv::DShowCameraGrabber>("FLIR ThermaCAM");
+        lvAssertHR(pLWIRSensor->Connect());
+        cv::Mat oLWIRFrame;
+        const cv::Size oLWIRFrameSize = std::get<3>(std::make_tuple(LWIR_OUTPUT_VIDEO_PARAMS));
     #if WRITE_OUTPUT
-        std::cout << "Setting up FLIR video writer..." << std::endl;
-        size_t nLastSavedFLIRFrameIdx = SIZE_MAX;
-        cv::VideoWriter oFLIRVideoWriter(FLIR_OUTPUT_VIDEO_PARAMS);
-        lvAssert(oFLIRVideoWriter.isOpened());
-        lv::DataWriter oFLIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oFLIRVideoWriter,nLastSavedFLIRFrameIdx));
-        lvAssert(oFLIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
-        vWriters.push_back(oFLIRVideoAsyncWriter);
-        vPackets.push_back(oFLIRFrame);
+        std::cout << "Setting up LWIR video writer..." << std::endl;
+        size_t nLastSavedLWIRFrameIdx = SIZE_MAX;
+        cv::VideoWriter oLWIRVideoWriter(LWIR_OUTPUT_VIDEO_PARAMS);
+        lvAssert(oLWIRVideoWriter.isOpened());
+        lv::DataWriter oLWIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oLWIRVideoWriter,nLastSavedLWIRFrameIdx));
+        lvAssert(oLWIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+        vWriters.push_back(oLWIRVideoAsyncWriter);
+        vPackets.push_back(oLWIRFrame);
     #endif //WRITE_OUTPUT
-    #endif //USE_FLIR_SENSOR
+    #endif //USE_LWIR_SENSOR
         std::cout << "Setting up Kinect device..." << std::endl;
         CComPtr<IKinectSensor> pKinectSensor;
         lvAssertHR(GetDefaultKinectSensor(&pKinectSensor));
@@ -192,18 +192,18 @@ int main() {
         lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create("DISPLAY","c:/temp/",cv::Size(1920,1200),cv::WINDOW_NORMAL);
         std::map<UINT64,cv::Scalar_<uchar>> mBodyColors;
     #else //!(DISPLAY_OUTPUT>1)
-    #if USE_FLIR_SENSOR
-        cv::namedWindow("oFLIRFrame",cv::WINDOW_NORMAL);
-    #endif //USE_FLIR_SENSOR
+    #if USE_LWIR_SENSOR
+        cv::namedWindow("oLWIRFrame",cv::WINDOW_NORMAL);
+    #endif //USE_LWIR_SENSOR
     #endif //!(DISPLAY_OUTPUT>1)
         cv::namedWindow("oRGBFrame",cv::WINDOW_NORMAL);
     #else //!DISPLAY_OUTPUT
         // still need to display at least one window for visual feedback
-    #if USE_FLIR_SENSOR
-        cv::namedWindow("oFLIRFrame",cv::WINDOW_NORMAL);
-    #else //!USE_FLIR_SENSOR
+    #if USE_LWIR_SENSOR
+        cv::namedWindow("oLWIRFrame",cv::WINDOW_NORMAL);
+    #else //!USE_LWIR_SENSOR
         cv::namedWindow("oRGBFrame",cv::WINDOW_NORMAL);
-    #endif //!USE_FLIR_SENSOR
+    #endif //!USE_LWIR_SENSOR
     #endif //!DISPLAY_OUTPUT
         CComPtr<IMultiSourceFrame> pMultiFrame;
         lv::WorkerPool<nStreamCount> oPool;
@@ -441,27 +441,27 @@ int main() {
             for(size_t n=0; n<alGrabTasks.size(); ++n)
                 abGrabResults[n] = oPool.queueTask(alGrabTasks[n]);
             bool bFinalGrabResult = true;
-        #if USE_FLIR_SENSOR
-            bFinalGrabResult &= (pFLIRSensor->GetLatestFrame(oFLIRFrame,true)>=0);
-        #endif //USE_FLIR_SENSOR
+        #if USE_LWIR_SENSOR
+            bFinalGrabResult &= (pLWIRSensor->GetLatestFrame(oLWIRFrame,true)>=0);
+        #endif //USE_LWIR_SENSOR
             for(size_t n=0; n<abGrabResults.size(); ++n)
                 bFinalGrabResult &= abGrabResults[n].get();
             if(bFinalGrabResult) {
-            #if USE_FLIR_SENSOR
-                static std::once_flag s_oFLIRMetadataWriteFlag;
-                std::call_once(s_oFLIRMetadataWriteFlag,[&]() {
-                    lvAssert(oFLIRFrame.size()==oFLIRFrameSize);
+            #if USE_LWIR_SENSOR
+                static std::once_flag s_oLWIRMetadataWriteFlag;
+                std::call_once(s_oLWIRMetadataWriteFlag,[&]() {
+                    lvAssert(oLWIRFrame.size()==oLWIRFrameSize);
                 #if WRITE_OUTPUT
                     {
                         std::lock_guard<std::mutex> oMetadataStorageLock(oMetadataStorageMutex);
-                        oMetadataStorage << "flir_metadata" << "{";
-                        oMetadataStorage << "orig_size" << oFLIRFrameSize;
-                        oMetadataStorage << "cv_type" << oFLIRFrame.type();
+                        oMetadataStorage << "lwir_metadata" << "{";
+                        oMetadataStorage << "orig_size" << oLWIRFrameSize;
+                        oMetadataStorage << "cv_type" << oLWIRFrame.type();
                         oMetadataStorage << "}";
                     }
                 #endif //WRITE_OUTPUT
                 });
-            #endif //USE_FLIR_SENSOR
+            #endif //USE_LWIR_SENSOR
             #if DISPLAY_OUTPUT
             #if DISPLAY_OUTPUT>1
                 cv::Mat oBodyIdxFrameTemp = oBodyIdxFrame<UCHAR_MAX;
@@ -497,13 +497,13 @@ int main() {
                 cv::drawContours(oDepthFrameDisplay,vvBodyIdxContours,-1,cv::Scalar(USHRT_MAX),3);
                 cv::flip(oDepthFrameDisplay,oDepthFrameDisplay,1);
                 vvImageNamePairs[0].emplace_back(oDepthFrameDisplay,"Depth");
-            #if USE_FLIR_SENSOR
-                cv::Mat oFLIRFrameDisplay;
-                cv::applyColorMap(oFLIRFrame,oFLIRFrameDisplay,cv::COLORMAP_HOT);
-                vvImageNamePairs[1].emplace_back(oFLIRFrameDisplay,"Thermal");
-            #else //!(USE_FLIR_SENSOR)
-                vvImageNamePairs[1].emplace_back(cv::Mat(oDepthFrameDisplay.size(),CV_8UC3,cv::Scalar_<uchar>::all(128)),"Thermal");
-            #endif //!(USE_FLIR_SENSOR)
+            #if USE_LWIR_SENSOR
+                cv::Mat oLWIRFrameDisplay;
+                cv::applyColorMap(oLWIRFrame,oLWIRFrameDisplay,cv::COLORMAP_HOT);
+                vvImageNamePairs[1].emplace_back(oLWIRFrameDisplay,"LWIR");
+            #else //!(USE_LWIR_SENSOR)
+                vvImageNamePairs[1].emplace_back(cv::Mat(oDepthFrameDisplay.size(),CV_8UC3,cv::Scalar_<uchar>::all(128)),"LWIR");
+            #endif //!(USE_LWIR_SENSOR)
                 cv::Mat oBodyFrameDisplay(oBodyIdxFrameSize,CV_8UC3,cv::Scalar_<uchar>::all(88));
                 const auto lBodyToScreen = [&](const CameraSpacePoint& oInputPt) {
                     DepthSpacePoint depthPoint = {0};
@@ -552,17 +552,17 @@ int main() {
                 cv::drawContours(oRGBFrameDisplay,vvBodyIdxContours_ColorSpace,-1,cv::Scalar(0,0,255),3);
                 cv::imshow("oRGBFrame",oRGBFrameDisplay);
             #else //DISPLAY_OUTPUT<=1
-            #if USE_FLIR_SENSOR
-                cv::imshow("oFLIRFrame",oFLIRFrame);
-            #endif //USE_FLIR_SENSOR
+            #if USE_LWIR_SENSOR
+                cv::imshow("oLWIRFrame",oLWIRFrame);
+            #endif //USE_LWIR_SENSOR
                 cv::imshow("oRGBFrame",oRGBFrame);
             #endif //DISPLAY_OUTPUT<=1
             #else //!DISPLAY_OUTPUT
-            #if USE_FLIR_SENSOR
-                cv::imshow("oFLIRFrame",oFLIRFrame);
-            #else //!USE_FLIR_SENSOR
+            #if USE_LWIR_SENSOR
+                cv::imshow("oLWIRFrame",oLWIRFrame);
+            #else //!USE_LWIR_SENSOR
                 cv::imshow("oRGBFrame",oRGBFrame);
-            #endif //!USE_FLIR_SENSOR
+            #endif //!USE_LWIR_SENSOR
             #endif //DISPLAY_OUTPUT
                 const char c = (char)cv::waitKey(1);
                 if(c=='q' || c==27)
@@ -575,9 +575,9 @@ int main() {
                 const bool bCanProcess = std::all_of(vQueueAvailabilities.begin(),vQueueAvailabilities.end(),[](bool b){return b;});
                 if(bCanProcess) {
                     lvAssert(oRGBVideoAsyncWriter.queue(oRGBFrame,nRealFrameIdx)!=SIZE_MAX);
-                #if USE_FLIR_SENSOR
-                    lvAssert(oFLIRVideoAsyncWriter.queue(oFLIRFrame,nRealFrameIdx)!=SIZE_MAX);
-                #endif //USE_FLIR_SENSOR
+                #if USE_LWIR_SENSOR
+                    lvAssert(oLWIRVideoAsyncWriter.queue(oLWIRFrame,nRealFrameIdx)!=SIZE_MAX);
+                #endif //USE_LWIR_SENSOR
                     lvAssert(oBodyStructAsyncWriter.queue(oBodyFrameWrapper,nRealFrameIdx)!=SIZE_MAX);
                     lvAssert(oBodyIdxVideoAsyncWriter.queue(oBodyIdxFrame,nRealFrameIdx)!=SIZE_MAX);
                 #if USE_NIR_SENSOR
