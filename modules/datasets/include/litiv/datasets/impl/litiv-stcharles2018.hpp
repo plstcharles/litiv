@@ -931,8 +931,6 @@ namespace lv {
             const size_t nInputLWIRStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_LWIR*(bUseInterlacedMasks?2:1));
             const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
             lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==this->getInputStreamCount());
-            const std::vector<lv::MatInfo>& vInputInfos = this->m_vInputInfos;
-            lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
             std::vector<bool> vValid(getInputStreamCount(),false);
             vValid[nInputRGBStreamIdx] = !(vsInputPaths[nInputRGBStreamIdx].empty()?cv::Mat():cv::imread(vsInputPaths[nInputRGBStreamIdx])).empty();
             vValid[nInputLWIRStreamIdx] = !(vsInputPaths[nInputLWIRStreamIdx].empty()?cv::Mat():cv::imread(vsInputPaths[nInputLWIRStreamIdx])).empty();
