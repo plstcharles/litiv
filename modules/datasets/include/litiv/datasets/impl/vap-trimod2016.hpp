@@ -75,7 +75,7 @@ namespace lv {
                         "VAP-trimodal2016",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/",
                         DataHandler::createOutputDir(lv::datasets::getRootPath()+"vap/rgbdt-stereo/results/",sOutputDirName),
-                        getWorkBatchDirNames(bUndistort||bHorizRectify),
+                        getWorkBatchDirNames(bUndistort||bHorizRectify||bLoadFrameSubset),
                         std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
@@ -93,7 +93,7 @@ namespace lv {
             lvAssert_(!m_bEvalDisparities,"missing impl (no stereo disparity gt in dataset)");
         }
         /// returns the names of all work batch directories available for this dataset specialization
-        static const std::vector<std::string>& getWorkBatchDirNames(bool bUndistortOrRectify) {
+        static const std::vector<std::string>& getWorkBatchDirNames(bool bUndistortOrRectifyOrSubset) {
             // dataset contains 3 scenes with GT for default use
             static const std::vector<std::string> s_vsWorkBatchDirs_real = {
                 "Scene 1",
@@ -105,7 +105,7 @@ namespace lv {
                 "Scene 1",
                 "Scene 3"
             };
-            return bUndistortOrRectify?s_vsWorkBatchDirs_calibonly:s_vsWorkBatchDirs_real;
+            return bUndistortOrRectifyOrSubset?s_vsWorkBatchDirs_calibonly:s_vsWorkBatchDirs_real;
         }
         /// returns whether the depth stream should be loaded & provided as input or not (if not, the dataset is used as a bimodal one)
         virtual bool isLoadingDepth() const override {return m_bLoadDepth;}
