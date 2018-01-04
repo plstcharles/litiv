@@ -931,6 +931,11 @@ namespace lv {
             if(isSavingOutput() && !vOutput.empty())
                 this->saveOutputArray(vOutput,nPacketIdx);
         }
+        /// pushes an output (processed) data packet array for writing and/or evaluation
+        template<size_t nArraySize>
+        inline void push(const std::array<cv::Mat,nArraySize>& aOutput, size_t nPacketIdx) {
+            return push(std::vector<cv::Mat>(aOutput.begin(),aOutput.end()),nPacketIdx);
+        }
     protected:
         /// processes an output array packet (does nothing by default, but may be overridden for evaluation/pipelining)
         virtual void processOutput(const std::vector<cv::Mat>& /*vOutput*/, size_t /*nPacketIdx*/) {}
