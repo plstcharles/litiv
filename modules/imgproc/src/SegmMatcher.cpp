@@ -2017,6 +2017,7 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
             cv::normalize(aBGDistMap[nCamIdx],aBGDistMap[nCamIdx],1,0,cv::NORM_MINMAX);
             cv::Mat oClusterLabelsDisplay = lv::getUniqueColorMap(aGMMClusterLabels[nCamIdx]);
             cv::imshow(std::string("aGMMClusterLabels-c")+std::to_string(nCamIdx),oClusterLabelsDisplay);
+        #if SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
             if(bInit && nTemporalLayerCount>1u && m_nFramesProcessed>=(nTemporalLayerCount-1u)) {
                 cv::normalize(aTempCoeffsDbgImgs[nCamIdx],aTempCoeffsDbgImgs[nCamIdx],1,0,cv::NORM_MINMAX);
                 cv::Mat oCurrStackedInputImages = m_aStackedInputImages[nCamIdx].clone();
@@ -2035,6 +2036,7 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
                 for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx)
                     cv::imshow(std::string("aaTempDiff-c")+std::to_string(nCamIdx)+"-t"+std::to_string(nLayerIdx),aaTempDiff[nCamIdx][nLayerIdx]);
             }
+        #endif //SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
         }
         //cv::Mat oStereoDispMap;
         //m_oSuperStackedStereoLabeling.convertTo(oStereoDispMap,CV_32F,1.0/m_nStereoLabels);
