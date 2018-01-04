@@ -21,6 +21,7 @@
 
 ////////////////////////////////
 #define PROCESS_PREPROC_BGSEGM  0
+#define PROCESS_PREPROC_GRABCUT 2
 #define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
 #define GLOBAL_VERBOSITY        2
@@ -56,6 +57,7 @@
 #if (((DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_MASKS_ONLY)>0) && WRITE_IMG_OUTPUT)
 #error "Should not overwrite output if only reevaluating results."
 #endif //(((DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_MASKS_ONLY)>0) && WRITE_IMG_OUTPUT)
+#define PROCESS_PREPROC (PROCESS_PREPROC_BGSEGM || PROCESS_PREPROC_GRABCUT)
 #if DATASET_VAPTRIMOD
 #define DATASET_ID Dataset_VAP_trimod2016
 #define DATASET_PARAMS \
@@ -63,13 +65,13 @@
     bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
     bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
     false,                                        /* bool bLoadDepth=true */\
-    PROCESS_PREPROC_BGSEGM?false:true,            /* bool bUndistort=true */\
-    PROCESS_PREPROC_BGSEGM?false:true,            /* bool bHorizRectify=false */\
+    PROCESS_PREPROC?false:true,                   /* bool bUndistort=true */\
+    PROCESS_PREPROC?false:true,                   /* bool bHorizRectify=false */\
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=false */\
     PROCESS_PREPROC_BGSEGM?false:DATASET_EVAL_INPUT_SUBSET,/* bool bLoadFrameSubset=false */\
     DATASET_EVAL_GT_SUBSET,                       /* bool bEvalOnlyFrameSubset=false */\
     (int)SegmMatcher::getTemporalDepth(),         /* int nEvalTemporalWindowSize=0*/\
-    PROCESS_PREPROC_BGSEGM?0:1/*4*/,              /* int nLoadInputMasks=0 */\
+    PROCESS_PREPROC?0:1,                          /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_LITIV2014
 #define DATASET_ID Dataset_LITIV_bilodeau2014
@@ -81,7 +83,7 @@
     true,                                         /* bool bFlipDisparities=false */\
     true,                                         /* bool bLoadFrameSubset=true */\
     -1,                                           /* int nLoadPersonSets=-1 */\
-    PROCESS_PREPROC_BGSEGM?0:1/*4*/,              /* int nLoadInputMasks=0 */\
+    PROCESS_PREPROC?0:1,                          /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
 #include "cosegm_tests.hpp"
@@ -98,9 +100,8 @@
 #endif //DATASET_...
 #if PROCESS_PREPROC_BGSEGM
 #define BGSEGM_ALGO_TYPE BackgroundSubtractorPAWCS
-#else //!PROCESS_PREPROC_BGSEGM
+#endif //PROCESS_PREPROC_BGSEGM
 #include "litiv/imgproc/SegmMatcher.hpp"
-#endif //!PROCESS_PREPROC_BGSEGM
 
 void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch);
 #if DATASET_EVAL_DISPARITY_MASKS
@@ -144,11 +145,11 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
         lvAssert(oBatch.getInputPacketType()==lv::ImageArrayPacket && oBatch.getOutputPacketType()==lv::ImageArrayPacket); // app works with stereo heads (2 images at once)
         lvAssert(oBatch.getIOMappingType()==lv::IndexMapping && oBatch.getGTMappingType()==lv::ElemMapping); // segmentation = 1:1 mapping between inputs and gtmasks
-#if PROCESS_PREPROC_BGSEGM
+#if PROCESS_PREPROC
         lvAssert(oBatch.getInputStreamCount()==2); // expect only one input image per camera
-#else //!PROCESS_PREPROC_BGSEGM
+#else //!PROCESS_PREPROC
         lvAssert(oBatch.getInputStreamCount()==4); // expect approx fg masks to be interlaced with input images
-#endif //!PROCESS_PREPROC_BGSEGM
+#endif //!PROCESS_PREPROC
         lvAssert(oBatch.getOutputStreamCount()==2); // we always only eval one output type at a time (fg masks or disparity)
         if(DATASET_PRECACHING)
             oBatch.startPrecaching(!bool(EVALUATE_OUTPUT));
@@ -157,6 +158,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const std::vector<cv::Mat>& vROIs = oBatch.getFrameROIArray();
         lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
         size_t nCurrIdx = DATASET_BATCH_START_INDEX, nLastTemporalBreakIdx = DATASET_BATCH_START_INDEX;
+        lvIgnore(nLastTemporalBreakIdx);
         const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
         lvAssert(vInitInput.size()==oBatch.getInputStreamCount());
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
@@ -172,13 +174,17 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
         lv::DisplayHelperPtr pDisplayHelper;
-        if(lv::getVerbosity()>=1)
+        if(lv::getVerbosity()>=1) {
             pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
-        pDisplayHelper->setContinuousUpdates(true);
+            pDisplayHelper->setContinuousUpdates(true);
+        }
+        const size_t nTotPacketCount = std::min(oBatch.getFrameCount(),size_t(DATASET_BATCH_STOP_MAX_INDEX+1));
 #if PROCESS_PREPROC_BGSEGM
+        lvAssert(!EVALUATE_OUTPUT || !DATASET_EVAL_DISPARITY_MASKS);
+        constexpr size_t nExpectedAlgoInputCount = 2u;
         std::vector<std::shared_ptr<IBackgroundSubtractor>> vAlgos = {
-                std::make_shared<BGSEGM_ALGO_TYPE>(),
-                std::make_shared<BGSEGM_ALGO_TYPE>(/*2,30*/)
+            std::make_shared<BGSEGM_ALGO_TYPE>(),
+            std::make_shared<BGSEGM_ALGO_TYPE>(/*2,30*/)
         };
         const double dDefaultLearningRate = vAlgos[0]->getDefaultLearningRate();
         for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx)
@@ -190,7 +196,79 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         size_t nCurrInitLoop = 0;
         bool bIncreasingIdxs = true;
 #endif //PROCESS_PREPROC_BGSEGM>1
-#else //!PROCESS_PREPROC_BGSEGM
+#elif PROCESS_PREPROC_GRABCUT
+        lvAssert(!EVALUATE_OUTPUT || !DATASET_EVAL_DISPARITY_MASKS);
+        constexpr size_t nExpectedAlgoInputCount = 2u;
+        lvAssert(nExpectedAlgoInputCount==vInitInput.size());
+        std::array<cv::Mat,nExpectedAlgoInputCount> aCurrInputs,aCurrMasks;
+        std::array<cv::Size,nExpectedAlgoInputCount> aOrigSizes;
+        for(size_t a=0u; a<2u; ++a)
+            aOrigSizes[a] = vInitInput[a].size();
+        const std::array<cv::Rect,nExpectedAlgoInputCount> vDefaultBBoxes = {
+            cv::Rect(aOrigSizes[0].width/4,aOrigSizes[0].height/4,aOrigSizes[0].width/2,aOrigSizes[0].height/2),
+            cv::Rect(aOrigSizes[1].width/4,aOrigSizes[1].height/4,aOrigSizes[1].width/2,aOrigSizes[1].height/2),
+        };
+        std::vector<std::array<cv::Rect,nExpectedAlgoInputCount>> vaBBoxes(nTotPacketCount,vDefaultBBoxes);
+        {
+            cv::FileStorage oBBoxesFS(oBatch.getOutputPath()+"bboxes.yml",cv::FileStorage::READ);
+            if(oBBoxesFS.isOpened()) {
+                int nReadPackets;
+                oBBoxesFS["npackets"] >> nReadPackets;
+                lvAssert(nTotPacketCount==(size_t)nReadPackets);
+                for(size_t a=0u; a<2u; ++a) {
+                    cv::FileNode oRectsNode = oBBoxesFS[std::string("rects")+std::to_string(a)];
+                    lvAssert(!oRectsNode.empty());
+                    for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx) {
+                        cv::FileNode oRectNode = oRectsNode[(std::string("f")+std::to_string(nIdx))];
+                        lvAssert(!oRectNode.empty());
+                        oRectNode >> vaBBoxes[nIdx][a];
+                    }
+                }
+            }
+        }
+        if(!pDisplayHelper) {
+            pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
+            pDisplayHelper->setContinuousUpdates(true);
+        }
+        std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
+            std::make_pair(vInitInput[0].clone(),oBatch.getInputStreamName(0)),
+            std::make_pair(vInitInput[1].clone(),oBatch.getInputStreamName(1))
+        }};
+        const cv::Size oDisplayTileSize(1024,768);
+        bool bIsDrawingRect = false;
+        cv::Point vRectStartPt;
+        pDisplayHelper->setMouseCallback([&](const lv::DisplayHelper::CallbackData& oData) {
+            if(oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
+                const cv::Point2f vClickPos(float(oData.oInternalPosition.x)/oData.oTileSize.width,float(oData.oInternalPosition.y)/oData.oTileSize.height);
+                if(vClickPos.x>=0.0f && vClickPos.y>=0.0f && vClickPos.x<1.0f && vClickPos.y<1.0f) {
+                    const int nCurrTile = oData.oPosition.x/oData.oTileSize.width;
+                    if(oData.nEvent==cv::EVENT_LBUTTONUP) {
+                        if(bIsDrawingRect) {
+                            const cv::Point2i vRectEndPt((int)std::round(vClickPos.x*aOrigSizes[nCurrTile].width),(int)std::round(vClickPos.y*aOrigSizes[nCurrTile].height));
+                            vaBBoxes[nCurrIdx][nCurrTile] = cv::Rect(vRectStartPt,vRectEndPt);
+                            aCurrInputs[nCurrTile].copyTo(vvDisplayPairs[0][nCurrTile].first);
+                            if(vvDisplayPairs[0][nCurrTile].first.channels()==1)
+                                cv::cvtColor(vvDisplayPairs[0][nCurrTile].first,vvDisplayPairs[0][nCurrTile].first,cv::COLOR_GRAY2BGR);
+                            cv::rectangle(vvDisplayPairs[0][nCurrTile].first,vaBBoxes[nCurrIdx][nCurrTile],cv::Scalar_<uchar>(0,0,255));
+                            cv::Mat oCurrMask;
+                            cv::grabCut(aCurrInputs[nCurrTile],oCurrMask,vaBBoxes[nCurrIdx][nCurrTile],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
+                            aCurrMasks[nCurrTile] = (oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD);
+                            cv::imshow(std::string("aCurrMasks_")+std::to_string(nCurrTile),aCurrMasks[nCurrTile]);
+                            cv::cvtColor(aCurrMasks[nCurrTile],aCurrMasks[nCurrTile],cv::COLOR_GRAY2BGR);
+                            cv::addWeighted(vvDisplayPairs[0][nCurrTile].first,0.5,aCurrMasks[nCurrTile],0.5,0.0,vvDisplayPairs[0][nCurrTile].first);
+                            bIsDrawingRect = false;
+                        }
+                        else {
+                            vRectStartPt = cv::Point((int)std::round(vClickPos.x*aOrigSizes[nCurrTile].width),(int)std::round(vClickPos.y*aOrigSizes[nCurrTile].height));
+                            cv::circle(vvDisplayPairs[0][nCurrTile].first,vRectStartPt,2,cv::Scalar_<uchar>(255,0,0),-1);
+                            bIsDrawingRect = true;
+                        }
+                    }
+                }
+            }
+            //pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
+        });
+#else //!PROCESS_PREPROC_...
         lvAssert(vInitInput.size()==4 && (vInitInput.size()%2)==0); // assume masks are interlaced with input images
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
         lvLog_(2,"\tdisp = [%d,%d]",(int)nMinDisp,(int)nMaxDisp);
@@ -222,8 +300,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
 #endif //(!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY)
-#endif //!PROCESS_PREPROC_BGSEGM
-        const size_t nTotPacketCount = std::min(oBatch.getFrameCount(),size_t(DATASET_BATCH_STOP_MAX_INDEX+1));
+#endif //!PROCESS_PREPROC_...
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
             //if(!((nCurrIdx+1)%100))
@@ -296,7 +373,48 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         #else //!(PROCESS_PREPROC_BGSEGM>1)
             ++nCurrIdx;
         #endif //!(PROCESS_PREPROC_BGSEGM>1)
-        #else //!PROCESS_PREPROC_BGSEGM
+        #elif PROCESS_PREPROC_GRABCUT
+            lvAssert(vCurrInput.size()==nExpectedAlgoInputCount);
+            for(size_t a=0u; a<nExpectedAlgoInputCount; ++a) {
+                lvAssert(!vCurrInput.empty());
+                vCurrInput[a].copyTo(vvDisplayPairs[0][a].first);
+                vCurrInput[a].copyTo(aCurrInputs[a]);
+                if(vvDisplayPairs[0][a].first.channels()==1) {
+                    cv::cvtColor(vvDisplayPairs[0][a].first,vvDisplayPairs[0][a].first,cv::COLOR_GRAY2BGR);
+                    cv::cvtColor(aCurrInputs[a],aCurrInputs[a],cv::COLOR_GRAY2BGR);
+                }
+                cv::rectangle(vvDisplayPairs[0][a].first,vaBBoxes[nCurrIdx][a],cv::Scalar_<uchar>(0,0,255));
+                cv::Mat oCurrMask;
+                cv::grabCut(aCurrInputs[a],oCurrMask,vaBBoxes[nCurrIdx][a],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
+                aCurrMasks[a] = (oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD);
+                cv::imshow(std::string("aCurrMasks_")+std::to_string(a),aCurrMasks[a]);
+                cv::cvtColor(aCurrMasks[a],aCurrMasks[a],cv::COLOR_GRAY2BGR);
+                cv::addWeighted(vvDisplayPairs[0][a].first,0.5,aCurrMasks[a],0.5,0.0,vvDisplayPairs[0][a].first);
+            }
+        #if PROCESS_PREPROC_GRABCUT>1
+            lvLog_(1,"\t grabcut @ #%d",int(nCurrIdx));
+            int nKeyPressed = -1;
+            while(nKeyPressed!=(int)'q' && nKeyPressed!=27/*escape*/ && nKeyPressed!=8/*backspace*/ && (nKeyPressed%256)!=10/*lf*/ && (nKeyPressed%256)!=13/*enter*/) {
+                pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
+                nKeyPressed = pDisplayHelper->waitKey();
+            }
+            bIsDrawingRect = false;
+            if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
+                break;
+            else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u)
+                --nCurrIdx;
+            else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u))
+                ++nCurrIdx;
+        #else //PROCESS_PREPROC_GRABCUT<=1
+            oBatch.push(aCurrMasks,nCurrIdx);
+            ++nCurrIdx;
+            lvAssert(pDisplayHelper);
+            pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
+            const int nKeyPressed = pDisplayHelper->waitKey(lv::getVerbosity()>=4?0:1);
+            if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
+                break;
+        #endif //PROCESS_PREPROC_GRABCUT<=1
+        #else //!PROCESS_PREPROC_...
         #if (DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY)
         #if DATASET_EVAL_OUTPUT_MASKS_ONLY
             const std::vector<cv::Mat> vArchivedOutput = oBatch.loadOutputArray(nCurrIdx);
@@ -329,6 +447,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 nLastTemporalBreakIdx = nCurrIdx;
             }
             const bool bNextIdxIsTemporalBreak = oBatch.isTemporalWindowBreak(nCurrIdx+1u);
+            lvIgnore(bNextIdxIsTemporalBreak);
         #if !DATASET_FORCE_RECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
             if(!oNextFeatsPacket.empty())
@@ -441,12 +560,28 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
         #endif //!DATASET_EVAL_FINAL_UPDATE
-        #endif //!PROCESS_PREPROC_BGSEGM
+        #endif //!PROCESS_PREPROC_...
         }
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getFinalProcessTime();
         const double dProcessSpeed = (double)nCurrIdx/dTimeElapsed;
         std::cout << "\t\t" << sCurrBatchName << " @ end [" << sWorkerName << "] (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+#if PROCESS_PREPROC_GRABCUT
+        {
+            lvLog(1,"Archiving rects data to file storage...");
+            cv::FileStorage oBBoxesFS(oBatch.getOutputPath()+"bboxes.yml",cv::FileStorage::WRITE);
+            lvAssert(oBBoxesFS.isOpened());
+            oBBoxesFS << "htag" << lv::getVersionStamp();
+            oBBoxesFS << "date" << lv::getTimeStamp();
+            oBBoxesFS << "npackets" << (int)nTotPacketCount;
+            for(size_t a=0u; a<2u; ++a) {
+                oBBoxesFS << (std::string("rects")+std::to_string(a)) << "{";
+                for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx)
+                    oBBoxesFS << (std::string("f")+std::to_string(nIdx)) << vaBBoxes[nIdx][a];
+                oBBoxesFS << "}";
+            }
+        }
+#endif //PROCESS_PREPROC_GRABCUT
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
     catch(const lv::Exception& e) {std::cout << "\nAnalyze caught lv::Exception (check stderr)\n" << std::endl;}
