@@ -204,11 +204,11 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::array<cv::Size,nExpectedAlgoInputCount> aOrigSizes;
         for(size_t a=0u; a<2u; ++a)
             aOrigSizes[a] = vInitInput[a].size();
-        const std::array<cv::Rect,nExpectedAlgoInputCount> vDefaultBBoxes = {
-            cv::Rect(aOrigSizes[0].width/4,aOrigSizes[0].height/4,aOrigSizes[0].width/2,aOrigSizes[0].height/2),
-            cv::Rect(aOrigSizes[1].width/4,aOrigSizes[1].height/4,aOrigSizes[1].width/2,aOrigSizes[1].height/2),
+        const std::array<std::vector<cv::Rect>,nExpectedAlgoInputCount> avDefaultBBoxes = {
+            std::vector<cv::Rect>(1,cv::Rect(aOrigSizes[0].width/4,aOrigSizes[0].height/4,aOrigSizes[0].width/2,aOrigSizes[0].height/2)),
+            std::vector<cv::Rect>(1,cv::Rect(aOrigSizes[1].width/4,aOrigSizes[1].height/4,aOrigSizes[1].width/2,aOrigSizes[1].height/2)),
         };
-        std::vector<std::array<cv::Rect,nExpectedAlgoInputCount>> vaBBoxes(nTotPacketCount,vDefaultBBoxes);
+        std::vector<std::array<std::vector<cv::Rect>,nExpectedAlgoInputCount>> vavBBoxes(nTotPacketCount,avDefaultBBoxes);
         {
             cv::FileStorage oBBoxesFS(oBatch.getOutputPath()+"bboxes.yml",cv::FileStorage::READ);
             if(oBBoxesFS.isOpened()) {
@@ -216,16 +216,43 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 oBBoxesFS["npackets"] >> nReadPackets;
                 lvAssert(nTotPacketCount==(size_t)nReadPackets);
                 for(size_t a=0u; a<2u; ++a) {
-                    cv::FileNode oRectsNode = oBBoxesFS[std::string("rects")+std::to_string(a)];
-                    lvAssert(!oRectsNode.empty());
+                    cv::FileNode oTopNode = oBBoxesFS[std::string("rects")+std::to_string(a)];
+                    lvAssert(!oTopNode.empty());
                     for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx) {
-                        cv::FileNode oRectNode = oRectsNode[(std::string("f")+std::to_string(nIdx))];
+                        cv::FileNode oFrameNode = oTopNode[(std::string("f")+std::to_string(nIdx))];
+                        lvAssert(!oFrameNode.empty());
+                        size_t nRectIdx = 0u;
+                        cv::FileNode oRectNode = oFrameNode[(std::string("r")+std::to_string(nRectIdx))];
                         lvAssert(!oRectNode.empty());
-                        oRectNode >> vaBBoxes[nIdx][a];
+                        std::vector<cv::Rect> vRects;
+                        while(!oRectNode.empty()) {
+                            vRects.resize(vRects.size()+1);
+                            oRectNode >> vRects.back();
+                            oRectNode = oFrameNode[(std::string("r")+std::to_string(++nRectIdx))];
+                        }
+                        vavBBoxes[nIdx][a] = vRects;
                     }
                 }
             }
         }
+        const auto lRectArchiver = [&]() {
+            lvLog(1,"Archiving rects data to file storage...");
+            cv::FileStorage oBBoxesFS(oBatch.getOutputPath()+"bboxes.yml",cv::FileStorage::WRITE);
+            lvAssert(oBBoxesFS.isOpened());
+            oBBoxesFS << "htag" << lv::getVersionStamp();
+            oBBoxesFS << "date" << lv::getTimeStamp();
+            oBBoxesFS << "npackets" << (int)nTotPacketCount;
+            for(size_t a=0u; a<2u; ++a) {
+                oBBoxesFS << (std::string("rects")+std::to_string(a)) << "{";
+                for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx) {
+                    oBBoxesFS << (std::string("f")+std::to_string(nIdx)) << "{";
+                    for(size_t nRectIdx=0; nRectIdx<vavBBoxes[nIdx][a].size(); ++nRectIdx)
+                        oBBoxesFS << (std::string("r")+std::to_string(nRectIdx)) << vavBBoxes[nIdx][a][nRectIdx];
+                    oBBoxesFS << "}";
+                }
+                oBBoxesFS << "}";
+            }
+        };
         if(!pDisplayHelper) {
             pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
             pDisplayHelper->setContinuousUpdates(true);
@@ -235,33 +262,102 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             std::make_pair(vInitInput[1].clone(),oBatch.getInputStreamName(1))
         }};
         const cv::Size oDisplayTileSize(1024,768);
-        bool bIsDrawingRect = false;
+        bool bIsDrawingRect = false, bIsSelectingRect = false;
+        size_t nSelectedRect = SIZE_MAX, nSelectedRectTile = SIZE_MAX;
         cv::Point vRectStartPt;
         pDisplayHelper->setMouseCallback([&](const lv::DisplayHelper::CallbackData& oData) {
             if(oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
                 const cv::Point2f vClickPos(float(oData.oInternalPosition.x)/oData.oTileSize.width,float(oData.oInternalPosition.y)/oData.oTileSize.height);
                 if(vClickPos.x>=0.0f && vClickPos.y>=0.0f && vClickPos.x<1.0f && vClickPos.y<1.0f) {
                     const int nCurrTile = oData.oPosition.x/oData.oTileSize.width;
-                    if(oData.nEvent==cv::EVENT_LBUTTONUP) {
-                        if(bIsDrawingRect) {
+                    if(oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
+                        if(bIsDrawingRect && nSelectedRectTile==size_t(nCurrTile)) {
+                            lvAssert(!bIsSelectingRect);
+                            lvAssert(nSelectedRect!=SIZE_MAX);
                             const cv::Point2i vRectEndPt((int)std::round(vClickPos.x*aOrigSizes[nCurrTile].width),(int)std::round(vClickPos.y*aOrigSizes[nCurrTile].height));
-                            vaBBoxes[nCurrIdx][nCurrTile] = cv::Rect(vRectStartPt,vRectEndPt);
+                            vavBBoxes[nCurrIdx][nCurrTile][nSelectedRect] = cv::Rect(vRectStartPt,vRectEndPt);
                             aCurrInputs[nCurrTile].copyTo(vvDisplayPairs[0][nCurrTile].first);
                             if(vvDisplayPairs[0][nCurrTile].first.channels()==1)
                                 cv::cvtColor(vvDisplayPairs[0][nCurrTile].first,vvDisplayPairs[0][nCurrTile].first,cv::COLOR_GRAY2BGR);
-                            cv::rectangle(vvDisplayPairs[0][nCurrTile].first,vaBBoxes[nCurrIdx][nCurrTile],cv::Scalar_<uchar>(0,0,255));
-                            cv::Mat oCurrMask;
-                            cv::grabCut(aCurrInputs[nCurrTile],oCurrMask,vaBBoxes[nCurrIdx][nCurrTile],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
-                            aCurrMasks[nCurrTile] = (oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD);
+                            aCurrMasks[nCurrTile].create(aOrigSizes[nCurrTile],CV_8UC1);
+                            aCurrMasks[nCurrTile] = uchar(0);
+                            for(size_t nRectIdx=0u; nRectIdx<vavBBoxes[nCurrIdx][nCurrTile].size(); ++nRectIdx) {
+                                cv::rectangle(vvDisplayPairs[0][nCurrTile].first,vavBBoxes[nCurrIdx][nCurrTile][nRectIdx],cv::Scalar_<uchar>(0,0,255));
+                                cv::Mat oCurrMask;
+                                cv::grabCut(aCurrInputs[nCurrTile],oCurrMask,vavBBoxes[nCurrIdx][nCurrTile][nRectIdx],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
+                                cv::bitwise_or(aCurrMasks[nCurrTile],(oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD),aCurrMasks[nCurrTile]);
+                            }
                             cv::imshow(std::string("aCurrMasks_")+std::to_string(nCurrTile),aCurrMasks[nCurrTile]);
                             cv::cvtColor(aCurrMasks[nCurrTile],aCurrMasks[nCurrTile],cv::COLOR_GRAY2BGR);
                             cv::addWeighted(vvDisplayPairs[0][nCurrTile].first,0.5,aCurrMasks[nCurrTile],0.5,0.0,vvDisplayPairs[0][nCurrTile].first);
                             bIsDrawingRect = false;
+                            nSelectedRect = SIZE_MAX;
+                            nSelectedRectTile = SIZE_MAX;
                         }
                         else {
                             vRectStartPt = cv::Point((int)std::round(vClickPos.x*aOrigSizes[nCurrTile].width),(int)std::round(vClickPos.y*aOrigSizes[nCurrTile].height));
-                            cv::circle(vvDisplayPairs[0][nCurrTile].first,vRectStartPt,2,cv::Scalar_<uchar>(255,0,0),-1);
-                            bIsDrawingRect = true;
+                            if(oData.nEvent==cv::EVENT_LBUTTONUP) {
+                                if(!bIsSelectingRect) {
+                                    size_t nClosestIdx = SIZE_MAX;
+                                    float fBestDistance = 9999.f;
+                                    for(size_t nRectIdx=0u; nRectIdx<vavBBoxes[nCurrIdx][nCurrTile].size(); ++nRectIdx) {
+                                        const float fDistance_TL = (float)cv::norm(vRectStartPt-vavBBoxes[nCurrIdx][nCurrTile][nRectIdx].tl());
+                                        if(fDistance_TL<10.0f && fDistance_TL<fBestDistance) {
+                                            fBestDistance = fDistance_TL;
+                                            nClosestIdx = nRectIdx*2u;
+                                        }
+                                        const float fDistance_BR = (float)cv::norm(vRectStartPt-vavBBoxes[nCurrIdx][nCurrTile][nRectIdx].br());
+                                        if(fDistance_BR<10.0f && fDistance_BR<fBestDistance) {
+                                            fBestDistance = fDistance_BR;
+                                            nClosestIdx = nRectIdx*2u+1u;
+                                        }
+                                    }
+                                    if(nClosestIdx<vavBBoxes[nCurrIdx][nCurrTile].size()*2u) {
+                                        bIsSelectingRect = true;
+                                        nSelectedRect = nClosestIdx/2u;
+                                        nSelectedRectTile = size_t(nCurrTile);
+                                        cv::rectangle(vvDisplayPairs[0][nCurrTile].first,vavBBoxes[nCurrIdx][nCurrTile][nSelectedRect],cv::Scalar_<uchar>(255,0,255));
+                                        cv::circle(vvDisplayPairs[0][nCurrTile].first,vavBBoxes[nCurrIdx][nCurrTile][nSelectedRect].tl(),2,cv::Scalar_<uchar>(0,255,0),-1);
+                                        cv::circle(vvDisplayPairs[0][nCurrTile].first,vavBBoxes[nCurrIdx][nCurrTile][nSelectedRect].br(),2,cv::Scalar_<uchar>(0,255,0),-1);
+                                    }
+                                }
+                                else if(bIsSelectingRect && nSelectedRectTile==size_t(nCurrTile)) {
+                                    lvAssert(nSelectedRect!=SIZE_MAX);
+                                    bIsSelectingRect = false;
+                                    bIsDrawingRect = true;
+                                    cv::circle(vvDisplayPairs[0][nCurrTile].first,vRectStartPt,2,cv::Scalar_<uchar>(255,0,0),-1);
+                                }
+                            }
+                            else if(oData.nEvent==cv::EVENT_RBUTTONUP && !bIsSelectingRect) {
+                                vavBBoxes[nCurrIdx][nCurrTile].emplace_back(vRectStartPt,vRectStartPt);
+                                bIsDrawingRect = true;
+                                nSelectedRect = vavBBoxes[nCurrIdx][nCurrTile].size()-1u;
+                                nSelectedRectTile = size_t(nCurrTile);
+                                cv::circle(vvDisplayPairs[0][nCurrTile].first,vRectStartPt,2,cv::Scalar_<uchar>(255,0,0),-1);
+                            }
+                            else if(oData.nEvent==cv::EVENT_RBUTTONUP && bIsSelectingRect && nSelectedRectTile==size_t(nCurrTile)) {
+                                lvAssert(nSelectedRect!=SIZE_MAX);
+                                if(vavBBoxes[nCurrIdx][nCurrTile].size()>1u) {
+                                    vavBBoxes[nCurrIdx][nCurrTile].erase(vavBBoxes[nCurrIdx][nCurrTile].begin()+nSelectedRect);
+                                    aCurrInputs[nCurrTile].copyTo(vvDisplayPairs[0][nCurrTile].first);
+                                    if(vvDisplayPairs[0][nCurrTile].first.channels()==1)
+                                        cv::cvtColor(vvDisplayPairs[0][nCurrTile].first,vvDisplayPairs[0][nCurrTile].first,cv::COLOR_GRAY2BGR);
+                                    aCurrMasks[nCurrTile].create(aOrigSizes[nCurrTile],CV_8UC1);
+                                    aCurrMasks[nCurrTile] = uchar(0);
+                                    for(size_t nRectIdx=0u; nRectIdx<vavBBoxes[nCurrIdx][nCurrTile].size(); ++nRectIdx) {
+                                        cv::rectangle(vvDisplayPairs[0][nCurrTile].first,vavBBoxes[nCurrIdx][nCurrTile][nRectIdx],cv::Scalar_<uchar>(0,0,255));
+                                        cv::Mat oCurrMask;
+                                        cv::grabCut(aCurrInputs[nCurrTile],oCurrMask,vavBBoxes[nCurrIdx][nCurrTile][nRectIdx],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
+                                        cv::bitwise_or(aCurrMasks[nCurrTile],(oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD),aCurrMasks[nCurrTile]);
+                                    }
+                                    cv::imshow(std::string("aCurrMasks_")+std::to_string(nCurrTile),aCurrMasks[nCurrTile]);
+                                    cv::cvtColor(aCurrMasks[nCurrTile],aCurrMasks[nCurrTile],cv::COLOR_GRAY2BGR);
+                                    cv::addWeighted(vvDisplayPairs[0][nCurrTile].first,0.5,aCurrMasks[nCurrTile],0.5,0.0,vvDisplayPairs[0][nCurrTile].first);
+                                    bIsSelectingRect = false;
+                                    nSelectedRect = SIZE_MAX;
+                                    nSelectedRectTile = SIZE_MAX;
+                                }
+                            }
                         }
                     }
                 }
@@ -383,10 +479,14 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                     cv::cvtColor(vvDisplayPairs[0][a].first,vvDisplayPairs[0][a].first,cv::COLOR_GRAY2BGR);
                     cv::cvtColor(aCurrInputs[a],aCurrInputs[a],cv::COLOR_GRAY2BGR);
                 }
-                cv::rectangle(vvDisplayPairs[0][a].first,vaBBoxes[nCurrIdx][a],cv::Scalar_<uchar>(0,0,255));
-                cv::Mat oCurrMask;
-                cv::grabCut(aCurrInputs[a],oCurrMask,vaBBoxes[nCurrIdx][a],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
-                aCurrMasks[a] = (oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD);
+                aCurrMasks[a].create(aOrigSizes[a],CV_8UC1);
+                aCurrMasks[a] = uchar(0);
+                for(size_t nRectIdx=0u; nRectIdx<vavBBoxes[nCurrIdx][a].size(); ++nRectIdx) {
+                    cv::rectangle(vvDisplayPairs[0][a].first,vavBBoxes[nCurrIdx][a][nRectIdx],cv::Scalar_<uchar>(0,0,255));
+                    cv::Mat oCurrMask;
+                    cv::grabCut(aCurrInputs[a],oCurrMask,vavBBoxes[nCurrIdx][a][nRectIdx],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
+                    cv::bitwise_or(aCurrMasks[a],(oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD),aCurrMasks[a]);
+                }
                 cv::imshow(std::string("aCurrMasks_")+std::to_string(a),aCurrMasks[a]);
                 cv::cvtColor(aCurrMasks[a],aCurrMasks[a],cv::COLOR_GRAY2BGR);
                 cv::addWeighted(vvDisplayPairs[0][a].first,0.5,aCurrMasks[a],0.5,0.0,vvDisplayPairs[0][a].first);
@@ -399,12 +499,16 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 nKeyPressed = pDisplayHelper->waitKey();
             }
             bIsDrawingRect = false;
+            bIsSelectingRect = false;
+            nSelectedRect = SIZE_MAX;
+            nSelectedRectTile = SIZE_MAX;
             if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
                 break;
             else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u)
                 --nCurrIdx;
             else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u))
                 ++nCurrIdx;
+            lRectArchiver();
         #else //PROCESS_PREPROC_GRABCUT<=1
             oBatch.push(aCurrMasks,nCurrIdx);
             ++nCurrIdx;
@@ -566,22 +670,6 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const double dTimeElapsed = oBatch.getFinalProcessTime();
         const double dProcessSpeed = (double)nCurrIdx/dTimeElapsed;
         std::cout << "\t\t" << sCurrBatchName << " @ end [" << sWorkerName << "] (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
-#if PROCESS_PREPROC_GRABCUT
-        {
-            lvLog(1,"Archiving rects data to file storage...");
-            cv::FileStorage oBBoxesFS(oBatch.getOutputPath()+"bboxes.yml",cv::FileStorage::WRITE);
-            lvAssert(oBBoxesFS.isOpened());
-            oBBoxesFS << "htag" << lv::getVersionStamp();
-            oBBoxesFS << "date" << lv::getTimeStamp();
-            oBBoxesFS << "npackets" << (int)nTotPacketCount;
-            for(size_t a=0u; a<2u; ++a) {
-                oBBoxesFS << (std::string("rects")+std::to_string(a)) << "{";
-                for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx)
-                    oBBoxesFS << (std::string("f")+std::to_string(nIdx)) << vaBBoxes[nIdx][a];
-                oBBoxesFS << "}";
-            }
-        }
-#endif //PROCESS_PREPROC_GRABCUT
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
     catch(const lv::Exception& e) {std::cout << "\nAnalyze caught lv::Exception (check stderr)\n" << std::endl;}
