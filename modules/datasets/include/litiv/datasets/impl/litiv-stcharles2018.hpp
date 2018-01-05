@@ -27,10 +27,17 @@
 #ifndef DATASETS_LITIV2018_LOAD_CALIB_DATA
 #define DATASETS_LITIV2018_LOAD_CALIB_DATA 0
 #endif //ndef(DATASETS_LITIV2018_LOAD_CALIB_DATA)
+#ifdef DATASETS_LITIV2018_LOAD_CALIB_DATA
+#ifndef DATASETS_LITIV2018_CALIB_VERSION
+#define DATASETS_LITIV2018_CALIB_VERSION 2
+#endif //ndef(DATASETS_LITIV2018_CALIB_VERSION)
+#endif //ndef(DATASETS_LITIV2018_LOAD_CALIB_DATA)
 #define DATASETS_LITIV2018_RECTIFIED_SIZE cv::Size(640,480)
-#ifndef DATASETS_LITIV2018_VERSION
-#define DATASETS_LITIV2018_VERSION "-v1"
-#endif //ndef(DATASETS_LITIV2018_VERSION)
+#ifndef DATASETS_LITIV2018_DATA_VERSION
+#define DATASETS_LITIV2018_DATA_VERSION 2
+#else //def(DATASETS_LITIV2018_DATA_VERSION)
+#error "cannot predefine data version outside interface"
+#endif //ndef(DATASETS_LITIV2018_DATA_VERSION)
 #ifndef DATASETS_LITIV2018_FLIP_RGB
 #define DATASETS_LITIV2018_FLIP_RGB 1
 #endif //ndef(DATASETS_LITIV2018_FLIP_RGB)
@@ -57,6 +64,8 @@ namespace lv {
         virtual int getEvalTemporalWindowSize() const = 0;
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         virtual int isLoadingInputMasks() const = 0;
+        /// returns the path to this batch's calibration data folder
+        virtual std::string getCalibDataFolderPath() const = 0;
         /// list of stream indices used in the array-based implementation below
         enum StreamIdxList {
             LITIV2018_RGB=0,
@@ -67,6 +76,9 @@ namespace lv {
             //LITIV2018_Joints,
         };
     };
+
+    #define DATASETS_LITIV2018_DATA_VERSION_STR lv::putf("stcharles2018-v%02d",(int)DATASETS_LITIV2018_DATA_VERSION)
+    #define DATASETS_LITIV2018_CALIB_VERSION_STR lv::putf("calib%02d",(int)DATASETS_LITIV2018_CALIB_VERSION)
 
     /// dataset loader impl specialization for LITIV cosegm/registration dataset -- instantiated via lv::datasets::create(...)
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
@@ -91,9 +103,9 @@ namespace lv {
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
                 IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_LITIV_stcharles2018,lv::getDatasetEval<eDatasetTask,Dataset_LITIV_stcharles2018>(),eEvalImpl>(
-                        "LITIV-stcharles2018" DATASETS_LITIV2018_VERSION,
-                        lv::datasets::getRootPath()+"litiv/stcharles2018" DATASETS_LITIV2018_VERSION "/",
-                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"litiv/stcharles2018" DATASETS_LITIV2018_VERSION "/results/",sOutputDirName),
+                        std::string("LITIV-")+DATASETS_LITIV2018_DATA_VERSION_STR,
+                        lv::datasets::getRootPath()+"litiv/"+DATASETS_LITIV2018_DATA_VERSION_STR+"/",
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"litiv/"+DATASETS_LITIV2018_DATA_VERSION_STR+"/results/",sOutputDirName),
                         getWorkBatchDirNames(),
                         std::vector<std::string>(),
                         bSaveOutput,
@@ -113,9 +125,15 @@ namespace lv {
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames() {
         #if DATASETS_LITIV2018_LOAD_CALIB_DATA
-            static const std::vector<std::string> s_vsWorkBatchDirs = {"calib02"};
+            static const std::vector<std::string> s_vsWorkBatchDirs = {DATASETS_LITIV2018_CALIB_VERSION_STR};
         #else //!DATASETS_LITIV2018_LOAD_CALIB_DATA
+        #if DATASETS_LITIV2018_DATA_VERSION==1
             static const std::vector<std::string> s_vsWorkBatchDirs = {"vid01","vid02","vid03"};
+        #elif DATASETS_LITIV2018_DATA_VERSION==2
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"scene04","scene05"};
+        #else //DATASETS_LITIV2018_DATA_VERSION==?
+        #error "unknown dataset version"
+        #endif //DATASETS_LITIV2018_DATA_VERSION==?
         #endif //!DATASETS_LITIV2018_LOAD_CALIB_DATA
             return s_vsWorkBatchDirs;
         }
@@ -137,6 +155,8 @@ namespace lv {
         virtual int getEvalTemporalWindowSize() const override {return m_nEvalTemporalWindowSize;}
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         virtual int isLoadingInputMasks() const override {return m_nLoadInputMasks;}
+        /// returns the path to this batch's calibration data folder
+        virtual std::string getCalibDataFolderPath() const override {return lv::addDirSlashIfMissing(this->getDataPath()+DATASETS_LITIV2018_CALIB_VERSION_STR);}
     protected:
         const bool m_bLoadDepth;
         const bool m_bUndistort;
@@ -228,6 +248,10 @@ namespace lv {
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         int isLoadingInputMasks() const {
             return dynamic_cast<const ILITIVStCharles2018Dataset&>(*this->getRoot()).isLoadingInputMasks();
+        }
+        /// returns the path to this batch's calibration data folder
+        std::string getCalibDataFolderPath() const {
+            return dynamic_cast<const ILITIVStCharles2018Dataset&>(*this->getRoot()).getCalibDataFolderPath();
         }
         /// returns the name of the directory where feature packets should be saved
         std::string getFeaturesDirName() const {
@@ -757,9 +781,8 @@ namespace lv {
             lvAssert__(bIsLoadingCalibData || !vsInputPaths[nInputRGBStreamIdx].empty(),"could not open RGB input frame #%d (empty path)",(int)nPacketIdx);
             cv::Mat oRGBPacket = vsInputPaths[nInputRGBStreamIdx].empty()?cv::Mat(oRGBSize,CV_8UC3,cv::Scalar::all(0)):cv::imread(vsInputPaths[nInputRGBStreamIdx],cv::IMREAD_COLOR);
             lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==oRGBSize);
-        #if DATASETS_LITIV2018_FLIP_RGB
-            cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
-        #endif //DATASETS_LITIV2018_FLIP_RGB
+            if(DATASETS_LITIV2018_FLIP_RGB && (!bIsLoadingCalibData || DATASETS_LITIV2018_CALIB_VERSION!=1))
+                cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
             if(oRGBPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
                 cv::resize(oRGBPacket,oRGBPacket,vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_CUBIC);
             if(this->m_bUndistort || this->m_bHorizRectify)
@@ -872,9 +895,8 @@ namespace lv {
                     }
                 }
                 else {
-                #if DATASETS_LITIV2018_FLIP_RGB
-                    cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
-                #endif //DATASETS_LITIV2018_FLIP_RGB
+                    if(DATASETS_LITIV2018_FLIP_RGB)
+                        cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
                     if(oRGBPacket.size()!=vGTInfos[nGTRGBStreamIdx].size())
                         cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBStreamIdx].size(),0,0,cv::INTER_LINEAR);
                     if(this->m_bUndistort || this->m_bHorizRectify)
