@@ -18,6 +18,8 @@
 #include "litiv/utils/opencv.hpp"
 #include <fstream>
 
+#define DISPLAY_HELPER_USE_LARGE_CROSSHAIR 1
+
 // these are really empty shells, but we need actual allocation due to ocv's virtual interface
 lv::AlignedMatAllocator<16,false> g_oMatAlloc16a = lv::AlignedMatAllocator<16,false>();
 lv::AlignedMatAllocator<32,false> g_oMatAlloc32a = lv::AlignedMatAllocator<32,false>();
@@ -227,8 +229,13 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
                 cv::resize(oImageBYTE3,oImageBYTE3,oNewTileSize);
             if(!vvImageNamePairs[nRowIdx][nColIdx].second.empty())
                 putText(oImageBYTE3,vvImageNamePairs[nRowIdx][nColIdx].second,cv::Scalar_<uint8_t>(0,0,255));
-            if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oNewTileSize.width && oDisplayPt.y<oNewTileSize.height && m_oLatestMouseEvent.oTileSize==oNewTileSize)
-                cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar(255,255,255));
+            if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oNewTileSize.width && oDisplayPt.y<oNewTileSize.height && m_oLatestMouseEvent.oTileSize==oNewTileSize) {
+            #if DISPLAY_HELPER_USE_LARGE_CROSSHAIR
+                cv::rectangle(oImageBYTE3,cv::Rect(0,oDisplayPt.y,oImageBYTE3.cols,1),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
+                cv::rectangle(oImageBYTE3,cv::Rect(oDisplayPt.x,0,1,oImageBYTE3.rows),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
+            #endif //DISPLAY_HELPER_USE_LARGE_CROSSHAIR
+                cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar::all(255));
+            }
             if(oOutputRow.empty())
                 oOutputRow = oImageBYTE3;
             else
@@ -288,8 +295,13 @@ void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::M
             cv::resize(oImageBYTE3,oImageBYTE3,oCurrDisplaySize);
         putText(oImageBYTE3,vImageNamePairs[nAlbumIdx].second+" ["+std::to_string(nAlbumIdx+1)+"/"+std::to_string(vImageNamePairs.size())+"]",cv::Scalar_<uint8_t>(0,0,255));
         const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oInternalPosition;
-        if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oCurrDisplaySize.width && oDisplayPt.y<oCurrDisplaySize.height && m_oLatestMouseEvent.oTileSize==oCurrDisplaySize)
-            cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar(255,255,255));
+        if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oCurrDisplaySize.width && oDisplayPt.y<oCurrDisplaySize.height && m_oLatestMouseEvent.oTileSize==oCurrDisplaySize) {
+        #if DISPLAY_HELPER_USE_LARGE_CROSSHAIR
+            cv::rectangle(oImageBYTE3,cv::Rect(0,oDisplayPt.y,oImageBYTE3.cols,1),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
+            cv::rectangle(oImageBYTE3,cv::Rect(oDisplayPt.x,0,1,oImageBYTE3.rows),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
+        #endif //DISPLAY_HELPER_USE_LARGE_CROSSHAIR
+            cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar::all(255));
+        }
         m_oLastDisplay = oImageBYTE3;
         if(m_bFirstDisplay) {
             putText(m_oLastDisplay,"[Press escape to exit album]",cv::Scalar_<uint8_t>(0,0,255),true,cv::Point2i(m_oLastDisplay.cols/2-115,15),1,1.0);
