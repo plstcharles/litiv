@@ -17,9 +17,9 @@
 
 ////////////////////////////////
 #define USE_OPENCV_CALIB        0
-#define USE_FINE_TUNING_PASS    1
+#define USE_FINE_TUNING_PASS    0
 #define USE_INTRINSIC_GUESS     0
-#define LOAD_CALIB_FROM_LAST    0
+#define LOAD_CALIB_FROM_LAST    1
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      1
@@ -97,7 +97,6 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     lvAssert(oBatch.getInputPacketType()==lv::ImageArrayPacket && oBatch.getInputStreamCount()==2 && oBatch.getInputCount()>=1);
     if(DATASET_PRECACHING)
         oBatch.startPrecaching();
-    lvAssert(oBatch.getName().find("calib")!=std::string::npos);
     const size_t nTotPacketCount = oBatch.getInputCount();
     size_t nCurrIdx = 0;
     std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // mat content becomes invalid on next getInput call
@@ -114,9 +113,18 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     std::array<cv::Mat_<double>,2> aCamMats,aDistCoeffs;
     cv::Mat_<double> oRotMat,oTranslMat,oEssMat,oFundMat;
 
+    lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
+    pDisplayHelper->setContinuousUpdates(true);
+    const cv::Size oDisplayTileSize(1024,768);
+    std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
+        std::make_pair(vInitInput[0].clone(),oBatch.getInputStreamName(0)),
+        std::make_pair(vInitInput[1].clone(),oBatch.getInputStreamName(1))
+    }};
+
 #if LOAD_CALIB_FROM_LAST
     {
-        cv::FileStorage oCalibFile(oBatch.getDataPath()+"calibdata.yml",cv::FileStorage::READ);
+        const std::string sCalibDataPath = oBatch.getCalibDataFolderPath();
+        cv::FileStorage oCalibFile(sCalibDataPath+"calibdata.yml",cv::FileStorage::READ);
         lvAssert(oCalibFile.isOpened());
         std::string sVerStr;
         oCalibFile["ver"] >> sVerStr;
@@ -137,6 +145,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     }
 #else //!LOAD_CALIB_FROM_LAST
 
+    lvAssert(oBatch.getName().find("calib")!=std::string::npos);
     lvLog(1,"Parsing calibration metadata file storage...");
     std::array<std::vector<std::vector<cv::Point2f>>,2> avvImagePts{std::vector<std::vector<cv::Point2f>>(nTotPacketCount),std::vector<std::vector<cv::Point2f>>(nTotPacketCount)};
     std::vector<std::vector<cv::Point3f>> vvWorldPts(nTotPacketCount);
@@ -312,16 +321,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         }
     }
 #if USE_FINE_TUNING_PASS
-    lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
-    std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
-        std::make_pair(vInitInput[0].clone(),oBatch.getInputStreamName(0)),
-        std::make_pair(vInitInput[1].clone(),oBatch.getInputStreamName(1))
-    }};
     bool bIsZoomedIn = false;
     size_t nSelectedPoint = SIZE_MAX;
     const cv::Size oZoomedNeigbSize(24,16);
     const std::array<int,2> anMarkerSizes{4,1};
-    const cv::Size oDisplayTileSize(1024,768);
     std::array<cv::Mat,2> aCurrInputs,aZoomedPatches;
     pDisplayHelper->setMouseCallback([&](const lv::DisplayHelper::CallbackData& oData) {
         if(oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
@@ -368,7 +371,6 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         }
         //pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
     });
-    pDisplayHelper->setContinuousUpdates(true);
     lvLog(1,"Image point edit mode initialized...");
     nCurrIdx = 0u;
     while(nCurrIdx<nTotPacketCount) {
@@ -470,15 +472,25 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             }
         }
     }
+    std::vector<std::vector<cv::Mat>> vvInputFrames(nTotPacketCount,std::vector<cv::Mat>(2u));
+    for(size_t nFrameIdx=0u; nFrameIdx<nTotPacketCount; ++nFrameIdx) {
+        const std::vector<cv::Mat>& vCurrInputs = oBatch.getInputArray(nFrameIdx);
+        for(size_t a=0u; a<vCurrInputs.size(); ++a) {
+            vvInputFrames[nFrameIdx][a] = vCurrInputs[a].clone();
+            if(vvInputFrames[nFrameIdx][a].channels()==1)
+                cv::cvtColor(vvInputFrames[nFrameIdx][a],vvInputFrames[nFrameIdx][a],cv::COLOR_GRAY2BGR);
+        }
+    }
     for(size_t nFrameIdx=0u; nFrameIdx<vvWorldPts.size(); ++nFrameIdx) {
         if(vvWorldPts[nFrameIdx].empty()) {
-            vvWorldPts.erase(vvWorldPts.begin()+nFrameIdx);
+            vvInputFrames.erase(vvInputFrames.begin()+nFrameIdx);
             avvImagePts[0].erase(avvImagePts[0].begin()+nFrameIdx);
             avvImagePts[1].erase(avvImagePts[1].begin()+nFrameIdx);
+            vvWorldPts.erase(vvWorldPts.begin()+nFrameIdx);
             nFrameIdx = 0u;
         }
     }
-    lvAssert(vvWorldPts.size()==avvImagePts[0].size() && vvWorldPts.size()==avvImagePts[1].size());
+    lvAssert(vvWorldPts.size()==avvImagePts[0].size() && vvWorldPts.size()==avvImagePts[1].size() && vvWorldPts.size()==vvInputFrames.size());
     lvAssert(!vvWorldPts.empty());
 
 #if USE_INTRINSIC_GUESS
@@ -539,21 +551,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     }
 #endif //!USE_INTRINSIC_GUESS
 
-    std::vector<std::vector<cv::Mat>> vvInputFrames(nTotPacketCount,std::vector<cv::Mat>(2u));
-    for(size_t nFrameIdx=0u; nFrameIdx<nTotPacketCount; ++nFrameIdx) {
-        const std::vector<cv::Mat>& vCurrInputs = oBatch.getInputArray(nFrameIdx);
-        for(size_t a=0u; a<vCurrInputs.size(); ++a) {
-            vvInputFrames[nFrameIdx][a] = vCurrInputs[a].clone();
-            if(vvInputFrames[nFrameIdx][a].channels()==1)
-                cv::cvtColor(vvInputFrames[nFrameIdx][a],vvInputFrames[nFrameIdx][a],cv::COLOR_GRAY2BGR);
-        }
-    }
     for(size_t nFrameIdx=0u; nFrameIdx<vvWorldPts.size(); ++nFrameIdx) {
         if(avvImagePts[0][nFrameIdx].empty() || avvImagePts[1][nFrameIdx].empty()) {
             vvInputFrames.erase(vvInputFrames.begin()+nFrameIdx);
-            vvWorldPts.erase(vvWorldPts.begin()+nFrameIdx);
             avvImagePts[0].erase(avvImagePts[0].begin()+nFrameIdx);
             avvImagePts[1].erase(avvImagePts[1].begin()+nFrameIdx);
+            vvWorldPts.erase(vvWorldPts.begin()+nFrameIdx);
             nFrameIdx = 0u;
         }
     }
@@ -570,7 +573,8 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     lvLog_(1,"\tmean stereo calib err : %f",dStereoCalibErr);
     {
         lvLog(1,"\nSaving stereo calibration...\n");
-        cv::FileStorage oCalibFile(oBatch.getDataPath()+"calibdata.yml",cv::FileStorage::WRITE);
+        const std::string sCalibDataPath = oBatch.getCalibDataFolderPath();
+        cv::FileStorage oCalibFile(sCalibDataPath+"calibdata.yml",cv::FileStorage::WRITE);
         lvAssert(oCalibFile.isOpened());
         oCalibFile << "ver" << (lv::getVersionStamp()+" "+lv::getTimeStamp());
         oCalibFile << "aCamMats0" << aCamMats[0];
@@ -621,9 +625,17 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     nCurrIdx = 0;
     double dRectifAlpha = -1;
     bool bRectify = true;
+#if LOAD_CALIB_FROM_LAST
+    const size_t nTotStereoFrames = nTotPacketCount;
+#else //!LOAD_CALIB_FROM_LAST
     const size_t nTotStereoFrames = vvInputFrames.size();
+#endif //!LOAD_CALIB_FROM_LAST
     while(nCurrIdx<nTotStereoFrames) {
+    #if LOAD_CALIB_FROM_LAST
+        const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
+    #else //!LOAD_CALIB_FROM_LAST
         const std::vector<cv::Mat>& vCurrInput = vvInputFrames[nCurrIdx];
+    #endif //!LOAD_CALIB_FROM_LAST
         lvAssert(vCurrInput.size()==aOrigSizes.size());
         std::array<cv::Mat,2> aRectifRotMats,aRectifProjMats;
         cv::Mat oDispToDepthMap;
@@ -646,11 +658,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             lvAssert(oCurrInput.size()==aOrigSizes[a]);
             if(oCurrInput.size()!=oTargetSize)
                 cv::resize(oCurrInput,oCurrInput,oTargetSize);
-
+        #if !LOAD_CALIB_FROM_LAST
             for(size_t nPtIdx=0u; nPtIdx<avvImagePts[a][nCurrIdx].size(); ++nPtIdx) {
                 const cv::Point2f& oPt = avvImagePts[a][nCurrIdx][nPtIdx];
                 cv::circle(oCurrInput,oPt,5,cv::Scalar_<uchar>(lv::getBGRFromHSL(360*float(nPtIdx)/avvImagePts[a][nCurrIdx].size(),1.0f,0.5f)),-1);
             }
+        #endif //!LOAD_CALIB_FROM_LAST
             if(bRectify) {
                 cv::remap(oCurrInput,aCurrRectifInput[a],aaRectifMaps[a][0],aaRectifMaps[a][1],cv::INTER_LINEAR);
                 aCurrRectifInput[a].copyTo(vvDisplayPairs[0][a].first);
