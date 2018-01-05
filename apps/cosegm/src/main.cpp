@@ -21,7 +21,7 @@
 
 ////////////////////////////////
 #define PROCESS_PREPROC_BGSEGM  0
-#define PROCESS_PREPROC_GRABCUT 2
+#define PROCESS_PREPROC_GRABCUT 0
 #define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
 #define GLOBAL_VERBOSITY        2
@@ -70,7 +70,7 @@
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=false */\
     PROCESS_PREPROC_BGSEGM?false:DATASET_EVAL_INPUT_SUBSET,/* bool bLoadFrameSubset=false */\
     DATASET_EVAL_GT_SUBSET,                       /* bool bEvalOnlyFrameSubset=false */\
-    (int)SegmMatcher::getTemporalDepth(),         /* int nEvalTemporalWindowSize=0*/\
+    PROCESS_PREPROC?0:(int)SegmMatcher::getTemporalDepth(),/* int nEvalTemporalWindowSize=0*/\
     PROCESS_PREPROC?0:1,                          /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_LITIV2014
@@ -234,7 +234,17 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                     }
                 }
             }
+        #if PROCESS_PREPROC_GRABCUT==1
+            else
+                lvError("missing bboxes file storage");
+        #endif //PROCESS_PREPROC_GRABCUT==1
         }
+        const cv::Size oDisplayTileSize(1024,768);
+        std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
+            std::make_pair(vInitInput[0].clone(),oBatch.getInputStreamName(0)),
+            std::make_pair(vInitInput[1].clone(),oBatch.getInputStreamName(1))
+        }};
+    #if PROCESS_PREPROC_GRABCUT>1
         const auto lRectArchiver = [&]() {
             lvLog(1,"Archiving rects data to file storage...");
             cv::FileStorage oBBoxesFS(oBatch.getOutputPath()+"bboxes.yml",cv::FileStorage::WRITE);
@@ -257,11 +267,6 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
             pDisplayHelper->setContinuousUpdates(true);
         }
-        std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
-            std::make_pair(vInitInput[0].clone(),oBatch.getInputStreamName(0)),
-            std::make_pair(vInitInput[1].clone(),oBatch.getInputStreamName(1))
-        }};
-        const cv::Size oDisplayTileSize(1024,768);
         bool bIsDrawingRect = false, bIsSelectingRect = false;
         size_t nSelectedRect = SIZE_MAX, nSelectedRectTile = SIZE_MAX;
         cv::Point vRectStartPt;
@@ -281,15 +286,16 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                                 cv::cvtColor(vvDisplayPairs[0][nCurrTile].first,vvDisplayPairs[0][nCurrTile].first,cv::COLOR_GRAY2BGR);
                             aCurrMasks[nCurrTile].create(aOrigSizes[nCurrTile],CV_8UC1);
                             aCurrMasks[nCurrTile] = uchar(0);
+                            cv::Mat oCurrMask(aOrigSizes[nCurrTile],CV_8UC1,cv::Scalar_<uchar>(cv::GC_BGD));
                             for(size_t nRectIdx=0u; nRectIdx<vavBBoxes[nCurrIdx][nCurrTile].size(); ++nRectIdx) {
                                 cv::rectangle(vvDisplayPairs[0][nCurrTile].first,vavBBoxes[nCurrIdx][nCurrTile][nRectIdx],cv::Scalar_<uchar>(0,0,255));
-                                cv::Mat oCurrMask;
-                                cv::grabCut(aCurrInputs[nCurrTile],oCurrMask,vavBBoxes[nCurrIdx][nCurrTile][nRectIdx],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
-                                cv::bitwise_or(aCurrMasks[nCurrTile],(oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD),aCurrMasks[nCurrTile]);
+                                oCurrMask(vavBBoxes[nCurrIdx][nCurrTile][nRectIdx]) = uchar(cv::GC_PR_FGD);
                             }
-                            cv::imshow(std::string("aCurrMasks_")+std::to_string(nCurrTile),aCurrMasks[nCurrTile]);
-                            cv::cvtColor(aCurrMasks[nCurrTile],aCurrMasks[nCurrTile],cv::COLOR_GRAY2BGR);
-                            cv::addWeighted(vvDisplayPairs[0][nCurrTile].first,0.5,aCurrMasks[nCurrTile],0.5,0.0,vvDisplayPairs[0][nCurrTile].first);
+                            cv::grabCut(aCurrInputs[nCurrTile],oCurrMask,cv::Rect(),cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_MASK);
+                            cv::bitwise_or(aCurrMasks[nCurrTile],(oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD),aCurrMasks[nCurrTile]);
+                            cv::Mat oCurrBGRMask;
+                            cv::cvtColor(aCurrMasks[nCurrTile],oCurrBGRMask,cv::COLOR_GRAY2BGR);
+                            cv::addWeighted(vvDisplayPairs[0][nCurrTile].first,0.5,oCurrBGRMask,0.5,0.0,vvDisplayPairs[0][nCurrTile].first);
                             bIsDrawingRect = false;
                             nSelectedRect = SIZE_MAX;
                             nSelectedRectTile = SIZE_MAX;
@@ -344,15 +350,16 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                                         cv::cvtColor(vvDisplayPairs[0][nCurrTile].first,vvDisplayPairs[0][nCurrTile].first,cv::COLOR_GRAY2BGR);
                                     aCurrMasks[nCurrTile].create(aOrigSizes[nCurrTile],CV_8UC1);
                                     aCurrMasks[nCurrTile] = uchar(0);
+                                    cv::Mat oCurrMask(aOrigSizes[nCurrTile],CV_8UC1,cv::Scalar_<uchar>(cv::GC_BGD));
                                     for(size_t nRectIdx=0u; nRectIdx<vavBBoxes[nCurrIdx][nCurrTile].size(); ++nRectIdx) {
                                         cv::rectangle(vvDisplayPairs[0][nCurrTile].first,vavBBoxes[nCurrIdx][nCurrTile][nRectIdx],cv::Scalar_<uchar>(0,0,255));
-                                        cv::Mat oCurrMask;
-                                        cv::grabCut(aCurrInputs[nCurrTile],oCurrMask,vavBBoxes[nCurrIdx][nCurrTile][nRectIdx],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
-                                        cv::bitwise_or(aCurrMasks[nCurrTile],(oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD),aCurrMasks[nCurrTile]);
+                                        oCurrMask(vavBBoxes[nCurrIdx][nCurrTile][nRectIdx]) = uchar(cv::GC_PR_FGD);
                                     }
-                                    cv::imshow(std::string("aCurrMasks_")+std::to_string(nCurrTile),aCurrMasks[nCurrTile]);
-                                    cv::cvtColor(aCurrMasks[nCurrTile],aCurrMasks[nCurrTile],cv::COLOR_GRAY2BGR);
-                                    cv::addWeighted(vvDisplayPairs[0][nCurrTile].first,0.5,aCurrMasks[nCurrTile],0.5,0.0,vvDisplayPairs[0][nCurrTile].first);
+                                    cv::grabCut(aCurrInputs[nCurrTile],oCurrMask,cv::Rect(),cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_MASK);
+                                    cv::bitwise_or(aCurrMasks[nCurrTile],(oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD),aCurrMasks[nCurrTile]);
+                                    cv::Mat oCurrBGRMask;
+                                    cv::cvtColor(aCurrMasks[nCurrTile],oCurrBGRMask,cv::COLOR_GRAY2BGR);
+                                    cv::addWeighted(vvDisplayPairs[0][nCurrTile].first,0.5,oCurrBGRMask,0.5,0.0,vvDisplayPairs[0][nCurrTile].first);
                                     bIsSelectingRect = false;
                                     nSelectedRect = SIZE_MAX;
                                     nSelectedRectTile = SIZE_MAX;
@@ -364,7 +371,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             }
             //pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
         });
-#else //!PROCESS_PREPROC_...
+    #endif //PROCESS_PREPROC_GRABCUT>1
+    #else //!PROCESS_PREPROC_...
         lvAssert(vInitInput.size()==4 && (vInitInput.size()%2)==0); // assume masks are interlaced with input images
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
         lvLog_(2,"\tdisp = [%d,%d]",(int)nMinDisp,(int)nMaxDisp);
@@ -390,13 +398,13 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 vvDisplayPairs[nDisplayRowIdx] = vRow;
             }
         }
-#if (!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY)
+    #if (!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY)
         std::shared_ptr<SegmMatcher> pAlgo = std::make_shared<SegmMatcher>(nMinDisp,nMaxDisp);
         pAlgo->m_pDisplayHelper = pDisplayHelper;
         pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
-#endif //(!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY)
-#endif //!PROCESS_PREPROC_...
+    #endif //(!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY)
+    #endif //!PROCESS_PREPROC_...
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
             //if(!((nCurrIdx+1)%100))
@@ -473,23 +481,29 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             lvAssert(vCurrInput.size()==nExpectedAlgoInputCount);
             for(size_t a=0u; a<nExpectedAlgoInputCount; ++a) {
                 lvAssert(!vCurrInput.empty());
-                vCurrInput[a].copyTo(vvDisplayPairs[0][a].first);
+                if(pDisplayHelper)
+                    vCurrInput[a].copyTo(vvDisplayPairs[0][a].first);
                 vCurrInput[a].copyTo(aCurrInputs[a]);
-                if(vvDisplayPairs[0][a].first.channels()==1) {
-                    cv::cvtColor(vvDisplayPairs[0][a].first,vvDisplayPairs[0][a].first,cv::COLOR_GRAY2BGR);
+                if(aCurrInputs[a].channels()==1) {
+                    if(pDisplayHelper)
+                        cv::cvtColor(vvDisplayPairs[0][a].first,vvDisplayPairs[0][a].first,cv::COLOR_GRAY2BGR);
                     cv::cvtColor(aCurrInputs[a],aCurrInputs[a],cv::COLOR_GRAY2BGR);
                 }
                 aCurrMasks[a].create(aOrigSizes[a],CV_8UC1);
                 aCurrMasks[a] = uchar(0);
+                cv::Mat oCurrMask(aOrigSizes[a],CV_8UC1,cv::Scalar_<uchar>(cv::GC_BGD));
                 for(size_t nRectIdx=0u; nRectIdx<vavBBoxes[nCurrIdx][a].size(); ++nRectIdx) {
-                    cv::rectangle(vvDisplayPairs[0][a].first,vavBBoxes[nCurrIdx][a][nRectIdx],cv::Scalar_<uchar>(0,0,255));
-                    cv::Mat oCurrMask;
-                    cv::grabCut(aCurrInputs[a],oCurrMask,vavBBoxes[nCurrIdx][a][nRectIdx],cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_RECT);
-                    cv::bitwise_or(aCurrMasks[a],(oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD),aCurrMasks[a]);
+                    if(pDisplayHelper)
+                        cv::rectangle(vvDisplayPairs[0][a].first,vavBBoxes[nCurrIdx][a][nRectIdx],cv::Scalar_<uchar>(0,0,255));
+                    oCurrMask(vavBBoxes[nCurrIdx][a][nRectIdx]) = uchar(cv::GC_PR_FGD);
                 }
-                cv::imshow(std::string("aCurrMasks_")+std::to_string(a),aCurrMasks[a]);
-                cv::cvtColor(aCurrMasks[a],aCurrMasks[a],cv::COLOR_GRAY2BGR);
-                cv::addWeighted(vvDisplayPairs[0][a].first,0.5,aCurrMasks[a],0.5,0.0,vvDisplayPairs[0][a].first);
+                cv::grabCut(aCurrInputs[a],oCurrMask,cv::Rect(),cv::Mat(),cv::Mat(),3,cv::GC_INIT_WITH_MASK);
+                cv::bitwise_or(aCurrMasks[a],(oCurrMask==cv::GC_FGD)|(oCurrMask==cv::GC_PR_FGD),aCurrMasks[a]);
+                if(pDisplayHelper) {
+                    cv::Mat oCurrBGRMask;
+                    cv::cvtColor(aCurrMasks[a],oCurrBGRMask,cv::COLOR_GRAY2BGR);
+                    cv::addWeighted(vvDisplayPairs[0][a].first,0.5,oCurrBGRMask,0.5,0.0,vvDisplayPairs[0][a].first);
+                }
             }
         #if PROCESS_PREPROC_GRABCUT>1
             lvLog_(1,"\t grabcut @ #%d",int(nCurrIdx));
@@ -512,11 +526,12 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         #else //PROCESS_PREPROC_GRABCUT<=1
             oBatch.push(aCurrMasks,nCurrIdx);
             ++nCurrIdx;
-            lvAssert(pDisplayHelper);
-            pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
-            const int nKeyPressed = pDisplayHelper->waitKey(lv::getVerbosity()>=4?0:1);
-            if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
-                break;
+            if(pDisplayHelper) {
+                pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
+                const int nKeyPressed = pDisplayHelper->waitKey(lv::getVerbosity()>=4?0:1);
+                if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
+                    break;
+            }
         #endif //PROCESS_PREPROC_GRABCUT<=1
         #else //!PROCESS_PREPROC_...
         #if (DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY)
