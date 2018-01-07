@@ -37,6 +37,7 @@
 ////////////////////////////////
 #define DATASET_FORCE_RECALC_FEATURES      1
 #define DATASET_EVAL_DISPARITY_MASKS       0
+#define DATASET_EVAL_BAD_INIT_MASKS        0
 #define DATASET_EVAL_APPROX_MASKS_ONLY     0
 #define DATASET_EVAL_OUTPUT_MASKS_ONLY     0
 #define DATASET_EVAL_INPUT_SUBSET          1
@@ -57,6 +58,9 @@
 #if (((DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_MASKS_ONLY)>0) && WRITE_IMG_OUTPUT)
 #error "Should not overwrite output if only reevaluating results."
 #endif //(((DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_MASKS_ONLY)>0) && WRITE_IMG_OUTPUT)
+#if ((DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY) && DATASET_EVAL_FINAL_UPDATE)
+#error "Deferred eval useless here."
+#endif //((DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY) && DATASET_EVAL_FINAL_UPDATE)
 #define PROCESS_PREPROC (PROCESS_PREPROC_BGSEGM || PROCESS_PREPROC_GRABCUT)
 #if DATASET_VAPTRIMOD
 #define DATASET_ID Dataset_VAP_trimod2016
@@ -409,7 +413,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         while(nCurrIdx<nTotPacketCount) {
             //if(!((nCurrIdx+1)%100))
                 std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [" << sWorkerName << "]" << std::endl;
-            const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
+            std::vector<cv::Mat> vCurrInput = oBatch.getInputArray(nCurrIdx); // caution: should use const ref to vec, but copy here so that we can clone and change mats if needed at app level
             lvDbgAssert(vCurrInput.size()==oBatch.getInputStreamCount());
             lvDbgAssert(vCurrInput.size()==nExpectedAlgoInputCount);
             for(size_t nStreamIdx=0; nStreamIdx<vCurrInput.size(); ++nStreamIdx) {
@@ -567,6 +571,13 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             }
             const bool bNextIdxIsTemporalBreak = oBatch.isTemporalWindowBreak(nCurrIdx+1u);
             lvIgnore(bNextIdxIsTemporalBreak);
+        #if DATASET_EVAL_BAD_INIT_MASKS
+            const size_t nModifMaskIdx = SegmMatcher::InputPack_LeftMask;
+            cv::Mat oModifMask = vCurrInput[nModifMaskIdx].clone();
+            lvAssert(!oModifMask.empty() && oModifMask.type()==CV_8UC1);
+            oModifMask = 0;
+            vCurrInput[nModifMaskIdx] = oModifMask;
+        #endif //DATASET_EVAL_BAD_INIT_MASKS
         #if !DATASET_FORCE_RECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
             if(!oNextFeatsPacket.empty())
