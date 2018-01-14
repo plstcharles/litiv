@@ -17,14 +17,15 @@
 
 ////////////////////////////////
 #define USE_OPENCV_CALIB        0
-#define USE_FINE_TUNING_PASS    0
+#define USE_FINE_TUNING_PASS    1
 #define USE_INTRINSIC_GUESS     0
-#define LOAD_CALIB_FROM_LAST    1
+#define LOAD_CALIB_FROM_LAST    0
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      1
 ////////////////////////////////
 #define DATASETS_LITIV2018_LOAD_CALIB_DATA 1
+#define DATASETS_LITIV2018_CALIB_VERSION 4
 
 #include "litiv/datasets.hpp"
 #include "litiv/imgproc.hpp"
@@ -276,8 +277,16 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                         ++nRGBPointCount;
                     }
                 #if DATASETS_LITIV2018_FLIP_RGB
-                    for(size_t nPtIdx=0u; nPtIdx<avvImagePts[0][nCurrIdx].size(); ++nPtIdx)
-                        avvImagePts[0][nCurrIdx][nPtIdx] = cv::Point2f((oRGBSize.width-1)-avvImagePts[0][nCurrIdx][nPtIdx].x,avvImagePts[0][nCurrIdx][nPtIdx].y);
+                    if(!avvImagePts[0][nCurrIdx].empty()) {
+                        lvAssert((int)avvImagePts[0][nCurrIdx].size()==(nSquareCount_y-1)*(nSquareCount_x-1));
+                        std::vector<cv::Point2f> vPts = avvImagePts[0][nCurrIdx];
+                        for(size_t nPtIdx=0u; nPtIdx<vPts.size(); ++nPtIdx)
+                            vPts[nPtIdx].x = (oRGBSize.width-1)-vPts[nPtIdx].x;
+                        int nRealPtIdx = 0;
+                        for(int nColIdx=(nSquareCount_x-2); nColIdx>=0; --nColIdx)
+                            for(int nRowIdx=0; nRowIdx<(nSquareCount_y-1); ++nRowIdx)
+                                avvImagePts[0][nCurrIdx][nRealPtIdx++] = vPts[nColIdx*(nSquareCount_y-1)+nRowIdx];
+                    }
                 #endif //DATASETS_LITIV2018_FLIP_RGB
                 }
                 if(vInputValid[1]) {
@@ -321,10 +330,31 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         }
     }
 #if USE_FINE_TUNING_PASS
+    const auto lArchiver = [&](){
+        lvLog(1,"Archiving points data to file storage...");
+        cv::FileStorage oPointsFS(oBatch.getDataPath()+"ptsdata.yml",cv::FileStorage::WRITE);
+        lvAssert(oPointsFS.isOpened());
+        oPointsFS << "htag" << lv::getVersionStamp();
+        oPointsFS << "date" << lv::getTimeStamp();
+        oPointsFS << "npackets" << (int)nTotPacketCount;
+        oPointsFS << "patternsize" << oPatternSize;
+        oPointsFS << "world_pts" << "{";
+        for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx)
+            oPointsFS << (std::string("f")+std::to_string(nIdx)) << vvWorldPts[nIdx];
+        oPointsFS << "}";
+        oPointsFS << "rgb_pts" << "{";
+        for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx)
+            oPointsFS << (std::string("f")+std::to_string(nIdx)) << avvImagePts[0][nIdx];
+        oPointsFS << "}";
+        oPointsFS << "lwir_pts" << "{";
+        for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx)
+            oPointsFS << (std::string("f")+std::to_string(nIdx)) << avvImagePts[1][nIdx];
+        oPointsFS << "}";
+    };
     bool bIsZoomedIn = false;
     size_t nSelectedPoint = SIZE_MAX;
     const cv::Size oZoomedNeigbSize(24,16);
-    const std::array<int,2> anMarkerSizes{4,1};
+    const std::array<int,2> anMarkerSizes{6,1};
     std::array<cv::Mat,2> aCurrInputs,aZoomedPatches;
     pDisplayHelper->setMouseCallback([&](const lv::DisplayHelper::CallbackData& oData) {
         if(oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
@@ -420,33 +450,16 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             break;
         else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u)
             --nCurrIdx;
-        else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u))
+        else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u)) {
             ++nCurrIdx;
+            lArchiver();
+        }
+
     }
     cv::destroyWindow(oBatch.getName());
     cv::destroyWindow("worldmap");
     cv::waitKey(100);
-    {
-        lvLog(1,"Archiving points data to file storage...");
-        cv::FileStorage oPointsFS(oBatch.getDataPath()+"ptsdata.yml",cv::FileStorage::WRITE);
-        lvAssert(oPointsFS.isOpened());
-        oPointsFS << "htag" << lv::getVersionStamp();
-        oPointsFS << "date" << lv::getTimeStamp();
-        oPointsFS << "npackets" << (int)nTotPacketCount;
-        oPointsFS << "patternsize" << oPatternSize;
-        oPointsFS << "world_pts" << "{";
-        for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx)
-            oPointsFS << (std::string("f")+std::to_string(nIdx)) << vvWorldPts[nIdx];
-        oPointsFS << "}";
-        oPointsFS << "rgb_pts" << "{";
-        for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx)
-            oPointsFS << (std::string("f")+std::to_string(nIdx)) << avvImagePts[0][nIdx];
-        oPointsFS << "}";
-        oPointsFS << "lwir_pts" << "{";
-        for(size_t nIdx=0; nIdx<nTotPacketCount; ++nIdx)
-            oPointsFS << (std::string("f")+std::to_string(nIdx)) << avvImagePts[1][nIdx];
-        oPointsFS << "}";
-    }
+    lArchiver();
 #endif //USE_FINE_TUNING_PASS
 #endif //!USE_OPENCV_CALIB
     lvDbgExceptionWatch;
