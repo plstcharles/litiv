@@ -73,10 +73,10 @@ set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Debug>:DEBUG>")
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Debug>:_DEBUG>")
 if(CMAKE_SIZEOF_VOID_P EQUAL 8) # 64-bit toolchain/platform
-    set(DATASETS_CACHE_SIZE 6 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
+    set(DATASETS_CACHE_SIZE 4096 CACHE STRING "Cache size to be used for dataset preloading, if needed (in MB)")
     set(TARGET_PLATFORM_x64 TRUE CACHE INTERNAL "" FORCE)
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 4) # 32-bit toolchain/platform
-    set(DATASETS_CACHE_SIZE 1 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
+    set(DATASETS_CACHE_SIZE 512 CACHE STRING "Cache size to be used for dataset preloading, if needed (in MB)")
     set(TARGET_PLATFORM_x64 FALSE CACHE INTERNAL "" FORCE)
 else()
     message(FATAL_ERROR "Could not detect x64/x86 platform identity using void pointer size (s=${CMAKE_SIZEOF_VOID_P}).")

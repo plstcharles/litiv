@@ -225,9 +225,9 @@
     #ifndef TEST_OUTPUT_DATA_ROOT
         #define TEST_OUTPUT_DATA_ROOT       XSTR(@TEST_OUTPUT_DATA_ROOT@)
     #endif //ndef(TEST_OUTPUT_DATA_ROOT)
-    #ifndef CACHE_MAX_SIZE_GB
-        #define CACHE_MAX_SIZE_GB           @DATASETS_CACHE_SIZE@LLU
-    #endif //ndef(CACHE_MAX_SIZE_GB)
+    #ifndef CACHE_MAX_SIZE_MB
+        #define CACHE_MAX_SIZE_MB           @DATASETS_CACHE_SIZE@LLU
+    #endif //ndef(CACHE_MAX_SIZE_MB)
     #ifndef DEFAULT_NB_THREADS
         #define DEFAULT_NB_THREADS          1
     #endif //ndef(DEFAULT_NB_THREADS)

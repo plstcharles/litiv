@@ -1001,7 +1001,7 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
     lvAssert(nTotResegmFuncDataSize==(nTotResegmUnaryFuncDataSize+nTotResegmPairwFuncDataSize+nTotResegmTemporalFuncDataSize));
     const size_t nModelSize = ((nStereoFuncDataSize+nTotResegmFuncDataSize)*sizeof(ValueType)/*+...externals unaccounted for, so x2*/*2);
     lvLog_(1,"Expecting total mem requirement <= %zu MB\n\t(~%zu MB for stereo graph, ~%zu MB for resegm graphs)",nModelSize/1024/1024,sizeof(ValueType)*nStereoFuncDataSize/1024/1024,sizeof(ValueType)*nTotResegmFuncDataSize/1024/1024);
-    lvAssert__(nModelSize<(CACHE_MAX_SIZE_GB*1024*1024*1024),"too many nodes/labels; model is unlikely to fit in memory (estimated: %zu MB)",nModelSize/1024/1024);
+    lvAssert__(nModelSize<(CACHE_MAX_SIZE_MB*1024*1024),"too many nodes/labels; model is unlikely to fit in memory (estimated: %zu MB)",nModelSize/1024/1024);
     lvLog(2,"Initializing graph lookup tables...");
     const size_t nCameraCount = getCameraCount();
     const size_t nLayerSize = m_oGridSize.total();
