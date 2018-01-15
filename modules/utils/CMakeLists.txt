@@ -170,6 +170,9 @@ if(USE_OPENGM)
             "${OpenGM_LIBRARIES}"
     )
 endif()
+if(USE_LZ4)
+	target_link_libraries(litiv_utils PRIVATE litiv_3rdparty_lz4)
+endif()
 if(UNIX AND NOT ANDROID AND NOT (APPLE AND CMAKE_COMPILER_IS_CLANGCXX))
     # build fails without this for some platforms... broken external dependency? (see PR#5)
     target_link_libraries(litiv_utils

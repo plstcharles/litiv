@@ -248,6 +248,7 @@
     #define USING_WORLD_SOURCE_GLOB   @USE_WORLD_SOURCE_GLOB@
     #define USING_SOSPD               @USE_SOSPD@
     #define USING_OFDIS               @USE_OFDIS@
+    #define USING_LZ4                 @USE_LZ4@
 
     #if (defined(_MSC_VER) || defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__))
         #ifdef _MSC_VER
