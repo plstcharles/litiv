@@ -666,6 +666,16 @@ TYPED_TEST(readwrite_fixture,regression) {
         const cv::Mat oNewMat = lv::read(sArchivePath,lv::MatArchive_BINARY);
         ASSERT_EQ(cv::countNonZero(oNewMat!=oNewMat),0);
     }
+#if USING_LZ4
+    const std::string sComprArchivePath = TEST_OUTPUT_DATA_ROOT "/test_readwrite_lz4.mat";
+    for(size_t i=0; i<100; ++i) {
+        cv::Mat_<TypeParam> oMat(rng.uniform(100,200),rng.uniform(100,200));
+        rng.fill(oMat,cv::RNG::UNIFORM,-200,200,true);
+        lv::write(sComprArchivePath,oMat,lv::MatArchive_BINARY_LZ4);
+        const cv::Mat oNewMat = lv::read(sComprArchivePath,lv::MatArchive_BINARY_LZ4);
+        ASSERT_EQ(cv::countNonZero(oNewMat!=oNewMat),0);
+    }
+#endif //USING_LZ4
     const std::string sYMLPath = TEST_OUTPUT_DATA_ROOT "/test_readwrite.yml";
     for(size_t i=0; i<100; ++i) {
         cv::Mat_<TypeParam> oMat(rng.uniform(10,20),rng.uniform(10,20));

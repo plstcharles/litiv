@@ -1413,7 +1413,10 @@ namespace lv {
     enum MatArchiveList {
         MatArchive_FILESTORAGE,
         MatArchive_PLAINTEXT,
-        MatArchive_BINARY
+#if USING_LZ4
+        MatArchive_BINARY_LZ4,
+#endif //USING_LZ4
+        MatArchive_BINARY,
     };
 
     /// writes matrix data locally using a binary/yml/text file format

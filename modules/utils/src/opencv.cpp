@@ -17,6 +17,9 @@
 
 #include "litiv/utils/opencv.hpp"
 #include <fstream>
+#if USING_LZ4
+#include <lz4.h>
+#endif //USING_LZ4
 
 #define DISPLAY_HELPER_USE_LARGE_CROSSHAIR 1
 
@@ -415,6 +418,41 @@ void lv::write(const std::string& sFilePath, const cv::Mat& _oData, lv::MatArchi
         }
         lvAssert_(ssStr,"plain text archive write failed");
     }
+#if USING_LZ4
+    else if(eArchiveType==MatArchive_BINARY_LZ4) {
+        std::ofstream ssStr(sFilePath,std::ios::binary);
+        lvAssert__(ssStr.is_open(),"could not open binary file at '%s' for writing",sFilePath.c_str());
+        const int32_t nDataType = (int32_t)oData.type();
+        ssStr.write((const char*)&nDataType,sizeof(nDataType));
+        const uint64_t nElemSize = (uint64_t)oData.elemSize();
+        ssStr.write((const char*)&nElemSize,sizeof(nElemSize));
+        const uint64_t nElemCount = (uint64_t)oData.total();
+        ssStr.write((const char*)&nElemCount,sizeof(nElemCount));
+        const int32_t nDims = (int32_t)oData.dims;
+        ssStr.write((const char*)&nDims,sizeof(nDims));
+        for(int32_t nDimIdx=0; nDimIdx<nDims; ++nDimIdx) {
+            const int32_t nDimSize = (int32_t)oData.size[nDimIdx];
+            ssStr.write((const char*)&nDimSize,sizeof(nDimSize));
+        }
+        if(nElemSize*nElemCount>0u) {
+            static thread_local lv::AutoBuffer<char> s_aDataBuffer;
+            s_aDataBuffer.resize(size_t(nElemSize*nElemCount));
+            lvAssert_(nElemSize*nElemCount<uint64_t(std::numeric_limits<int32_t>::max()),"binary mat size too big for lz4");
+            const int32_t nComprSize = LZ4_compress_default((const char*)(oData.data),s_aDataBuffer.data(),int32_t(nElemSize*nElemCount),int32_t(nElemSize*nElemCount));
+            lvAssert__(nComprSize<=int32_t(nElemSize*nElemCount) && nComprSize>=0,"lz4 compression failed (%d)",nComprSize);
+            ssStr.write((const char*)&nComprSize,sizeof(nComprSize));
+            if(nComprSize==0) // cannot compress any more, use raw data instead
+                ssStr.write((const char*)(oData.data),nElemSize*nElemCount);
+            else
+                ssStr.write(s_aDataBuffer.data(),nComprSize);
+        }
+        else {
+            const int32_t nComprSize = 0;
+            ssStr.write((const char*)&nComprSize,sizeof(nComprSize));
+        }
+        lvAssert_(ssStr,"binary archive write failed");
+    }
+#endif //USING_LZ4
     else if(eArchiveType==MatArchive_BINARY) {
         std::ofstream ssStr(sFilePath,std::ios::binary);
         lvAssert__(ssStr.is_open(),"could not open binary file at '%s' for writing",sFilePath.c_str());
@@ -474,6 +512,41 @@ void lv::read(const std::string& sFilePath, cv::Mat& oData, lv::MatArchiveList e
         lvAssert_(ssStr,"plain text archive read failed");
         oDataTemp.convertTo(oData,nDataDepth);
     }
+#if USING_LZ4
+    else if(eArchiveType==MatArchive_BINARY_LZ4) {
+        std::ifstream ssStr(sFilePath,std::ios::binary);
+        lvAssert__(ssStr.is_open(),"could not open binary file at '%s' for reading",sFilePath.c_str());
+        int32_t nDataType;
+        ssStr.read((char*)&nDataType,sizeof(nDataType));
+        uint64_t nElemSize;
+        ssStr.read((char*)&nElemSize,sizeof(nElemSize));
+        uint64_t nElemCount;
+        ssStr.read((char*)&nElemCount,sizeof(nElemCount));
+        int32_t nDims;
+        ssStr.read((char*)&nDims,sizeof(nDims));
+        std::vector<int32_t> anSizes(nDims);
+        for(int32_t nDimIdx=0; nDimIdx<nDims; ++nDimIdx)
+            ssStr.read((char*)&anSizes[nDimIdx],sizeof(anSizes[nDimIdx]));
+        oData.create(nDims,anSizes.data(),nDataType);
+        lvAssert_(ssStr,"binary archive read failed");
+        if(oData.total()>0u) {
+            int32_t nComprSize;
+            ssStr.read((char*)&nComprSize,sizeof(nComprSize));
+            lvAssert_(nComprSize>=0 && uint64_t(nComprSize)<=(nElemSize*nElemCount),"bad lz4 compressed size");
+            if(nComprSize==0) // could not compress any more, use raw data instead
+                ssStr.read((char*)(oData.data),nElemSize*nElemCount);
+            else {
+                static thread_local lv::AutoBuffer<char> s_aDataBuffer;
+                s_aDataBuffer.resize(size_t(nComprSize));
+                ssStr.read(s_aDataBuffer.data(),nComprSize);
+                lvAssert_(ssStr,"binary archive read failed");
+                lvAssert_(nElemSize*nElemCount<uint64_t(std::numeric_limits<int32_t>::max()),"binary mat size too big for lz4");
+                const int nDecomprRes = LZ4_decompress_safe(s_aDataBuffer.data(),(char*)(oData.data),nComprSize,int(nElemSize*nElemCount));
+                lvAssert__(nDecomprRes==int(nElemSize*nElemCount),"lz4 decompression failed (%d)",nDecomprRes);
+            }
+        }
+    }
+#endif //USING_LZ4
     else if(eArchiveType==MatArchive_BINARY) {
         std::ifstream ssStr(sFilePath,std::ios::binary);
         lvAssert__(ssStr.is_open(),"could not open binary file at '%s' for reading",sFilePath.c_str());
