@@ -286,6 +286,8 @@ namespace lv {
         virtual bool isEvaluable() const {return false;}
         /// returns whether this work batch/group is currently processing data
         virtual bool isProcessing() const = 0;
+        /// returns whether this work batch/group is currently precaching data
+        virtual bool isPrecaching() const = 0;
         /// returns whether the work group is a pass-through container (always false for work batches)
         virtual bool isBare() const = 0;
         /// returns whether this data handler interface points to a work batch or a work group
@@ -408,6 +410,8 @@ namespace lv {
         virtual void resetMetrics() override final;
         /// returns whether *any* children work batch is currently processing data
         virtual bool isProcessing() const override final;
+        /// returns whether *any* children work batch is currently precaching data
+        virtual bool isPrecaching() const override final;
         /// returns whether the work group is a pass-through container
         virtual bool isBare() const override final;
         /// returns whether this data handler interface points to a work group (always true here)
@@ -516,6 +520,8 @@ namespace lv {
         virtual bool isInputInfoConst() const = 0;
         /// returns whether the gt packets are constant-sized and constant-typed
         virtual bool isGTInfoConst() const = 0;
+        /// returns whether this work batch is currently precaching data
+        virtual bool isPrecaching() const override;
     protected:
         /// types serve to automatically transform packets & define default implementations
         IIDataLoader(PacketPolicy eInputType, PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);

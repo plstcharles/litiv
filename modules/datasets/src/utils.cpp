@@ -224,6 +224,13 @@ bool lv::DataGroupHandler::isProcessing() const {
     return false;
 }
 
+bool lv::DataGroupHandler::isPrecaching() const {
+    for(const auto& pBatch : getBatches(true))
+        if(pBatch->isPrecaching())
+            return true;
+    return false;
+}
+
 bool lv::DataGroupHandler::isBare() const {
     return m_bIsBare;
 }
@@ -524,6 +531,10 @@ const cv::Mat& lv::IIDataLoader::getInputROI(size_t /*nPacketIdx*/) const {
 
 const cv::Mat& lv::IIDataLoader::getGTROI(size_t /*nPacketIdx*/) const {
     return lv::emptyMat();
+}
+
+bool lv::IIDataLoader::isPrecaching() const {
+    return m_oInputPrecacher.isActive();
 }
 
 lv::IIDataLoader::IIDataLoader(PacketPolicy eInputType, PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
