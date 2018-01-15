@@ -1387,6 +1387,8 @@ namespace lv {
         void setMouseCallback(std::function<void(const CallbackData&)> lCallback);
         /// sets whether the waitKey call should block and wait for a key press or allow timeouts and return without one
         void setContinuousUpdates(bool b);
+        /// sets whether the cursor should be displayed on top of each tile or not
+        void setDisplayCursor(bool b);
         /// calls cv::waitKey (blocking for a key press if m_bContinuousUpdates is false) and returns the cv::waitKey result
         int waitKey(int nDefaultSleepDelay=1);
         /// desctructor automatically closes its window
@@ -1401,7 +1403,7 @@ namespace lv {
         /// global entrypoint for opencv mouse callbacks
         static void onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData);
         cv::Size m_oLastDisplaySize,m_oLastTileSize;
-        bool m_bContinuousUpdates,m_bFirstDisplay,m_bMustDestroy;
+        bool m_bContinuousUpdates,m_bFirstDisplay,m_bMustDestroy,m_bDisplayCursor;
         cv::Mat m_oLastDisplay;
         std::function<void(int,int,int,int)> m_lInternalCallback;
         std::function<void(const CallbackData&)> m_lExternalCallback;

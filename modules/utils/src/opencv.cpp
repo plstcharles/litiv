@@ -155,6 +155,7 @@ lv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::str
         m_bContinuousUpdates(false),
         m_bFirstDisplay(true),
         m_bMustDestroy(false),
+        m_bDisplayCursor(true),
         m_lInternalCallback(std::bind(&DisplayHelper::onMouseEventCallback,this,std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4)) {
     if(m_oFS.isOpened()) {
         m_oFS << "htag" << lv::getVersionStamp();
@@ -229,7 +230,7 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
                 cv::resize(oImageBYTE3,oImageBYTE3,oNewTileSize);
             if(!vvImageNamePairs[nRowIdx][nColIdx].second.empty())
                 putText(oImageBYTE3,vvImageNamePairs[nRowIdx][nColIdx].second,cv::Scalar_<uint8_t>(0,0,255));
-            if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oNewTileSize.width && oDisplayPt.y<oNewTileSize.height && m_oLatestMouseEvent.oTileSize==oNewTileSize) {
+            if(m_bDisplayCursor && oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oNewTileSize.width && oDisplayPt.y<oNewTileSize.height && m_oLatestMouseEvent.oTileSize==oNewTileSize) {
             #if DISPLAY_HELPER_USE_LARGE_CROSSHAIR
                 cv::rectangle(oImageBYTE3,cv::Rect(0,oDisplayPt.y,oImageBYTE3.cols,1),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
                 cv::rectangle(oImageBYTE3,cv::Rect(oDisplayPt.x,0,1,oImageBYTE3.rows),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
@@ -295,7 +296,7 @@ void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::M
             cv::resize(oImageBYTE3,oImageBYTE3,oCurrDisplaySize);
         putText(oImageBYTE3,vImageNamePairs[nAlbumIdx].second+" ["+std::to_string(nAlbumIdx+1)+"/"+std::to_string(vImageNamePairs.size())+"]",cv::Scalar_<uint8_t>(0,0,255));
         const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oInternalPosition;
-        if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oCurrDisplaySize.width && oDisplayPt.y<oCurrDisplaySize.height && m_oLatestMouseEvent.oTileSize==oCurrDisplaySize) {
+        if(m_bDisplayCursor && oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oCurrDisplaySize.width && oDisplayPt.y<oCurrDisplaySize.height && m_oLatestMouseEvent.oTileSize==oCurrDisplaySize) {
         #if DISPLAY_HELPER_USE_LARGE_CROSSHAIR
             cv::rectangle(oImageBYTE3,cv::Rect(0,oDisplayPt.y,oImageBYTE3.cols,1),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
             cv::rectangle(oImageBYTE3,cv::Rect(oDisplayPt.x,0,1,oImageBYTE3.rows),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
@@ -339,6 +340,10 @@ void lv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)
 
 void lv::DisplayHelper::setContinuousUpdates(bool b) {
     m_bContinuousUpdates = b;
+}
+
+void lv::DisplayHelper::setDisplayCursor(bool b) {
+    m_bDisplayCursor = b;
 }
 
 int lv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
