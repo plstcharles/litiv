@@ -304,7 +304,8 @@ namespace lv {
             const bool bUseInterlacedMasks = this->m_nLoadInputMasks!=0;
             const size_t nInputRGBStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_RGB*(bUseInterlacedMasks?2:1));
             const size_t nInputLWIRStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_LWIR*(bUseInterlacedMasks?2:1));
-            if(bIsLoadingCalibData && vsInputPaths[nInputRGBStreamIdx].empty()) {
+            const bool bMustCheckLWIRName = (bIsLoadingCalibData && vsInputPaths[nInputRGBStreamIdx].empty());
+            if(bMustCheckLWIRName) {
                 lvDbgAssert(!vsInputPaths[nInputLWIRStreamIdx].empty());
                 return extractPathName(vsInputPaths[nInputLWIRStreamIdx]);
             }
@@ -801,7 +802,8 @@ namespace lv {
             lvAssert__(bIsLoadingCalibData || !vsInputPaths[nInputRGBStreamIdx].empty(),"could not open RGB input frame #%d (empty path)",(int)nPacketIdx);
             cv::Mat oRGBPacket = vsInputPaths[nInputRGBStreamIdx].empty()?cv::Mat(oRGBSize,CV_8UC3,cv::Scalar::all(0)):cv::imread(vsInputPaths[nInputRGBStreamIdx],cv::IMREAD_COLOR);
             lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==oRGBSize);
-            if(DATASETS_LITIV2018_FLIP_RGB && (!bIsLoadingCalibData || DATASETS_LITIV2018_CALIB_VERSION!=1))
+            const bool bFlipRGBPacket = (DATASETS_LITIV2018_FLIP_RGB && (!bIsLoadingCalibData || DATASETS_LITIV2018_CALIB_VERSION!=1));
+            if(bFlipRGBPacket)
                 cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
             if(oRGBPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
                 cv::resize(oRGBPacket,oRGBPacket,vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_CUBIC);
