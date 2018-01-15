@@ -90,6 +90,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 
     lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
     pDisplayHelper->setContinuousUpdates(true);
+    pDisplayHelper->setDisplayCursor(!GEN_SEGMENTATION_ANNOT);
     //const cv::Size oDisplayTileSize(1024,768);
     const cv::Size oDisplayTileSize(1200,1000);
     std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
@@ -111,7 +112,6 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     lv::createDirIfNotExist(sRGBGTDir); lv::createDirIfNotExist(sLWIRGTDir);
 
     std::set<int> mnSubsetIdxs;
-    std::set<std::string> msSubsetNames;
     {
         cv::FileStorage oGTMetadataFS(sRGBGTDir+"gtmetadata.yml",cv::FileStorage::READ);
         if(oGTMetadataFS.isOpened()) {
@@ -123,7 +123,6 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             oGTMetadataFS["subsetidxs"] >> vnPrevSubsetIdxs;
             oGTMetadataFS["subsetnames"] >> vsPrevSubsetNames;
             mnSubsetIdxs.insert(vnPrevSubsetIdxs.begin(),vnPrevSubsetIdxs.end());
-            msSubsetNames.insert(vsPrevSubsetNames.begin(),vsPrevSubsetNames.end());
         }
     }
 
@@ -135,34 +134,39 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     // @@@@@ add circle for tool size, add drag and drop via user side toggle
     double dSegmOpacity = 0.5, dSegmToolRadius = 3;
     lvIgnore(dSegmOpacity); lvIgnore(dSegmToolRadius);
+    cv::Point2f vMousePos(0.5f,0.5f);
+    int nCurrTile = -1;
     pDisplayHelper->setMouseCallback([&](const lv::DisplayHelper::CallbackData& oData) {
-        const cv::Point2f vClickPos(float(oData.oInternalPosition.x)/oData.oTileSize.width,float(oData.oInternalPosition.y)/oData.oTileSize.height);
-        if(vClickPos.x>=0.0f && vClickPos.y>=0.0f && vClickPos.x<1.0f && vClickPos.y<1.0f) {
-            const int nCurrTile = oData.oPosition.x/oData.oTileSize.width;
+        vMousePos = cv::Point2f(float(oData.oInternalPosition.x)/oData.oTileSize.width,float(oData.oInternalPosition.y)/oData.oTileSize.height);
+        if(vMousePos.x>=0.0f && vMousePos.y>=0.0f && vMousePos.x<1.0f && vMousePos.y<1.0f) {
+            nCurrTile = oData.oPosition.x/oData.oTileSize.width;
             if(oData.nEvent==cv::EVENT_MOUSEWHEEL && cv::getMouseWheelDelta(oData.nFlags)>0) {
                 dSegmToolRadius += std::max(1.0,dSegmToolRadius/10);
                 if(dSegmToolRadius>50)
                     dSegmToolRadius = 50;
+                lvLog_(2,"\tnew tool size = %f",dSegmToolRadius);
             }
             else if(oData.nEvent==cv::EVENT_MOUSEWHEEL && cv::getMouseWheelDelta(oData.nFlags)<0) {
                 dSegmToolRadius -= std::max(1.0,dSegmToolRadius/10);
                 if(dSegmToolRadius<1)
                     dSegmToolRadius = 1;
+                lvLog_(2,"\tnew tool size = %f",dSegmToolRadius);
             }
             if(oData.nEvent==cv::EVENT_LBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && oData.nFlags==cv::EVENT_FLAG_LBUTTON)) {
-                const cv::Point2i vClickPos_FP2(int(vClickPos.x*vOrigSizes[nCurrTile].width*4),int(vClickPos.y*vOrigSizes[nCurrTile].height*4));
-                cv::circle(aSegmMasks[nCurrTile],vClickPos_FP2,(int)dSegmToolRadius,cv::Scalar_<uchar>(255),-1,cv::LINE_8,2);
-                lvPrint("draw!");
+                const cv::Point2i vMousePos_FP2(int(vMousePos.x*vOrigSizes[nCurrTile].width*4),int(vMousePos.y*vOrigSizes[nCurrTile].height*4));
+                cv::circle(aSegmMasks[nCurrTile],vMousePos_FP2,(int)dSegmToolRadius,cv::Scalar_<uchar>(255),-1,cv::LINE_8,2);
             }
             else if(oData.nEvent==cv::EVENT_RBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && oData.nFlags==cv::EVENT_FLAG_RBUTTON)) {
-                const cv::Point2i vClickPos_FP2(int(vClickPos.x*vOrigSizes[nCurrTile].width*4),int(vClickPos.y*vOrigSizes[nCurrTile].height*4));
-                cv::circle(aSegmMasks[nCurrTile],vClickPos_FP2,(int)dSegmToolRadius,cv::Scalar_<uchar>(0),-1,cv::LINE_8,2);
+                const cv::Point2i vMousePos_FP2(int(vMousePos.x*vOrigSizes[nCurrTile].width*4),int(vMousePos.y*vOrigSizes[nCurrTile].height*4));
+                cv::circle(aSegmMasks[nCurrTile],vMousePos_FP2,(int)dSegmToolRadius,cv::Scalar_<uchar>(0),-1,cv::LINE_8,2);
             }
             if(oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
                 for(size_t a=0u; a<2u; ++a)
                     cv::compare(aSegmMasks[a],128u,aSegmMasks[a],cv::CMP_GT);
             }
         }
+        else
+            nCurrTile = -1;
         //pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
     });
     lvLog(1,"Annotation edit mode initialized...");
@@ -228,6 +232,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 }
             #endif //GEN_REGISTRATION_ANNOT
             }
+        #if GEN_SEGMENTATION_ANNOT
+            if(nCurrTile!=-1) {
+                const cv::Point2i vMousePos_FP2(int(vMousePos.x*vOrigSizes[nCurrTile].width*4),int(vMousePos.y*vOrigSizes[nCurrTile].height*4));
+                cv::circle(vvDisplayPairs[0][nCurrTile].first,vMousePos_FP2,(int)dSegmToolRadius,cv::Scalar_<uchar>(0,0,255),1,cv::LINE_AA,2);
+            }
+        #endif //GEN_SEGMENTATION_ANNOT
             pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
             nKeyPressed = pDisplayHelper->waitKey();
         }
@@ -245,13 +255,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             @@@@
         }
 #endif //GEN_REGISTRATION_ANNOT
-        if(bCurrFrameValid && mnSubsetIdxs.find((int)nCurrIdx)==mnSubsetIdxs.end()) {
-            mnSubsetIdxs.insert((int)nCurrIdx);
-            msSubsetNames.insert(sPacketName);
+        const int nRealIdx = std::stoi(sPacketName);
+        if(bCurrFrameValid && mnSubsetIdxs.find(nRealIdx)==mnSubsetIdxs.end()) {
+            mnSubsetIdxs.insert(nRealIdx);
         }
-        else if(!bCurrFrameValid && mnSubsetIdxs.find((int)nCurrIdx)!=mnSubsetIdxs.end()) {
-            mnSubsetIdxs.erase((int)nCurrIdx);
-            msSubsetNames.erase(sPacketName);
+        else if(!bCurrFrameValid && mnSubsetIdxs.find(nRealIdx)!=mnSubsetIdxs.end()) {
+            mnSubsetIdxs.erase(nRealIdx);
         }
         if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
             break;
@@ -267,7 +276,6 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         oGTMetadataFS << "date" << lv::getTimeStamp();
         oGTMetadataFS << "npackets" << (int)nTotPacketCount;
         oGTMetadataFS << "subsetidxs" << std::vector<int>(mnSubsetIdxs.begin(),mnSubsetIdxs.end());
-        oGTMetadataFS << "subsetnames" << std::vector<std::string>(msSubsetNames.begin(),msSubsetNames.end());
     }
     lvLog(1,"... batch done.\n");
 }
