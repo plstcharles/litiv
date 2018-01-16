@@ -16,21 +16,29 @@
 // limitations under the License.
 
 ////////////////////////////////
-#define GEN_SEGMENTATION_ANNOT  1
+#define GEN_SEGMENTATION_ANNOT  0
 #define GEN_REGISTRATION_ANNOT  0
+#define SAVE_C2D_MAPPING        1
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      1
 ////////////////////////////////
-#define DATASETS_LITIV2018_CALIB_VERSION 2
+#define DATASETS_LITIV2018_CALIB_VERSION 4
+#define DATASETS_LITIV2018_DATA_VERSION 3
 
-#if (GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)!=1
+#if (GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)>1
 #error "must select one type of annotation to generate"
-#endif //(GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)!=1
+#endif //(GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)>1
 
 #include "litiv/datasets.hpp"
 #include "litiv/imgproc.hpp"
 #include <opencv2/calib3d.hpp>
+#if SAVE_C2D_MAPPING
+#ifndef _MSC_VER
+#error "must use kinect api"
+#endif //ndef(_MSC_VER)
+#include "litiv/utils/kinect.hpp"
+#endif //SAVE_C2D_MAPPING
 
 using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::Dataset_LITIV_stcharles2018,lv::NonParallel>;
 void Analyze(lv::IDataHandlerPtr pBatch);
@@ -41,7 +49,7 @@ int main(int, char**) {
                 DATASET_OUTPUT_PATH, // const std::string& sOutputDirName
                 false, //bool bSaveOutput
                 false, //bool bUseEvaluator
-                (GEN_SEGMENTATION_ANNOT==1), //bool bLoadDepth
+                (GEN_SEGMENTATION_ANNOT==1 || SAVE_C2D_MAPPING==1), //bool bLoadDepth
                 (GEN_REGISTRATION_ANNOT==1), //bool bUndistort
                 (GEN_REGISTRATION_ANNOT==1), //bool bHorizRectify
                 false, //bool bEvalDisparities
@@ -89,6 +97,17 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         }
         lvLog_(1,"\ninitializing batch '%s'...\n",oBatch.getName().c_str());
 
+    #if SAVE_C2D_MAPPING
+        CComPtr<IKinectSensor> pKinectSensor;
+        lvAssertHR(GetDefaultKinectSensor(&pKinectSensor));
+        lvAssert(pKinectSensor);
+        lvAssertHR(pKinectSensor->Open());
+        CComPtr<ICoordinateMapper> pCoordMapper;
+        lvAssertHR(pKinectSensor->get_CoordinateMapper(&pCoordMapper));
+        const std::string sC2DMappingDir = oBatch.getDataPath()+"coordmap_c2d/";
+        lv::createDirIfNotExist(sC2DMappingDir);
+    #endif //SAVE_C2D_MAPPING
+
         lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pDisplayHelper->setContinuousUpdates(true);
         pDisplayHelper->setDisplayCursor(!GEN_SEGMENTATION_ANNOT);
@@ -124,7 +143,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 mnSubsetIdxs.insert(vnPrevSubsetIdxs.begin(),vnPrevSubsetIdxs.end());
             }
         }
-
+    #if (GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
     #if GEN_SEGMENTATION_ANNOT
         std::array<cv::Mat,2> aSegmMasks,aSegmMasks_3ch;
     #elif GEN_REGISTRATION_ANNOT
@@ -152,7 +171,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     const cv::Point2i vMousePos_FP2(int(vMousePos.x*vOrigSizes[nCurrTile].width*4),int(vMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vLastMousePos_FP2(int(vLastMousePos.x*vOrigSizes[nCurrTile].width*4),int(vLastMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vMousePosDiff = vMousePos_FP2-vLastMousePos_FP2;
-                    const int nMoveIter = int(cv::norm(vMousePosDiff)/4.0);
+                    const int nMoveIter = int(cv::norm(vMousePosDiff)/2.0);
                     for(int nCurrIter=1; nCurrIter<=nMoveIter; ++nCurrIter) {
                         const cv::Point2i vMouseCurrPos = vLastMousePos_FP2+cv::Point2i(vMousePosDiff.x*nCurrIter/nMoveIter,vMousePosDiff.y*nCurrIter/nMoveIter);
                         cv::circle(aSegmMasks[nCurrTile],vMouseCurrPos,(int)adSegmToolRadius[nCurrTile],cv::Scalar_<uchar>(255),-1,cv::LINE_8,2);
@@ -163,7 +182,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     const cv::Point2i vMousePos_FP2(int(vMousePos.x*vOrigSizes[nCurrTile].width*4),int(vMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vLastMousePos_FP2(int(vLastMousePos.x*vOrigSizes[nCurrTile].width*4),int(vLastMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vMousePosDiff = vMousePos_FP2-vLastMousePos_FP2;
-                    const int nMoveIter = int(cv::norm(vMousePosDiff)/4.0);
+                    const int nMoveIter = int(cv::norm(vMousePosDiff)/2.0);
                     for(int nCurrIter=1; nCurrIter<=nMoveIter; ++nCurrIter) {
                         const cv::Point2i vMouseCurrPos = vLastMousePos_FP2+cv::Point2i(vMousePosDiff.x*nCurrIter/nMoveIter,vMousePosDiff.y*nCurrIter/nMoveIter);
                         cv::circle(aSegmMasks[nCurrTile],vMouseCurrPos,(int)adSegmToolRadius[nCurrTile],cv::Scalar_<uchar>(0),-1,cv::LINE_8,2);
@@ -180,9 +199,11 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             vLastMousePos = vMousePos;
             //pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
         });
+    #endif //(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
         lvLog(1,"Annotation edit mode initialized...");
         nCurrIdx = 0u;
         while(nCurrIdx<nTotPacketCount) {
+            const std::string sPacketName = oBatch.getInputName(nCurrIdx);
             const std::vector<cv::Mat>& vCurrInputs = oBatch.getInputArray(nCurrIdx);
             std::array<cv::Mat,2> aInputs;
             for(size_t a=0; a<2u; ++a) {
@@ -200,9 +221,18 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 lvAssert(!oDepthFrame.empty());
                 lvAssert(oDepthFrame.size()==vOrigSizes[2]);
                 lvAssert(oDepthFrame.type()==CV_16UC1);
+                cv::Mat oCoordMap = lv::read(oBatch.getDataPath()+"/coordmap_d2c/"+sPacketName+".bin",lv::MatArchive_BINARY_LZ4);
+                lvAssert(oCoordMap.total()==oDepthFrame.total() && oCoordMap.type()==CV_32FC2);
+                cv::Mat oBodyIdxMap = lv::read(oBatch.getDataPath()+"/bodyidx/"+sPacketName+".bin",lv::MatArchive_BINARY_LZ4);
+                lvAssert(oBodyIdxMap.size()==oDepthFrame.size() && oBodyIdxMap.type()==CV_8UC1);
+
+            #if SAVE_C2D_MAPPING
+                cv::Mat oCoordMapFrame_c2d(oRGBFrame.size(),CV_32FC2);
+                lvAssertHR(pCoordMapper->MapColorFrameToDepthSpace((UINT)oDepthFrame.total(),(uint16_t*)oDepthFrame.data,(UINT)oRGBFrame.total(),(DepthSpacePoint*)oCoordMapFrame_c2d.data));
+                lv::write(sC2DMappingDir+sPacketName+".bin",oCoordMapFrame_c2d,lv::MatArchive_BINARY_LZ4);
+            #endif //SAVE_C2D_MAPPING
             }
-            const std::string sPacketName = oBatch.getInputName(nCurrIdx);
-    #if GEN_SEGMENTATION_ANNOT
+        #if GEN_SEGMENTATION_ANNOT
             aSegmMasks[0] = cv::imread(sRGBGTDir+lv::putf("%05d.png",(int)nCurrIdx),cv::IMREAD_GRAYSCALE);
             if(aSegmMasks[0].empty()) {
                 aSegmMasks[0].create(vOrigSizes[0],CV_8UC1);
@@ -215,14 +245,15 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 aSegmMasks[1] = 0u;
                 // @@@ try to reg w/ depth here?
             }
-    #elif GEN_REGISTRATION_ANNOT
+        #elif GEN_REGISTRATION_ANNOT
             {
                 cv::FileStorage oGTFS_RGB(sRGBGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::READ);
                 cv::FileStorage oGTFS_LWIR(sLWIRGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::READ);
                 @@@ missing impl
             }
-    #endif //GEN_REGISTRATION_ANNOT
+        #endif //GEN_REGISTRATION_ANNOT
             lvLog_(1,"\t annot @ #%d ('%s') of %d",int(nCurrIdx),sPacketName.c_str(),int(nTotPacketCount));
+        #if (GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
             int nKeyPressed = -1;
             while(nKeyPressed!=(int)'q' &&
                   nKeyPressed!=27/*escape*/ &&
@@ -260,20 +291,20 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     lvLog_(1,"\topacity now at %f",dSegmOpacity);
                 }
             }
-    #if GEN_SEGMENTATION_ANNOT
+        #if GEN_SEGMENTATION_ANNOT
             const bool bCurrFrameValid = (cv::countNonZero(aSegmMasks[0])!=0 || cv::countNonZero(aSegmMasks[1])!=0);
             if(bCurrFrameValid) {
                 cv::imwrite(sRGBGTDir+lv::putf("%05d.png",(int)nCurrIdx),aSegmMasks[0]);
                 cv::imwrite(sLWIRGTDir+lv::putf("%05d.png",(int)nCurrIdx),aSegmMasks[1]);
             }
-    #elif GEN_REGISTRATION_ANNOT
+        #elif GEN_REGISTRATION_ANNOT
             const bool bCurrFrameValid = (!avvRegistrPts[0][nCurrIdx].empty() || !avvRegistrPts[1][nCurrIdx].empty());
             if(bCurrFrameValid) {
                 cv::FileStorage oGTFS_RGB(sRGBGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::WRITE);
                 cv::FileStorage oGTFS_LWIR(sLWIRGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::WRITE);
                 @@@@
             }
-    #endif //GEN_REGISTRATION_ANNOT
+        #endif //GEN_REGISTRATION_ANNOT
             const int nRealIdx = std::stoi(sPacketName);
             if(bCurrFrameValid && mnSubsetIdxs.find(nRealIdx)==mnSubsetIdxs.end()) {
                 mnSubsetIdxs.insert(nRealIdx);
@@ -287,6 +318,9 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 --nCurrIdx;
             else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u))
                 ++nCurrIdx;
+        #else //!(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
+            ++nCurrIdx;
+        #endif //!(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
         }
         {
             cv::FileStorage oGTMetadataFS(sRGBGTDir+"gtmetadata.yml",cv::FileStorage::WRITE);

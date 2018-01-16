@@ -19,6 +19,7 @@
 
 #include "litiv/utils/cxx.hpp"
 #if defined(_MSC_VER) && !USE_KINECTSDK_STANDALONE
+#include <atlbase.h>
 #include <windows.h>
 #include <winerror.h>
 #include <comdef.h>
