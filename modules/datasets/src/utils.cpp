@@ -1255,7 +1255,7 @@ bool lv::DataWriter::queue_check(const cv::Mat& oPacket, size_t nIdx) {
     if(!m_bIsActive)
         return true;
     const size_t nPacketSize = oPacket.total()*oPacket.elemSize();
-    lvAssert_(nPacketSize<=m_nQueueMaxSize,"packet too large for queue, max cache size must be incrased");
+    lvAssert__(nPacketSize<=m_nQueueMaxSize,"packet too large for queue, max cache size must be increased (got %d, max is %d)",(int)nPacketSize,(int)m_nQueueMaxSize);
     if(!m_bAllowPacketDrop)
         return true; // since this config blocks, packet will never be dropped
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
@@ -1270,7 +1270,7 @@ size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
     if(!m_bIsActive)
         return m_lCallback(oPacket,nIdx);
     const size_t nPacketSize = oPacket.total()*oPacket.elemSize();
-    lvAssert_(nPacketSize<=m_nQueueMaxSize,"packet too large for queue, max cache size must be incrased");
+    lvAssert__(nPacketSize<=m_nQueueMaxSize,"packet too large for queue, max cache size must be increased (got %d, max is %d)",(int)nPacketSize,(int)m_nQueueMaxSize);
     size_t nPacketPosition;
     {
         lvLog_(4,"data writer [%" PRIxPTR "] received packet at idx = %zu...",uintptr_t(this),nIdx);

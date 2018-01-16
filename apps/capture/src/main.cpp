@@ -24,13 +24,15 @@
 /////////////////////////////////
 #define USE_LWIR_SENSOR         1
 #define USE_NIR_SENSOR          0
+#define USE_C2D_MAPPING         0
 /////////////////////////////////
 #define DISPLAY_OUTPUT          2
 #define WRITE_OUTPUT            0
 #define WRITE_OUTPUT_PREFIX     "test"
 /////////////////////////////////
+// note: values below are useless if larger than cmake's DATASETS_CACHE_SIZE
 #define DEFAULT_QUEUE_BUFFER_SIZE   1024*1024*50  // max = 50MB per queue (default)
-#define HIGHDEF_QUEUE_BUFFER_SIZE   1024*1024*1024 // max = 1GB per queue (high-defition stream)
+#define HIGHDEF_QUEUE_BUFFER_SIZE   1024*1024*512 // max = 512MB per queue (high-defition stream)
 //#define VIDEO_FILE_PREALLOC_SIZE    1024*1024*1024 // tot = 1GB per video file
 //#define STRUCT_FILE_PREALLOC_SIZE   1024*1024*20 // tot = 200MB per struct file
 /////////////////////////////////
@@ -39,10 +41,11 @@
 #define NIR_OUTPUT_VIDEO_PARAMS     "c:/temp/" WRITE_OUTPUT_PREFIX "/nir.avi",     -1,     30.0,     cv::Size(512,424),    false    // ffdshow mpeg4/xvid w/ 'grayscale' preset
 #define RGB_OUTPUT_VIDEO_PARAMS     "e:/temp/" WRITE_OUTPUT_PREFIX "/rgb.avi",     -1,     30.0,     cv::Size(1920,1080),  true     // x264/mpeg4 w/ 'superfast' preset
 /////////////////////////////////
-//////// custom params //////////                     folder name                  filename  fileext       frame size         compr params
-#define BODYIDX_OUTPUT_IMGSEQ_PARAMS  "e:/temp/" WRITE_OUTPUT_PREFIX "/bodyidx/",  "%05d",   ".bin",   cv::Size(512,424),  std::vector<int>{}
-#define DEPTH_OUTPUT_IMGSEQ_PARAMS    "e:/temp/" WRITE_OUTPUT_PREFIX "/depth/",    "%05d",   ".bin",   cv::Size(512,424),  std::vector<int>{}
-#define COORDMAP_OUTPUT_IMGSEQ_PARAMS "e:/temp/" WRITE_OUTPUT_PREFIX "/coordmap/", "%05d",   ".bin"
+//////// custom params //////////                     folder name                         filename  fileext       frame size         compr params
+#define BODYIDX_OUTPUT_IMGSEQ_PARAMS  "e:/temp/" WRITE_OUTPUT_PREFIX "/bodyidx/",          "%05d",   ".bin",   cv::Size(512,424),  std::vector<int>{}
+#define DEPTH_OUTPUT_IMGSEQ_PARAMS    "e:/temp/" WRITE_OUTPUT_PREFIX "/depth/",            "%05d",   ".bin",   cv::Size(512,424),  std::vector<int>{}
+#define COORDMAP_C2D_OUTPUT_IMGSEQ_PARAMS "e:/temp/" WRITE_OUTPUT_PREFIX "/coordmap_c2d/", "%05d",   ".bin"
+#define COORDMAP_D2C_OUTPUT_IMGSEQ_PARAMS "e:/temp/" WRITE_OUTPUT_PREFIX "/coordmap_d2c/", "%05d",   ".bin"
 /////////////////////////////////
 #define BODY_DATA_OUTPUT_PARAMS     "c:/temp/" WRITE_OUTPUT_PREFIX "/body.bin",     std::ios::out|std::ios::binary
 #define META_DATA_OUTPUT_PARAMS     "c:/temp/" WRITE_OUTPUT_PREFIX "/metadata.yml", cv::FileStorage::WRITE
@@ -66,7 +69,11 @@ int main() {
             if(sRealPath.find("%")!=std::string::npos)
                 sRealPath = lv::putf(sRealPath.c_str(),(int)++nLastSavedIndex);
             if(sRealPath.size()>=4 && sRealPath.compare(sRealPath.size()-4,sRealPath.size(),".bin")==0)
+            #if USING_LZ4
+                lv::write(sRealPath,oImage,lv::MatArchive_BINARY_LZ4);
+            #else //!USING_LZ4
                 lv::write(sRealPath,oImage);
+            #endif //!USING_LZ4
             else
                 cv::imwrite(sRealPath,oImage,vComprParams);
             return (size_t)0;
@@ -118,7 +125,8 @@ int main() {
         constexpr size_t nStreamCount = size_t(USE_NIR_SENSOR?5:4);
         lv::KinectBodyFrame oBodyFrame;
         cv::Mat oBodyFrameWrapper(1,(int)sizeof(lv::KinectBodyFrame),CV_8UC1,&oBodyFrame);
-        cv::Mat oBodyIdxFrame,oNIRFrame,oDepthFrame,oCoordMapFrame,oRGBFrame;
+        cv::Mat oBodyIdxFrame,oNIRFrame,oDepthFrame,oCoordMapFrame_c2d,oCoordMapFrame_d2c,oRGBFrame;
+        lvIgnore(oCoordMapFrame_c2d);
         const cv::Size oBodyIdxFrameSize = std::get<3>(std::make_tuple(BODYIDX_OUTPUT_IMGSEQ_PARAMS));
         const cv::Size oNIRFrameSize = std::get<3>(std::make_tuple(NIR_OUTPUT_VIDEO_PARAMS));
         const cv::Size oDepthFrameSize = std::get<3>(std::make_tuple(DEPTH_OUTPUT_IMGSEQ_PARAMS));
@@ -166,13 +174,22 @@ int main() {
         vWriters.push_back(oDepthVideoAsyncWriter);
         vPackets.push_back(oDepthFrame);
         std::cout << "Setting up COORDMAP video writer..." << std::endl;
-        size_t nLastSavedCoordMapFrameIdx = SIZE_MAX;
-        lv::createDirIfNotExist(std::get<0>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS)));
-        const std::string sCoordMapFramePath = lv::addDirSlashIfMissing(std::get<0>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS)))+std::get<1>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS))+std::get<2>(std::make_tuple(COORDMAP_OUTPUT_IMGSEQ_PARAMS));
-        lv::DataWriter oCoordMapVideoAsyncWriter(std::bind(lEncodeAndSaveImage,std::placeholders::_1,std::placeholders::_2,sCoordMapFramePath,std::vector<int>(),nLastSavedCoordMapFrameIdx));
-        lvAssert(oCoordMapVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE/**4*/,true));
-        vWriters.push_back(oCoordMapVideoAsyncWriter);
-        vPackets.push_back(oCoordMapFrame);
+    #if USE_C2D_MAPPING
+        size_t nLastSavedCoordMapFrameIdx_c2d = SIZE_MAX;
+        lv::createDirIfNotExist(std::get<0>(std::make_tuple(COORDMAP_C2D_OUTPUT_IMGSEQ_PARAMS)));
+        const std::string sCoordMapFramePath_c2d = lv::addDirSlashIfMissing(std::get<0>(std::make_tuple(COORDMAP_C2D_OUTPUT_IMGSEQ_PARAMS)))+std::get<1>(std::make_tuple(COORDMAP_C2D_OUTPUT_IMGSEQ_PARAMS))+std::get<2>(std::make_tuple(COORDMAP_C2D_OUTPUT_IMGSEQ_PARAMS));
+        lv::DataWriter oCoordMapVideoAsyncWriter_c2d(std::bind(lEncodeAndSaveImage,std::placeholders::_1,std::placeholders::_2,sCoordMapFramePath_c2d,std::vector<int>(),nLastSavedCoordMapFrameIdx_c2d));
+        lvAssert(oCoordMapVideoAsyncWriter_c2d.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
+        vWriters.push_back(oCoordMapVideoAsyncWriter_c2d);
+        vPackets.push_back(oCoordMapFrame_c2d);
+    #endif USE_C2D_MAPPING
+        size_t nLastSavedCoordMapFrameIdx_d2c = SIZE_MAX;
+        lv::createDirIfNotExist(std::get<0>(std::make_tuple(COORDMAP_D2C_OUTPUT_IMGSEQ_PARAMS)));
+        const std::string sCoordMapFramePath_d2c = lv::addDirSlashIfMissing(std::get<0>(std::make_tuple(COORDMAP_D2C_OUTPUT_IMGSEQ_PARAMS)))+std::get<1>(std::make_tuple(COORDMAP_D2C_OUTPUT_IMGSEQ_PARAMS))+std::get<2>(std::make_tuple(COORDMAP_D2C_OUTPUT_IMGSEQ_PARAMS));
+        lv::DataWriter oCoordMapVideoAsyncWriter_d2c(std::bind(lEncodeAndSaveImage,std::placeholders::_1,std::placeholders::_2,sCoordMapFramePath_d2c,std::vector<int>(),nLastSavedCoordMapFrameIdx_d2c));
+        lvAssert(oCoordMapVideoAsyncWriter_d2c.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE*2,true));
+        vWriters.push_back(oCoordMapVideoAsyncWriter_d2c);
+        vPackets.push_back(oCoordMapFrame_d2c);
         std::cout << "Setting up RGB video writer..." << std::endl;
         size_t nLastSavedRGBFrameIdx = SIZE_MAX;
         //lvAssert(lv::createBinFileWithPrealloc(std::get<0>(std::make_tuple(RGB_OUTPUT_VIDEO_PARAMS)),VIDEO_FILE_PREALLOC_SIZE));
@@ -364,12 +381,19 @@ int main() {
                         }
                     #endif //WRITE_OUTPUT
                         oDepthFrame.create(oDepthFrameSize,CV_16UC1);
-                        oCoordMapFrame.create(1,oDepthFrameSize.area(),CV_32FC2);
+                    #if USE_C2D_MAPPING
+                        oCoordMapFrame_c2d.create(oRGBFrameSize,CV_32FC2);
+                    #endif //USE_C2D_MAPPING
+                        oCoordMapFrame_d2c.create(oDepthFrameSize,CV_32FC2);
                     }
-                    const UINT nDepthPts = (UINT)oDepthFrame.total();
+                    const UINT nDepthPts = (UINT)oCoordMapFrame_d2c.total();
                     lvAssertHR(pFrame->CopyFrameDataToArray(nDepthPts,(uint16_t*)oDepthFrame.data));
                     static_assert(sizeof(ColorSpacePoint[3])==sizeof(float)*6,"cannot properly fit color space point data into ocv mat");
-                    lvAssertHR(pCoordMapper->MapDepthFrameToColorSpace(nDepthPts,(uint16_t*)oDepthFrame.data,nDepthPts,(ColorSpacePoint*)oCoordMapFrame.data));
+                #if USE_C2D_MAPPING
+                    const UINT nColorPts = (UINT)oCoordMapFrame_c2d.total();
+                    lvAssertHR(pCoordMapper->MapColorFrameToDepthSpace(nDepthPts,(uint16_t*)oDepthFrame.data,nColorPts,(DepthSpacePoint*)oCoordMapFrame_c2d.data));
+                #endif //USE_C2D_MAPPING
+                    lvAssertHR(pCoordMapper->MapDepthFrameToColorSpace(nDepthPts,(uint16_t*)oDepthFrame.data,nDepthPts,(ColorSpacePoint*)oCoordMapFrame_d2c.data));
                 }
                 return bGotFrame;
             },
@@ -472,7 +496,7 @@ int main() {
                     for (size_t nBodyContourPtIdx = 0u; nBodyContourPtIdx < vvBodyIdxContours[nBodyIdx].size(); ++nBodyContourPtIdx) {
                         const cv::Point& oContourPt = vvBodyIdxContours[nBodyIdx][nBodyContourPtIdx];
                         const UINT nDepthPtIdx = UINT(oContourPt.y*oDepthFrameSize.width+oContourPt.x);
-                        const ColorSpacePoint& oContourPt_ColorSpace = ((ColorSpacePoint*)oCoordMapFrame.data)[nDepthPtIdx];
+                        const ColorSpacePoint& oContourPt_ColorSpace = ((ColorSpacePoint*)oCoordMapFrame_d2c.data)[nDepthPtIdx];
                         vvBodyIdxContours_ColorSpace[nBodyIdx].emplace_back((int)std::round(oContourPt_ColorSpace.X),(int)std::round(oContourPt_ColorSpace.Y));
                     }
                 }
@@ -584,7 +608,10 @@ int main() {
                     lvAssert(oNIRVideoAsyncWriter.queue(oNIRFrame,nRealFrameIdx)!=SIZE_MAX);
                 #endif //USE_NIR_SENSOR
                     lvAssert(oDepthVideoAsyncWriter.queue(oDepthFrame,nRealFrameIdx)!=SIZE_MAX);
-                    lvAssert(oCoordMapVideoAsyncWriter.queue(oCoordMapFrame,nRealFrameIdx)!=SIZE_MAX);
+                #if USE_C2D_MAPPING
+                    lvAssert(oCoordMapVideoAsyncWriter_c2d.queue(oCoordMapFrame_c2d,nRealFrameIdx)!=SIZE_MAX);
+                #endif //USE_C2D_MAPPING
+                    lvAssert(oCoordMapVideoAsyncWriter_d2c.queue(oCoordMapFrame_d2c,nRealFrameIdx)!=SIZE_MAX);
                     ++nGoodFrameIdx;
                 }
                 else {
