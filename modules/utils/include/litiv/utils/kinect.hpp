@@ -144,6 +144,9 @@ namespace lv {
 
     /// portable structure containing kinect body data for one frame
     struct KinectBodyFrame {
+        using BOOLEAN = unsigned char;
+        using DWORD = unsigned long;
+        using UINT64 = unsigned long long;
         bool bIsValid;
         TIMESPAN nTimeStamp;
         Vector4 vFloorClipPlane;
