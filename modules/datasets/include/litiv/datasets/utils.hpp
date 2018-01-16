@@ -476,7 +476,7 @@ namespace lv {
         std::mutex m_oSyncMutex;
         std::condition_variable m_oReqCondVar;
         std::condition_variable m_oSyncCondVar;
-        std::atomic_bool m_bIsActive;
+        std::atomic_bool m_bIsActive,m_bGotRequest;
         size_t m_nReqIdx,m_nLastReqIdx;
         std::atomic_size_t m_nAnswIdx;
         cv::Mat m_oReqPacket,m_oLastReqPacket;

@@ -21,7 +21,7 @@
 #define PRECACHE_REQUEST_TIMEOUT_MS        1
 #define PRECACHE_QUERY_TIMEOUT_MS          10
 #define PRECACHE_QUERY_END_TIMEOUT_MS      500
-#define PRECACHE_REFILL_TIMEOUT_MS         10000
+#define PRECACHE_REFILL_TIMEOUT_MS         5000
 #if (!(defined(_M_X64) || defined(__amd64__) || defined(__aarch64__)) && CACHE_MAX_SIZE_MB>2048)
 #error "Cache max size exceeds system limit (x86)."
 #endif //(!(defined(...arch...)) && CACHE_MAX_SIZE_MB>2048)
@@ -294,7 +294,7 @@ void lv::DataGroupHandler::parseData() {
 lv::DataPrecacher::DataPrecacher(std::function<cv::Mat(size_t)> lDataLoaderCallback) :
         m_lCallback(lDataLoaderCallback) {
     lvAssert_(m_lCallback,"invalid data precacher callback");
-    m_bIsActive = false;
+    m_bIsActive = m_bGotRequest = false;
     m_pWorkerException = nullptr;
     m_nAnswIdx = m_nReqIdx = m_nLastReqIdx = size_t(-1);
 }
@@ -318,15 +318,19 @@ const cv::Mat& lv::DataPrecacher::getPacket(size_t nIdx) {
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     m_nReqIdx = nIdx;
     std::cv_status res;
-    size_t nAnswIdx;
+    size_t nAnswIdx = size_t(-1);
+    lvAssert_(!m_bGotRequest,"data precacher trying two requests at once!");
+    m_oReqCondVar.notify_one();
+    m_bGotRequest = true;
+    lvLog_(4,"data precacher [%" PRIxPTR "] sending request for packet at idx = %zu...",uintptr_t(this),nIdx);
     do {
-        m_oReqCondVar.notify_one();
-        lvLog_(4,"data precacher [%" PRIxPTR "] sending request for packet at idx = %zu...",uintptr_t(this),nIdx);
         res = m_oSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_REQUEST_TIMEOUT_MS));
         nAnswIdx = m_nAnswIdx.load();
-        if(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx)
+        if(nAnswIdx!=m_nReqIdx)
             lvLog_(3,"data precacher [%" PRIxPTR "] retrying request for packet #%zu...",uintptr_t(this),nIdx);
-    } while(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx && !m_pWorkerException);
+    } while(nAnswIdx!=m_nReqIdx && !m_pWorkerException);
+    m_nReqIdx = size_t(-1);
+    m_bGotRequest = false;
     if(m_pWorkerException) {
         lvLog_(0,"data precacher [%" PRIxPTR "] caught precacher exception while requesting packet #%zu, will rethrow...",uintptr_t(this),nIdx);
         m_bIsActive = false;
@@ -348,6 +352,7 @@ bool lv::DataPrecacher::startAsyncPrecaching(size_t nSuggestedBufferSize) {
         m_bIsActive = true;
         m_pWorkerException = nullptr;
         m_nAnswIdx = m_nReqIdx = size_t(-1);
+        m_bGotRequest = false;
         const size_t nBufferSize = std::max(std::min(nSuggestedBufferSize,CACHE_MAX_SIZE),CACHE_MIN_SIZE);
         lvLog_(2,"data precacher [%" PRIxPTR "] precaching thread init w/ buffer size = %zu mb",uintptr_t(this),(nBufferSize/1024)/1024);
         m_hWorker = std::thread(&DataPrecacher::entry,this,nBufferSize);
@@ -361,6 +366,7 @@ void lv::DataPrecacher::stopAsyncPrecaching() {
         m_bIsActive = false;
         lvLog_(2,"data precacher [%" PRIxPTR "] joining precaching thread",uintptr_t(this));
         m_hWorker.join();
+        lvAssert_(!m_bGotRequest,"last request should have been answered");
     }
     if(m_pWorkerException)
         std::rethrow_exception(m_pWorkerException);
@@ -370,32 +376,44 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     try {
         lvDbgExceptionWatch;
-        std::queue<cv::Mat> qoCache;
+        std::list<cv::Mat> lCache;
         std::vector<uchar> vcBuffer(nBufferSize);
         size_t nNextExpectedReqIdx = 0;
         size_t nNextPrecacheIdx = 0;
         size_t nFirstBufferIdx = size_t(-1);
         size_t nNextBufferIdx = size_t(-1);
+        size_t nLastTargetPacketIdx = size_t(-1);
+        cv::Mat oLastTargetPacket;
         bool bReachedEnd = false;
-        const auto lCacheNextPacket = [&]() -> size_t {
-            const cv::Mat oNextPacket = m_lCallback(nNextPrecacheIdx);
+        const auto lCacheNextPacket = [&](size_t nTargetPacketIdx) -> size_t {
+            cv::Mat oNextPacket;
+            bool bAlreadyTested = false;
+            if(nTargetPacketIdx!=nLastTargetPacketIdx) {
+                oLastTargetPacket = oNextPacket = m_lCallback(nTargetPacketIdx);
+                nLastTargetPacketIdx = nTargetPacketIdx;
+            }
+            else {
+                oNextPacket = oLastTargetPacket;
+                bAlreadyTested = true;
+            }
             const size_t nNextPacketSize = oNextPacket.total()*oNextPacket.elemSize();
             if(nNextPacketSize==0) {
                 if(!bReachedEnd)
-                    lvLog_(3,"data precacher [%" PRIxPTR "] reached end of stream at idx = %zu",uintptr_t(this),nNextPrecacheIdx);
+                    lvLog_(bAlreadyTested?8:3,"data precacher [%" PRIxPTR "] reached end of stream at idx = %zu",uintptr_t(this),nTargetPacketIdx);
                 bReachedEnd = true;
                 return 0;
             }
             bReachedEnd = false;
-            if(nFirstBufferIdx<=nNextBufferIdx) {
+            if(nFirstBufferIdx==size_t(-1) || nNextBufferIdx==size_t(-1) || nFirstBufferIdx<nNextBufferIdx) {
+                lvDbgAssert(!((nFirstBufferIdx==size_t(-1))^(nNextBufferIdx==size_t(-1))));
                 if(nNextBufferIdx==size_t(-1) || (nNextBufferIdx+nNextPacketSize>nBufferSize)) {
                     if((nFirstBufferIdx!=size_t(-1) && nNextPacketSize>nFirstBufferIdx) || nNextPacketSize>nBufferSize) {
-                        lvLog_(4,"data precacher [%" PRIxPTR "] cannot cache packet at idx = %zu with size = %zu kb (too big/cache full)",uintptr_t(this),nNextPrecacheIdx,nNextPacketSize/1024);
+                        lvLog_(bAlreadyTested?8:4,"data precacher [%" PRIxPTR "] cannot cache packet at idx = %zu with size = %zu kb (too big/cache full)",uintptr_t(this),nTargetPacketIdx,nNextPacketSize/1024);
                         return 0;
                     }
                     cv::Mat oNextPacket_cache(oNextPacket.dims,oNextPacket.size,oNextPacket.type(),vcBuffer.data());
                     oNextPacket.copyTo(oNextPacket_cache);
-                    qoCache.push(oNextPacket_cache);
+                    lCache.push_back(oNextPacket_cache);
                     nNextBufferIdx = nNextPacketSize;
                     if(nFirstBufferIdx==size_t(-1))
                         nFirstBufferIdx = 0;
@@ -403,45 +421,57 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                 else { // nNextBufferIdx+nNextPacketSize<m_nBufferSize
                     cv::Mat oNextPacket_cache(oNextPacket.dims,oNextPacket.size,oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
                     oNextPacket.copyTo(oNextPacket_cache);
-                    qoCache.push(oNextPacket_cache);
+                    lCache.push_back(oNextPacket_cache);
                     nNextBufferIdx += nNextPacketSize;
                 }
             }
             else if(nNextBufferIdx+nNextPacketSize<nFirstBufferIdx) {
                 cv::Mat oNextPacket_cache(oNextPacket.dims,oNextPacket.size,oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
                 oNextPacket.copyTo(oNextPacket_cache);
-                qoCache.push(oNextPacket_cache);
+                lCache.push_back(oNextPacket_cache);
                 nNextBufferIdx += nNextPacketSize;
             }
             else {// nNextBufferIdx+nNextPacketSize>=nFirstBufferIdx
-                lvLog_(4,"data precacher [%" PRIxPTR "] cannot cache packet at idx = %zu, with size = %zu kb (cache full)",uintptr_t(this),nNextPrecacheIdx,nNextPacketSize/1024);
+                lvLog_(bAlreadyTested?8:4,"data precacher [%" PRIxPTR "] cannot cache packet at idx = %zu, with size = %zu kb (cache full)",uintptr_t(this),nTargetPacketIdx,nNextPacketSize/1024);
                 return 0;
             }
-            lvLog_(4,"data precacher [%" PRIxPTR "] cached packet at idx = %zu, with size = %zu kb",uintptr_t(this),nNextPrecacheIdx,nNextPacketSize/1024);
-            ++nNextPrecacheIdx;
+            if(lv::getVerbosity()>=5) {
+                size_t nTotCacheUsed = 0u;
+                for(cv::Mat oPacket : lCache)
+                    nTotCacheUsed += oPacket.total()*oPacket.elemSize();
+                lvLog_(5,"data precacher [%" PRIxPTR "] cached packet at idx = %zu, with size = %zu kb (currently ~%zu MB, or ~%d%% full)",uintptr_t(this),nTargetPacketIdx,nNextPacketSize/1024,nTotCacheUsed/1024/1024,int(float(nTotCacheUsed)*100/nBufferSize));
+            }
+            else
+                lvLog_(4,"data precacher [%" PRIxPTR "] cached packet at idx = %zu, with size = %zu kb",uintptr_t(this),nTargetPacketIdx,nNextPacketSize/1024);
             return nNextPacketSize;
         };
         const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
-        while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nPrefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && lCacheNextPacket());
+        while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nPrefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS) {
+            if(lCacheNextPacket(nNextPrecacheIdx)!=0u)
+                ++nNextPrecacheIdx;
+            else
+                break;
+        }
         while(m_bIsActive) {
-            if(m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(bReachedEnd?PRECACHE_QUERY_END_TIMEOUT_MS:PRECACHE_QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
+            const std::cv_status nWaitRes = m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(bReachedEnd?PRECACHE_QUERY_END_TIMEOUT_MS:PRECACHE_QUERY_TIMEOUT_MS));
+            if(m_bGotRequest) {
                 if(m_nReqIdx!=nNextExpectedReqIdx-1) {
                     lvLog_(4,"data precacher [%" PRIxPTR "] answering request for packet at idx = %zu...",uintptr_t(this),m_nReqIdx);
-                    if(!qoCache.empty()) {
+                    if(!lCache.empty()) {
                         if(m_nReqIdx<nNextPrecacheIdx && m_nReqIdx>=nNextExpectedReqIdx) {
                             if(m_nReqIdx>nNextExpectedReqIdx)
                                 lvLog_(3,"data precacher [%" PRIxPTR "] popping %zu extra packet(s) from cache",uintptr_t(this),m_nReqIdx-nNextExpectedReqIdx);
                             while(m_nReqIdx-nNextExpectedReqIdx+1>0) {
-                                m_oReqPacket = qoCache.front();
+                                m_oReqPacket = lCache.front();
                                 m_nAnswIdx = m_nReqIdx;
                                 nFirstBufferIdx = (size_t)(m_oReqPacket.data-vcBuffer.data());
-                                qoCache.pop();
+                                lCache.pop_front();
                                 ++nNextExpectedReqIdx;
                             }
                         }
                         else {
                             lvLog_(3,"data precacher [%" PRIxPTR "] out-of-order request (expected = %zu), destroying cache",uintptr_t(this),nNextExpectedReqIdx);
-                            qoCache = std::queue<cv::Mat>();
+                            lCache = std::list<cv::Mat>();
                             m_oReqPacket = m_lCallback(m_nReqIdx);
                             m_nAnswIdx = m_nReqIdx;
                             nFirstBufferIdx = nNextBufferIdx = size_t(-1);
@@ -460,16 +490,24 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                 else
                     lvLog_(3,"data precacher [%" PRIxPTR "] answering request using last packet at idx = %zu",uintptr_t(this),m_nReqIdx);
                 m_oSyncCondVar.notify_one();
-                lCacheNextPacket();
             }
             else if(!bReachedEnd) {
-                const size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
-                if(nUsedBufferSize<nBufferSize/4) {
-                    lvLog_(3,"data precacher [%" PRIxPTR "] force refilling precache buffer... (current size = %zu mb)",uintptr_t(this),(nUsedBufferSize/1024)/1024);
+                size_t nTotCacheUsed = 0u;
+                for(cv::Mat oPacket : lCache)
+                    nTotCacheUsed += oPacket.total()*oPacket.elemSize();
+                if(nTotCacheUsed<nBufferSize/4) {
+                    lvLog_(3,"data precacher [%" PRIxPTR "] force filling buffer until timeout... (currently ~%zu MB, or ~%d%% full)",uintptr_t(this),nTotCacheUsed/1024/1024,int(float(nTotCacheUsed)*100/nBufferSize));
                     size_t nFillCount = 0;
                     const std::chrono::time_point<std::chrono::high_resolution_clock> nRefillTick = std::chrono::high_resolution_clock::now();
-                    while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nRefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && nFillCount++<10 && lCacheNextPacket());
+                    while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nRefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && nFillCount++<10) {
+                        if(lCacheNextPacket(nNextPrecacheIdx)!=0u)
+                            ++nNextPrecacheIdx;
+                        else
+                            break;
+                    }
                 }
+                else if(lCacheNextPacket(nNextPrecacheIdx)!=0u)
+                    ++nNextPrecacheIdx;
             }
         }
     }
