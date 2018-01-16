@@ -35,8 +35,6 @@
 #define DATASETS_LITIV2018_RECTIFIED_SIZE cv::Size(640,480)
 #ifndef DATASETS_LITIV2018_DATA_VERSION
 #define DATASETS_LITIV2018_DATA_VERSION 2
-#else //def(DATASETS_LITIV2018_DATA_VERSION)
-#error "cannot predefine data version outside interface"
 #endif //ndef(DATASETS_LITIV2018_DATA_VERSION)
 #ifndef DATASETS_LITIV2018_FLIP_RGB
 #define DATASETS_LITIV2018_FLIP_RGB 1
@@ -77,6 +75,9 @@ namespace lv {
 
     #define DATASETS_LITIV2018_DATA_VERSION_STR lv::putf("stcharles2018-v%02d",(int)DATASETS_LITIV2018_DATA_VERSION)
     #define DATASETS_LITIV2018_CALIB_VERSION_STR lv::putf("calib%02d",(int)DATASETS_LITIV2018_CALIB_VERSION)
+    #if DATASETS_LITIV2018_DATA_VERSION>=3 && !USING_LZ4
+    #error "input mats compressed with lz4, required for this version"
+    #endif //DATASETS_LITIV2018_DATA_VERSION>=3 && !USING_LZ4
 
     /// dataset loader impl specialization for LITIV cosegm/registration dataset -- instantiated via lv::datasets::create(...)
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
@@ -129,6 +130,8 @@ namespace lv {
             static const std::vector<std::string> s_vsWorkBatchDirs = {"vid01","vid02","vid03"};
         #elif DATASETS_LITIV2018_DATA_VERSION==2
             static const std::vector<std::string> s_vsWorkBatchDirs = {"scene04","scene05"};
+        #elif DATASETS_LITIV2018_DATA_VERSION==3
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"testmini"};
         #else //DATASETS_LITIV2018_DATA_VERSION==?
         #error "unknown dataset version"
         #endif //DATASETS_LITIV2018_DATA_VERSION==?
@@ -847,7 +850,11 @@ namespace lv {
             }
             ///////////////////////////////////////////////////////////////////////////////////
             if(this->m_bLoadDepth) {
-                cv::Mat oDepthPacket = lv::read(vsInputPaths[nInputDepthStreamIdx]);
+            #if DATASETS_LITIV2018_DATA_VERSION>=3
+                cv::Mat oDepthPacket = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY_LZ4);
+            #else //DATASETS_LITIV2018_DATA_VERSION<=2
+                cv::Mat oDepthPacket = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY);
+            #endif //DATASETS_LITIV2018_DATA_VERSION<=2
                 lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==oDepthSize);
                 if(oDepthPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
                     cv::resize(oDepthPacket,oDepthPacket,vInputInfos[nInputDepthStreamIdx].size(),0,0,cv::INTER_CUBIC);
