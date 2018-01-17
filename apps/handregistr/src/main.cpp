@@ -113,6 +113,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     const cv::Size oTargetSize(DATASETS_LITIV2018_RECTIFIED_SIZE);
     std::array<cv::Mat_<double>,2> aCamMats,aDistCoeffs;
     cv::Mat_<double> oRotMat,oTranslMat,oEssMat,oFundMat;
+    double dRectifAlpha = -1;
 
     lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
     pDisplayHelper->setContinuousUpdates(true);
@@ -124,8 +125,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 
 #if LOAD_CALIB_FROM_LAST
     {
-        const std::string sCalibDataPath = oBatch.getCalibDataFolderPath();
-        cv::FileStorage oCalibFile(sCalibDataPath+"calibdata.yml",cv::FileStorage::READ);
+        cv::FileStorage oCalibFile(oBatch.getDataPath()+"calibdata.yml",cv::FileStorage::READ);
         lvAssert(oCalibFile.isOpened());
         std::string sVerStr;
         oCalibFile["ver"] >> sVerStr;
@@ -139,6 +139,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         oCalibFile["oTranslMat"] >> oTranslMat;
         oCalibFile["oEssMat"] >> oEssMat;
         oCalibFile["oFundMat"] >> oFundMat;
+        oCalibFile["dRectifAlpha"] >> dRectifAlpha;
         double dStereoCalibErr;
         oCalibFile["dStereoCalibErr"] >> dStereoCalibErr;
         lvAssert(dStereoCalibErr>=0.0);
@@ -586,8 +587,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     lvLog_(1,"\tmean stereo calib err : %f",dStereoCalibErr);
     {
         lvLog(1,"\nSaving stereo calibration...\n");
-        const std::string sCalibDataPath = oBatch.getCalibDataFolderPath();
-        cv::FileStorage oCalibFile(sCalibDataPath+"calibdata.yml",cv::FileStorage::WRITE);
+        cv::FileStorage oCalibFile(oBatch.getDataPath()+"calibdata.yml",cv::FileStorage::WRITE);
         lvAssert(oCalibFile.isOpened());
         oCalibFile << "ver" << (lv::getVersionStamp()+" "+lv::getTimeStamp());
         oCalibFile << "aCamMats0" << aCamMats[0];
@@ -636,7 +636,6 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 
     lvLog(1,"Running live stereo rectification...");
     nCurrIdx = 0;
-    double dRectifAlpha = -1;
     bool bRectify = true;
 #if LOAD_CALIB_FROM_LAST
     const size_t nTotStereoFrames = nTotPacketCount;

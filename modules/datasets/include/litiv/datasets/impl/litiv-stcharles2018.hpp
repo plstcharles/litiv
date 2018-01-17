@@ -248,11 +248,6 @@ namespace lv {
         int isLoadingInputMasks() const {
             return dynamic_cast<const ILITIVStCharles2018Dataset&>(*this->getRoot()).isLoadingInputMasks();
         }
-        /// returns the path to this batch's calibration data folder
-        std::string getCalibDataFolderPath() const {
-            // @@@@ to modify based on which scene is loaded
-            return lv::addDirSlashIfMissing(this->getRoot()->getDataPath()+DATASETS_LITIV2018_CALIB_VERSION_STR);
-        }
         /// returns the name of the directory where feature packets should be saved
         std::string getFeaturesDirName() const {
             return this->m_sFeaturesDirName;
@@ -524,7 +519,7 @@ namespace lv {
             lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
             ////////////////////////////////
             if(this->m_bUndistort) {
-                const std::string sCalibDataFilePath = this->getDataPath()+"calib/calibdata.yml";
+                const std::string sCalibDataFilePath = this->getDataPath()+"calibdata.yml";
                 cv::FileStorage oParamsFS(sCalibDataFilePath,cv::FileStorage::READ);
                 lvAssert__(oParamsFS.isOpened(),"could not open calibration yml file at '%s'",sCalibDataFilePath.c_str());
                 oParamsFS["aCamMats0"] >> this->m_oRGBCameraParams;
@@ -533,12 +528,20 @@ namespace lv {
                 oParamsFS["aCamMats1"] >> this->m_oLWIRCameraParams;
                 oParamsFS["aDistCoeffs1"] >> this->m_oLWIRDistortParams;
                 lvAssert_(!this->m_oLWIRCameraParams.empty() && !this->m_oLWIRDistortParams.empty(),"failed to load LWIR camera calibration parameters");
+                cv::Size oUndistortRGBSize(oRGBSize),oUndistortLWIRSize(oLWIRSize);
                 if(this->m_bHorizRectify) {
                     lvAssert_(!this->m_bLoadDepth,"missing depth image rectification impl"); // @@@
                     std::array<cv::Mat,2> aRectifRotMats,aRectifProjMats;
                     cv::Mat oDispToDepthMap,oRotMat,oTranslMat;
                     oParamsFS["oRotMat"] >> oRotMat;
                     oParamsFS["oTranslMat"] >> oTranslMat;
+                    double dRectifAlpha;
+                    oParamsFS["dRectifAlpha"] >> dRectifAlpha;
+                    cv::Size oRectifSize_test;
+                    oParamsFS["oTargetSize"] >> oRectifSize_test;
+                    lvAssert(oRectifSize==oRectifSize_test);
+                    oUndistortRGBSize = oRectifSize;
+                    oUndistortLWIRSize = oRectifSize;
                     lvAssert_(!this->m_oLWIRCameraParams.empty() && !this->m_oLWIRDistortParams.empty(),"failed to load LWIR camera calibration parameters");
                     // @@@@ calib individual heads using cv::calibrateCamera, and recalc cam mats using 'getOptimalNewCameraMatrix' for common size (imageSize param)
                     cv::stereoRectify(this->m_oRGBCameraParams,this->m_oRGBDistortParams,
@@ -548,7 +551,7 @@ namespace lv {
                                       aRectifProjMats[0],aRectifProjMats[1],
                                       oDispToDepthMap,
                                       0,//cv::CALIB_ZERO_DISPARITY,
-                                      -1,oRectifSize);
+                                      dRectifAlpha,oRectifSize);
                     cv::initUndistortRectifyMap(this->m_oRGBCameraParams,this->m_oRGBDistortParams,
                                                 aRectifRotMats[0],aRectifProjMats[0],oRectifSize,
                                                 CV_16SC2,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2);
@@ -581,26 +584,26 @@ namespace lv {
                     oRGBROI_undist = oRGBROI_undist>128;
                 }
                 else
-                    oRGBROI_undist = cv::Mat(oRGBSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                    oRGBROI_undist = cv::Mat(oUndistortRGBSize,CV_8UC1,cv::Scalar_<uchar>(255));
                 if(!oLWIRROI_undist.empty()) {
                     lvAssert(oLWIRROI_undist.type()==CV_8UC1 && oLWIRROI_undist.size()==oLWIRSize);
                     oLWIRROI_undist = oLWIRROI_undist>128;
                 }
                 else
-                    oLWIRROI_undist = cv::Mat(oLWIRSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                    oLWIRROI_undist = cv::Mat(oUndistortLWIRSize,CV_8UC1,cv::Scalar_<uchar>(255));
                 oRGBROI &= oRGBROI_undist;
                 oLWIRROI &= oLWIRROI_undist;
             }
             ////////////////////////////////
             this->m_vOrigGTInfos.resize(nGTStreamCount);
             this->m_vOrigInputInfos.resize(nInputStreamCount);
-            this->m_vOrigGTInfos[nGTRGBStreamIdx] = lv::MatInfo{oRGBROI};
-            this->m_vOrigGTInfos[nGTLWIRStreamIdx] = lv::MatInfo{oLWIRROI};
-            this->m_vOrigInputInfos[nInputRGBStreamIdx] = lv::MatInfo{oRGBROI.size(),CV_8UC3};
-            this->m_vOrigInputInfos[nInputLWIRStreamIdx] = lv::MatInfo{oLWIRROI.size(),CV_8UC1};
+            this->m_vOrigGTInfos[nGTRGBStreamIdx] = lv::MatInfo{oRGBSize,CV_8UC1};
+            this->m_vOrigGTInfos[nGTLWIRStreamIdx] = lv::MatInfo{oLWIRSize,CV_8UC1};
+            this->m_vOrigInputInfos[nInputRGBStreamIdx] = lv::MatInfo{oRGBSize,CV_8UC3};
+            this->m_vOrigInputInfos[nInputLWIRStreamIdx] = lv::MatInfo{oLWIRSize,CV_8UC1};
             if(this->m_bLoadDepth) {
-                this->m_vOrigGTInfos[nGTDepthStreamIdx] = lv::MatInfo{oDepthROI};
-                this->m_vOrigInputInfos[nInputDepthStreamIdx] = lv::MatInfo{oDepthROI.size(),CV_16UC1};
+                this->m_vOrigGTInfos[nGTDepthStreamIdx] = lv::MatInfo{oDepthSize,CV_8UC1};
+                this->m_vOrigInputInfos[nInputDepthStreamIdx] = lv::MatInfo{oDepthSize,CV_16UC1};
             }
             if(bUseInterlacedMasks) {
                 this->m_vOrigInputInfos[nInputRGBMaskStreamIdx] = lv::MatInfo{oRGBROI};
@@ -802,7 +805,8 @@ namespace lv {
             lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
             std::vector<cv::Mat> vInputs(getInputStreamCount());
             ///////////////////////////////////////////////////////////////////////////////////
-            lvAssert__(bIsLoadingCalibData || !vsInputPaths[nInputRGBStreamIdx].empty(),"could not open RGB input frame #%d (empty path)",(int)nPacketIdx);
+            if(!bIsLoadingCalibData)
+                lvAssert__(!vsInputPaths[nInputRGBStreamIdx].empty(),"could not open RGB input frame #%d (empty path)",(int)nPacketIdx);
             cv::Mat oRGBPacket = vsInputPaths[nInputRGBStreamIdx].empty()?cv::Mat(oRGBSize,CV_8UC3,cv::Scalar::all(0)):cv::imread(vsInputPaths[nInputRGBStreamIdx],cv::IMREAD_COLOR);
             lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==oRGBSize);
             const bool bFlipRGBPacket = (DATASETS_LITIV2018_FLIP_RGB && (!bIsLoadingCalibData || DATASETS_LITIV2018_CALIB_VERSION!=1));
@@ -824,7 +828,8 @@ namespace lv {
                 vInputs[nInputRGBMaskStreamIdx] = oRGBMaskPacket;
             }
             ///////////////////////////////////////////////////////////////////////////////////
-            lvAssert__(bIsLoadingCalibData || !vsInputPaths[nInputLWIRStreamIdx].empty(),"could not open LWIR input frame #%d (empty path)",(int)nPacketIdx);
+            if(!bIsLoadingCalibData)
+                lvAssert__(!vsInputPaths[nInputLWIRStreamIdx].empty(),"could not open LWIR input frame #%d (empty path)",(int)nPacketIdx);
             cv::Mat oLWIRPacket = vsInputPaths[nInputLWIRStreamIdx].empty()?cv::Mat(oLWIRSize,CV_8UC1,cv::Scalar::all(0)):cv::imread(vsInputPaths[nInputLWIRStreamIdx],cv::IMREAD_GRAYSCALE);
             lvAssert(!oLWIRPacket.empty() && oLWIRPacket.type()==CV_8UC1 && oLWIRPacket.size()==oLWIRSize);
             if(oLWIRPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
