@@ -115,7 +115,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 
         lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pDisplayHelper->setContinuousUpdates(true);
-        pDisplayHelper->setDisplayCursor(!GEN_SEGMENTATION_ANNOT);
+        pDisplayHelper->setDisplayCursor(false);
         //const cv::Size oDisplayTileSize(1024,768);
         const cv::Size oDisplayTileSize(1200,1000);
         std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
@@ -159,8 +159,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     #elif GEN_REGISTRATION_ANNOT
         std::array<std::vector<cv::Point2i>,2> avTempPts;
         std::array<std::vector<std::pair<cv::Point2i,int>>,2> avCorrespPts;
+        bool bDragInProgress = false;
         size_t nSelectedPoint = SIZE_MAX;
-        const std::array<int,2> anMarkerSizes{6,1};
+        int nSelectedPointTile = -1;
+        cv::Point2i vInitDragPt;
+        const double dMaxSelectDist = 5.0;
+        const std::array<int,2> anMarkerSizes{2,2};
     #endif //GEN_REGISTRATION_ANNOT
         cv::Point2f vMousePos(0.5f,0.5f),vLastMousePos(0.5f,0.5f);
         int nCurrTile = -1;
@@ -224,17 +228,43 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                         cv::compare(aSegmMasks[a],128u,aSegmMasks[a],cv::CMP_GT);
                 }
             #elif GEN_REGISTRATION_ANNOT
-                if(oData.nEvent==cv::EVENT_MBUTTONDOWN || oData.nEvent==cv::EVENT_LBUTTONDOWN) {
+                const cv::Point2i vCurrPt(int(vMousePos.x*vOrigSizes[nCurrTile].width),int(vMousePos.y*vOrigSizes[nCurrTile].height));
+                // @@@@ make middle mouse delete, left add & select if close enough?
+                if(!bDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONDOWN || oData.nEvent==cv::EVENT_LBUTTONDOWN)) {
+                    lvAssert(nSelectedPoint==SIZE_MAX);
                     if(oData.nEvent==cv::EVENT_MBUTTONDOWN) {
-                        // look for existing point near mouse, select
+                        double dMinDist = 9999.;
+                        for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[nCurrTile].size(); ++nPtIdx) {
+                            const double dCurrDist = cv::norm(vCurrPt-avCorrespPts[nCurrTile][nPtIdx].first);
+                            if(dCurrDist<dMaxSelectDist && dCurrDist<dMinDist) {
+                                dMinDist = dCurrDist;
+                                nSelectedPoint = nPtIdx;
+                            }
+                        }
                     }
                     else if(oData.nEvent==cv::EVENT_LBUTTONDOWN) {
-                        // add new point near mouse, select
+                        nSelectedPoint = avCorrespPts[nCurrTile].size();
+                        avCorrespPts[nCurrTile].emplace_back(vCurrPt,0);
+                        avCorrespPts[nCurrTile^1].emplace_back(vCurrPt,0);
                     }
-                    // prepare to drag for disparity (default disp given by depth?)
+                    if(nSelectedPoint!=SIZE_MAX) {
+                        lvAssert(nSelectedPoint<avCorrespPts[nCurrTile].size() && nSelectedPoint<avCorrespPts[nCurrTile^1].size());
+                        nSelectedPointTile = nCurrTile;
+                        vInitDragPt = vCurrPt;
+                        bDragInProgress = true;
+                    }
                 }
-                else if(oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP) {
-                    // if point selected, set given disp and save
+                else if(bDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_MOUSEMOVE)) {
+                    const int nDist = (nSelectedPointTile!=nCurrTile)?0:((vCurrPt.x-vInitDragPt.x)/8);
+                    lvAssert(nSelectedPoint<avCorrespPts[nSelectedPointTile^1].size());
+                    avCorrespPts[nSelectedPointTile][nSelectedPoint].second = nDist;
+                    avCorrespPts[nSelectedPointTile^1][nSelectedPoint].second = nDist;
+                    avCorrespPts[nSelectedPointTile^1][nSelectedPoint].first.x = avCorrespPts[nSelectedPointTile][nSelectedPoint].first.x+(nSelectedPointTile?-1:1)*nDist;
+                    if(oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP) {
+                        bDragInProgress = false;
+                        nSelectedPointTile = -1;
+                        nSelectedPoint = SIZE_MAX;
+                    }
                 }
                 else if(oData.nEvent==cv::EVENT_RBUTTONDOWN) {
                     // if mode is 'init'
@@ -386,6 +416,8 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 #elif GEN_REGISTRATION_ANNOT
                     aInputs[a].copyTo(vvDisplayPairs[0][a].first);
                     for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[a].size(); ++nPtIdx) {
+                        if(bDragInProgress && nSelectedPoint==nPtIdx)
+                            cv::rectangle(vvDisplayPairs[0][a].first,cv::Rect(avCorrespPts[a][nPtIdx].first.x,0,1,vOrigSizes[a].height),cv::Scalar_<uchar>(0,0,172));
                         if(nSelectedPoint==nPtIdx)
                             cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a]*2,cv::Scalar::all(1u),-1);
                         cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a],cv::Scalar_<uchar>(lv::getBGRFromHSL(360*float(nPtIdx)/avCorrespPts[a].size(),1.0f,0.5f)),-1);
