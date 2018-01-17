@@ -16,8 +16,8 @@
 // limitations under the License.
 
 ////////////////////////////////
-#define GEN_SEGMENTATION_ANNOT  1
-#define GEN_REGISTRATION_ANNOT  0
+#define GEN_SEGMENTATION_ANNOT  0
+#define GEN_REGISTRATION_ANNOT  1
 #define SAVE_C2D_MAPPING        0
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
@@ -30,6 +30,9 @@
 #if (GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)>1
 #error "must select one type of annotation to generate"
 #endif //(GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)>1
+#if GEN_SEGMENTATION_ANNOT
+#define USE_SINGLE_VIEW_IDX 0
+#endif //GEN_SEGMENTATION_ANNOT
 #if SAVE_C2D_MAPPING
 #ifndef _MSC_VER
 #error "must use kinect api"
@@ -119,7 +122,6 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             std::make_pair(vInitInput[0].clone(),oBatch.getInputStreamName(0)),
             std::make_pair(vInitInput[1].clone(),oBatch.getInputStreamName(1))
         }};
-
         lvAssert(oBatch.getName().find("calib")==std::string::npos);
         lvLog(1,"Parsing metadata...");
         cv::FileStorage oMetadataFS(oBatch.getDataPath()+"metadata.yml",cv::FileStorage::READ);
@@ -129,12 +131,14 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         oDepthData["min_reliable_dist"] >> nMinDepthVal;
         oDepthData["max_reliable_dist"] >> nMaxDepthVal;
         lvAssert(nMinDepthVal>=0 && nMaxDepthVal>nMinDepthVal);
-        const std::string sRGBGTDir = oBatch.getDataPath()+(GEN_REGISTRATION_ANNOT?"rgb_gt_disp/":"rgb_gt_masks/");
-        const std::string sLWIRGTDir = oBatch.getDataPath()+(GEN_REGISTRATION_ANNOT?"lwir_gt_disp/":"lwir_gt_masks/");
-        lv::createDirIfNotExist(sRGBGTDir); lv::createDirIfNotExist(sLWIRGTDir);
+        const std::string sGTName = (GEN_REGISTRATION_ANNOT?"gt_disp":"gt_masks");
+        const std::string sRGBGTDir = oBatch.getDataPath()+"rgb_"+sGTName+"/";
+        const std::string sLWIRGTDir = oBatch.getDataPath()+"lwir_"+sGTName+"/";
+        lv::createDirIfNotExist(sRGBGTDir);
+        lv::createDirIfNotExist(sLWIRGTDir);
         std::set<int> mnSubsetIdxs;
         {
-            cv::FileStorage oGTMetadataFS(sRGBGTDir+"gtmetadata.yml",cv::FileStorage::READ);
+            cv::FileStorage oGTMetadataFS(oBatch.getDataPath()+sGTName+"_metadata.yml",cv::FileStorage::READ);
             if(oGTMetadataFS.isOpened()) {
                 int nPrevPacketCount;
                 oGTMetadataFS["npackets"] >> nPrevPacketCount;
@@ -146,16 +150,18 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         }
     #if (GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
     #if GEN_SEGMENTATION_ANNOT
+        double dSegmOpacity = 0.5;
+        std::array<double,2> adSegmToolRadius={10,3};
+        const std::array<double,2> adSegmToolRadiusMin={3,1},adSegmToolRadiusMax={80,40};
         std::array<cv::Mat,2> aSegmMasks,aTempSegmMasks,aSegmMasks_3ch,aFloodFillMasks;
         cv::Rect oShapeDragRect;
         cv::Point oShapeDragInitPos;
     #elif GEN_REGISTRATION_ANNOT
-        std::array<std::vector<std::pair<cv::Point2i,int>>,2> avRegistrPts;
+        std::array<std::vector<cv::Point2i>,2> avTempPts;
+        std::array<std::vector<std::pair<cv::Point2i,int>>,2> avCorrespPts;
+        size_t nSelectedPoint = SIZE_MAX;
+        const std::array<int,2> anMarkerSizes{6,1};
     #endif //GEN_REGISTRATION_ANNOT
-        // @@@@@ add circle for tool size, add drag and drop via user side toggle
-        double dSegmOpacity = 0.5;
-        std::array<double,2> adSegmToolRadius={10,3};
-        const std::array<double,2> adSegmToolRadiusMin={3,1},adSegmToolRadiusMax={80,40};
         cv::Point2f vMousePos(0.5f,0.5f),vLastMousePos(0.5f,0.5f);
         int nCurrTile = -1;
         pDisplayHelper->setContinuousUpdates(true);
@@ -163,6 +169,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             vMousePos = cv::Point2f(float(oData.oInternalPosition.x)/oData.oTileSize.width,float(oData.oInternalPosition.y)/oData.oTileSize.height);
             if(vMousePos.x>=0.0f && vMousePos.y>=0.0f && vMousePos.x<1.0f && vMousePos.y<1.0f) {
                 nCurrTile = oData.oPosition.x/oData.oTileSize.width;
+            #if GEN_SEGMENTATION_ANNOT
                 if(oData.nEvent==cv::EVENT_MOUSEWHEEL && cv::getMouseWheelDelta(oData.nFlags)>0) {
                     adSegmToolRadius[nCurrTile] = std::min(adSegmToolRadius[nCurrTile]+std::max(1.0,adSegmToolRadius[nCurrTile]/4),adSegmToolRadiusMax[nCurrTile]);
                     lvLog_(2,"\tnew tool size = %f",adSegmToolRadius[nCurrTile]);
@@ -216,11 +223,36 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     for(size_t a=0u; a<2u; ++a)
                         cv::compare(aSegmMasks[a],128u,aSegmMasks[a],cv::CMP_GT);
                 }
+            #elif GEN_REGISTRATION_ANNOT
+                if(oData.nEvent==cv::EVENT_MBUTTONDOWN || oData.nEvent==cv::EVENT_LBUTTONDOWN) {
+                    if(oData.nEvent==cv::EVENT_MBUTTONDOWN) {
+                        // look for existing point near mouse, select
+                    }
+                    else if(oData.nEvent==cv::EVENT_LBUTTONDOWN) {
+                        // add new point near mouse, select
+                    }
+                    // prepare to drag for disparity (default disp given by depth?)
+                }
+                else if(oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP) {
+                    // if point selected, set given disp and save
+                }
+                else if(oData.nEvent==cv::EVENT_RBUTTONDOWN) {
+                    // if mode is 'init'
+                    //     if first click, set line start in curr tile
+                    //     if second click, set line end in curr tile  (snaps to epipolar line)
+                    //        then, interp points on line (1 per 2px?)
+                    //        and set mode to 'select second pair' (disables other clicking)
+                    // if mode is 'select second pair'
+                    //     if first click, set line start in curr tile (snaps to epipolar line)
+                    //     if second click, set line end in curr tile  (snaps to epipolar line)
+                    //        then, interp points on line (1 per 2px?)
+                    //        and set mode to 'init' (reenables other clicking)
+                }
+            #endif //GEN_REGISTRATION_ANNOT
             }
             else
                 nCurrTile = -1;
             vLastMousePos = vMousePos;
-            //pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
         });
     #endif //(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
         lvLog(1,"Annotation edit mode initialized...");
@@ -291,21 +323,52 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 else
                     aSegmMasks[0] = 0u;
             }
+            lvAssert(lv::MatInfo(aSegmMasks[0])==lv::MatInfo(vOrigSizes[0],CV_8UC1));
             aSegmMasks[1] = cv::imread(sLWIRGTDir+lv::putf("%05d.png",(int)nCurrIdx),cv::IMREAD_GRAYSCALE);
             if(aSegmMasks[1].empty()) {
                 aSegmMasks[1].create(vOrigSizes[1],CV_8UC1);
                 aSegmMasks[1] = 0u;
                 // @@@ try to reg w/ depth here?
             }
+            lvAssert(lv::MatInfo(aSegmMasks[1])==lv::MatInfo(vOrigSizes[1],CV_8UC1));
             aTempSegmMasks[0].create(vOrigSizes[0],CV_8UC1);
             aTempSegmMasks[1].create(vOrigSizes[1],CV_8UC1);
             aTempSegmMasks[0] = 0u;
             aTempSegmMasks[1] = 0u;
         #elif GEN_REGISTRATION_ANNOT
             {
-                cv::FileStorage oGTFS_RGB(sRGBGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::READ);
-                cv::FileStorage oGTFS_LWIR(sLWIRGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::READ);
-                @@@ missing impl
+                avCorrespPts[0].clear();
+                const cv::FileStorage oGTFS_RGB(sRGBGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::READ);
+                if(oGTFS_RGB.isOpened()) {
+                    int nPts;
+                    oGTFS_RGB["nbpts"] >> nPts;
+                    lvAssert(nPts>0);
+                    for(int nPtIdx=0; nPtIdx<nPts; ++nPtIdx) {
+                        const cv::FileNode oPtNode = oGTFS_RGB[lv::putf("pt%04d",nPtIdx)];
+                        lvAssert(!oPtNode.empty());
+                        int x,y,d;
+                        oPtNode["x"] >> x;
+                        oPtNode["y"] >> y;
+                        oPtNode["d"] >> d;
+                        avCorrespPts[0].emplace_back(cv::Point(x,y),d);
+                    }
+                }
+                avCorrespPts[1].clear();
+                const cv::FileStorage oGTFS_LWIR(sLWIRGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::READ);
+                if(oGTFS_LWIR.isOpened()) {
+                    int nPts;
+                    oGTFS_LWIR["nbpts"] >> nPts;
+                    lvAssert(nPts>0);
+                    for(int nPtIdx=0; nPtIdx<nPts; ++nPtIdx) {
+                        const cv::FileNode oPtNode = oGTFS_LWIR[lv::putf("pt%04d",nPtIdx)];
+                        lvAssert(!oPtNode.empty());
+                        int x,y,d;
+                        oPtNode["x"] >> x;
+                        oPtNode["y"] >> y;
+                        oPtNode["d"] >> d;
+                        avCorrespPts[1].emplace_back(cv::Point(x,y),d);
+                    }
+                }
             }
         #endif //GEN_REGISTRATION_ANNOT
             lvLog_(1,"\t annot @ #%d ('%s') of %d",int(nCurrIdx),sPacketName.c_str(),int(nTotPacketCount));
@@ -322,11 +385,14 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     cv::addWeighted(aInputs[a],(1-dSegmOpacity),aSegmMasks_3ch[a],dSegmOpacity,0.0,vvDisplayPairs[0][a].first);
                 #elif GEN_REGISTRATION_ANNOT
                     aInputs[a].copyTo(vvDisplayPairs[0][a].first);
-                    @@@@
-                    for(size_t nPtIdx=0u; nPtIdx<avvImagePts[a][nCurrIdx].size(); ++nPtIdx) {
+                    for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[a].size(); ++nPtIdx) {
                         if(nSelectedPoint==nPtIdx)
-                            cv::circle(vvDisplayPairs[0][a].first,cv::Point2i(avvImagePts[a][nCurrIdx][nPtIdx]),anMarkerSizes[a]*2,cv::Scalar::all(1u),-1);
-                        cv::circle(vvDisplayPairs[0][a].first,cv::Point2i(avvImagePts[a][nCurrIdx][nPtIdx]),anMarkerSizes[a],cv::Scalar_<uchar>(lv::getBGRFromHSL(360*float(nPtIdx)/avvImagePts[a][nCurrIdx].size(),1.0f,0.5f)),-1);
+                            cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a]*2,cv::Scalar::all(1u),-1);
+                        cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a],cv::Scalar_<uchar>(lv::getBGRFromHSL(360*float(nPtIdx)/avCorrespPts[a].size(),1.0f,0.5f)),-1);
+                    }
+                    for(size_t nPtIdx=0u; nPtIdx<avTempPts[a].size(); ++nPtIdx) {
+                        cv::circle(vvDisplayPairs[0][a].first,avTempPts[a][nPtIdx],anMarkerSizes[a]*2,cv::Scalar::all(255),-1);
+                        cv::circle(vvDisplayPairs[0][a].first,avTempPts[a][nPtIdx],anMarkerSizes[a],cv::Scalar::all(1u),-1);
                     }
                 #endif //GEN_REGISTRATION_ANNOT
                 }
@@ -336,8 +402,13 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     cv::circle(vvDisplayPairs[0][nCurrTile].first,vMousePos_FP2,(int)adSegmToolRadius[nCurrTile],cv::Scalar_<uchar>(0,0,255),1,cv::LINE_AA,2);
                 }
             #endif //GEN_SEGMENTATION_ANNOT
+            #ifdef USE_SINGLE_VIEW_IDX
+                pDisplayHelper->display(std::vector<std::vector<std::pair<cv::Mat,std::string>>>{{vvDisplayPairs[0][USE_SINGLE_VIEW_IDX]}},oDisplayTileSize);
+            #else //ndef(USE_SINGLE_VIEW_IDX)
                 pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);
+            #endif //ndef(USE_SINGLE_VIEW_IDX)
                 nKeyPressed = pDisplayHelper->waitKey(1);
+            #if GEN_SEGMENTATION_ANNOT
                 if(nKeyPressed==(int)'o') {
                     dSegmOpacity = std::min(dSegmOpacity+0.05,1.0);
                     lvLog_(1,"\topacity now at %f",dSegmOpacity);
@@ -346,6 +417,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     dSegmOpacity = std::max(dSegmOpacity-0.05,0.0);
                     lvLog_(1,"\topacity now at %f",dSegmOpacity);
                 }
+            #endif //GEN_SEGMENTATION_ANNOT
             }
         #if GEN_SEGMENTATION_ANNOT
             const bool bCurrFrameValid = (cv::countNonZero(aSegmMasks[0])!=0 || cv::countNonZero(aSegmMasks[1])!=0);
@@ -354,11 +426,33 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 cv::imwrite(sLWIRGTDir+lv::putf("%05d.png",(int)nCurrIdx),aSegmMasks[1]);
             }
         #elif GEN_REGISTRATION_ANNOT
-            const bool bCurrFrameValid = (!avvRegistrPts[0][nCurrIdx].empty() || !avvRegistrPts[1][nCurrIdx].empty());
+            const bool bCurrFrameValid = (!avCorrespPts[0].empty() || !avCorrespPts[1].empty());
             if(bCurrFrameValid) {
+                lvAssert(avCorrespPts[0].size()==avCorrespPts[1].size());
                 cv::FileStorage oGTFS_RGB(sRGBGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::WRITE);
+                lvAssert(oGTFS_RGB.isOpened());
+                oGTFS_RGB << "htag" << lv::getVersionStamp();
+                oGTFS_RGB << "date" << lv::getTimeStamp();
+                oGTFS_RGB << "nbpts" << (int)avCorrespPts[0].size();
+                for(size_t nPtIdx=0; nPtIdx<avCorrespPts[0].size(); ++nPtIdx) {
+                    oGTFS_RGB << lv::putf("pt%04d",(int)nPtIdx) << "{";
+                    oGTFS_RGB << "x" << avCorrespPts[0][nPtIdx].first.x;
+                    oGTFS_RGB << "y" << avCorrespPts[0][nPtIdx].first.y;
+                    oGTFS_RGB << "d" << avCorrespPts[0][nPtIdx].second;
+                    oGTFS_RGB << "}";
+                }
                 cv::FileStorage oGTFS_LWIR(sLWIRGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::WRITE);
-                @@@@
+                lvAssert(oGTFS_LWIR.isOpened());
+                oGTFS_LWIR << "htag" << lv::getVersionStamp();
+                oGTFS_LWIR << "date" << lv::getTimeStamp();
+                oGTFS_LWIR << "nbpts" << (int)avCorrespPts[1].size();
+                for(size_t nPtIdx=0; nPtIdx<avCorrespPts[1].size(); ++nPtIdx) {
+                    oGTFS_LWIR << lv::putf("pt%04d",(int)nPtIdx) << "{";
+                    oGTFS_LWIR << "x" << avCorrespPts[1][nPtIdx].first.x;
+                    oGTFS_LWIR << "y" << avCorrespPts[1][nPtIdx].first.y;
+                    oGTFS_LWIR << "d" << avCorrespPts[1][nPtIdx].second;
+                    oGTFS_LWIR << "}";
+                }
             }
         #endif //GEN_REGISTRATION_ANNOT
             const int nRealIdx = std::stoi(sPacketName);
@@ -379,7 +473,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         #endif //!(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
         }
         {
-            cv::FileStorage oGTMetadataFS(sRGBGTDir+"gtmetadata.yml",cv::FileStorage::WRITE);
+            cv::FileStorage oGTMetadataFS(oBatch.getDataPath()+sGTName+"_metadata.yml",cv::FileStorage::WRITE);
             lvAssert(oGTMetadataFS.isOpened());
             oGTMetadataFS << "htag" << lv::getVersionStamp();
             oGTMetadataFS << "date" << lv::getTimeStamp();
