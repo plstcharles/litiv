@@ -16,6 +16,7 @@
 // limitations under the License.
 
 #include "litiv/datasets.hpp"
+#include <list>
 
 #define HARDCODE_IMAGE_PACKET_INDEX        0 // for sync debug only! will corrupt data for non-image packets
 #define PRECACHE_REQUEST_TIMEOUT_MS        1
@@ -458,7 +459,7 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                 break;
         }
         while(m_bIsActive) {
-            const std::cv_status nWaitRes = m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(bReachedEnd?PRECACHE_QUERY_END_TIMEOUT_MS:PRECACHE_QUERY_TIMEOUT_MS));
+            m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(bReachedEnd?PRECACHE_QUERY_END_TIMEOUT_MS:PRECACHE_QUERY_TIMEOUT_MS));
             if(m_bGotRequest) {
                 if(m_nReqIdx!=nNextExpectedReqIdx-1) {
                     lvLog_(4,"data precacher [%" PRIxPTR "] answering request for packet at idx = %zu...",uintptr_t(this),m_nReqIdx);
