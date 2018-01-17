@@ -316,23 +316,28 @@ const cv::Mat& lv::DataPrecacher::getPacket(size_t nIdx) {
         return m_oLastReqPacket;
     }
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
-    m_nReqIdx = nIdx;
-    std::cv_status res;
-    size_t nAnswIdx = size_t(-1);
     lvAssert_(!m_bGotRequest,"data precacher trying two requests at once!");
-    m_oReqCondVar.notify_one();
+    size_t nAnswIdx = size_t(-1);
+    m_nReqIdx = nIdx;
     m_bGotRequest = true;
+    m_oReqCondVar.notify_one();
     lvLog_(4,"data precacher [%" PRIxPTR "] sending request for packet at idx = %zu...",uintptr_t(this),nIdx);
-    do {
-        res = m_oSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_REQUEST_TIMEOUT_MS));
+    const std::chrono::milliseconds nTimeout(PRECACHE_REQUEST_TIMEOUT_MS);
+    while(!m_oSyncCondVar.wait_for(sync_lock,nTimeout,[&](){return !(m_bIsActive && m_pWorkerException==nullptr && nAnswIdx!=m_nReqIdx);})) {
         nAnswIdx = m_nAnswIdx.load();
         if(nAnswIdx!=m_nReqIdx)
             lvLog_(3,"data precacher [%" PRIxPTR "] retrying request for packet #%zu...",uintptr_t(this),nIdx);
-    } while(nAnswIdx!=m_nReqIdx && !m_pWorkerException);
+        if(m_pWorkerException || !m_bIsActive) {
+            lvLog_(1,"data precacher [%" PRIxPTR "] shutdown/error caught during query of packet #%zu (throwing)",uintptr_t(this),nIdx);
+            break; // hard exit, something went wrong, will throw below
+        }
+    }
     m_nReqIdx = size_t(-1);
     m_bGotRequest = false;
-    if(m_pWorkerException) {
-        lvLog_(0,"data precacher [%" PRIxPTR "] caught precacher exception while requesting packet #%zu, will rethrow...",uintptr_t(this),nIdx);
+    if(!m_bIsActive)
+        lvError_("could not fetch packet #%zu, data precacher [%" PRIxPTR "] shutting down",nIdx,uintptr_t(this));
+    else if(m_pWorkerException) {
+        lvLog_(1,"data precacher [%" PRIxPTR "] caught precacher exception while requesting packet #%zu, will rethrow...",uintptr_t(this),nIdx);
         m_bIsActive = false;
         m_hWorker.join();
         std::rethrow_exception(m_pWorkerException);
