@@ -16,8 +16,8 @@
 // limitations under the License.
 
 ////////////////////////////////
-#define GEN_SEGMENTATION_ANNOT  0
-#define GEN_REGISTRATION_ANNOT  1
+#define GEN_SEGMENTATION_ANNOT  1
+#define GEN_REGISTRATION_ANNOT  0
 #define SAVE_C2D_MAPPING        0
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
@@ -153,7 +153,8 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         double dSegmOpacity = 0.5;
         std::array<double,2> adSegmToolRadius={10,3};
         const std::array<double,2> adSegmToolRadiusMin={3,1},adSegmToolRadiusMax={80,40};
-        std::array<cv::Mat,2> aSegmMasks,aTempSegmMasks,aSegmMasks_3ch,aFloodFillMasks;
+        std::array<cv::Mat,2> aSegmMasks,aPrevSegmMasks,aTempSegmMasks,aSegmMasks_3ch,aFloodFillMasks;
+        bool bDragInProgress = false;
         cv::Rect oShapeDragRect;
         cv::Point oShapeDragInitPos;
     #elif GEN_REGISTRATION_ANNOT
@@ -161,9 +162,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         std::array<std::vector<std::pair<cv::Point2i,int>>,2> avCorrespPts;
         bool bDragInProgress = false;
         size_t nSelectedPoint = SIZE_MAX;
-        int nSelectedPointTile = -1;
+        int nSelectedPointTile = -1, nLineCreationStep = 0;
         cv::Point2i vInitDragPt;
         const double dMaxSelectDist = 5.0;
+        const int nLineSplitRatio = 3;
         const std::array<int,2> anMarkerSizes{2,2};
     #endif //GEN_REGISTRATION_ANNOT
         cv::Point2f vMousePos(0.5f,0.5f),vLastMousePos(0.5f,0.5f);
@@ -174,34 +176,44 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             if(vMousePos.x>=0.0f && vMousePos.y>=0.0f && vMousePos.x<1.0f && vMousePos.y<1.0f) {
                 nCurrTile = oData.oPosition.x/oData.oTileSize.width;
             #if GEN_SEGMENTATION_ANNOT
-                if(oData.nEvent==cv::EVENT_MOUSEWHEEL && cv::getMouseWheelDelta(oData.nFlags)>0) {
+                if(!bDragInProgress && oData.nEvent==cv::EVENT_MOUSEWHEEL && cv::getMouseWheelDelta(oData.nFlags)>0) {
                     adSegmToolRadius[nCurrTile] = std::min(adSegmToolRadius[nCurrTile]+std::max(1.0,adSegmToolRadius[nCurrTile]/4),adSegmToolRadiusMax[nCurrTile]);
                     lvLog_(2,"\tnew tool size = %f",adSegmToolRadius[nCurrTile]);
                 }
-                else if(oData.nEvent==cv::EVENT_MOUSEWHEEL && cv::getMouseWheelDelta(oData.nFlags)<0) {
+                else if(!bDragInProgress && oData.nEvent==cv::EVENT_MOUSEWHEEL && cv::getMouseWheelDelta(oData.nFlags)<0) {
                     adSegmToolRadius[nCurrTile] = std::max(adSegmToolRadius[nCurrTile]-std::max(1.0,adSegmToolRadius[nCurrTile]/4),adSegmToolRadiusMin[nCurrTile]);
                     lvLog_(2,"\tnew tool size = %f",adSegmToolRadius[nCurrTile]);
                 }
-                if(oData.nEvent==cv::EVENT_MBUTTONDOWN) {
+                if(!bDragInProgress && oData.nEvent==cv::EVENT_MBUTTONDOWN) {
                     aFloodFillMasks[nCurrTile].create(vOrigSizes[nCurrTile].height+2,vOrigSizes[nCurrTile].width+2,CV_8UC1);
-                    aFloodFillMasks[nCurrTile] = 0u;
                     oShapeDragInitPos = cv::Point(int(vMousePos.x*vOrigSizes[nCurrTile].width),int(vMousePos.y*vOrigSizes[nCurrTile].height));
-                    cv::floodFill(aSegmMasks[nCurrTile],aFloodFillMasks[nCurrTile],oShapeDragInitPos,cv::Scalar(0),&oShapeDragRect,cv::Scalar(),cv::Scalar(),4|((255)<<8));
+                    if(aSegmMasks[nCurrTile].at<uchar>(oShapeDragInitPos)!=0u) {
+                        aFloodFillMasks[nCurrTile] = 0u;
+                        cv::floodFill(aSegmMasks[nCurrTile],aFloodFillMasks[nCurrTile],oShapeDragInitPos,cv::Scalar(0),&oShapeDragRect,cv::Scalar(),cv::Scalar(),4|((255)<<8));
+                        bDragInProgress = true;
+                    }
+                    else if(aPrevSegmMasks[nCurrTile].at<uchar>(oShapeDragInitPos)!=0u) {
+                        aFloodFillMasks[nCurrTile] = 0u;
+                        cv::floodFill(aPrevSegmMasks[nCurrTile],aFloodFillMasks[nCurrTile],oShapeDragInitPos,cv::Scalar(0),&oShapeDragRect,cv::Scalar(),cv::Scalar(),4|((255)<<8));
+                        bDragInProgress = true;
+                    }
                 }
-                else if(oData.nEvent==cv::EVENT_MBUTTONUP) {
+                else if(bDragInProgress && oData.nEvent==cv::EVENT_MBUTTONUP) {
+                    // @@@@ if outside shape, try in last mask, and copy over
                     const cv::Point oShapeMov(int(vMousePos.x*vOrigSizes[nCurrTile].width)-oShapeDragInitPos.x,int(vMousePos.y*vOrigSizes[nCurrTile].height)-oShapeDragInitPos.y);
                     const cv::Rect oOutputRect(oShapeDragRect.x+oShapeMov.x,oShapeDragRect.y+oShapeMov.y,oShapeDragRect.width,oShapeDragRect.height);
                     const cv::Rect oInputRect(oShapeDragRect.x+1,oShapeDragRect.y+1,oShapeDragRect.width,oShapeDragRect.height);
-                    aFloodFillMasks[nCurrTile](oInputRect).copyTo(aSegmMasks[nCurrTile](oOutputRect));
+                    lv::copyValidPixelsTo(aFloodFillMasks[nCurrTile],oInputRect,aSegmMasks[nCurrTile],oOutputRect,nullptr,aFloodFillMasks[nCurrTile]>0);
+                    bDragInProgress = false;
                 }
-                else if(oData.nEvent==cv::EVENT_MOUSEMOVE && (oData.nFlags&cv::EVENT_FLAG_MBUTTON)) {
+                else if(bDragInProgress && oData.nEvent==cv::EVENT_MOUSEMOVE) {
                     aTempSegmMasks[nCurrTile] = 0u;
                     const cv::Point oShapeMov(int(vMousePos.x*vOrigSizes[nCurrTile].width)-oShapeDragInitPos.x,int(vMousePos.y*vOrigSizes[nCurrTile].height)-oShapeDragInitPos.y);
                     const cv::Rect oOutputRect(oShapeDragRect.x+oShapeMov.x,oShapeDragRect.y+oShapeMov.y,oShapeDragRect.width,oShapeDragRect.height);
                     const cv::Rect oInputRect(oShapeDragRect.x+1,oShapeDragRect.y+1,oShapeDragRect.width,oShapeDragRect.height);
-                    aFloodFillMasks[nCurrTile](oInputRect).copyTo(aTempSegmMasks[nCurrTile](oOutputRect));
+                    lv::copyValidPixelsTo(aFloodFillMasks[nCurrTile],oInputRect,aTempSegmMasks[nCurrTile],oOutputRect);
                 }
-                else if(oData.nEvent==cv::EVENT_LBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && (oData.nFlags&cv::EVENT_FLAG_LBUTTON))) {
+                else if(!bDragInProgress && oData.nEvent==cv::EVENT_LBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && (oData.nFlags&cv::EVENT_FLAG_LBUTTON))) {
                     const cv::Point2i vMousePos_FP2(int(vMousePos.x*vOrigSizes[nCurrTile].width*4),int(vMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vLastMousePos_FP2(int(vLastMousePos.x*vOrigSizes[nCurrTile].width*4),int(vLastMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vMousePosDiff = vMousePos_FP2-vLastMousePos_FP2;
@@ -212,7 +224,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     }
                     cv::circle(aSegmMasks[nCurrTile],vMousePos_FP2,(int)adSegmToolRadius[nCurrTile],cv::Scalar_<uchar>(255),-1,cv::LINE_8,2);
                 }
-                else if(oData.nEvent==cv::EVENT_RBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && (oData.nFlags&cv::EVENT_FLAG_RBUTTON))) {
+                else if(!bDragInProgress && oData.nEvent==cv::EVENT_RBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && (oData.nFlags&cv::EVENT_FLAG_RBUTTON))) {
                     const cv::Point2i vMousePos_FP2(int(vMousePos.x*vOrigSizes[nCurrTile].width*4),int(vMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vLastMousePos_FP2(int(vLastMousePos.x*vOrigSizes[nCurrTile].width*4),int(vLastMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vMousePosDiff = vMousePos_FP2-vLastMousePos_FP2;
@@ -223,29 +235,35 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     }
                     cv::circle(aSegmMasks[nCurrTile],vMousePos_FP2,(int)adSegmToolRadius[nCurrTile],cv::Scalar_<uchar>(0),-1,cv::LINE_8,2);
                 }
-                if(oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
+                if(!bDragInProgress && oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
                     for(size_t a=0u; a<2u; ++a)
                         cv::compare(aSegmMasks[a],128u,aSegmMasks[a],cv::CMP_GT);
                 }
             #elif GEN_REGISTRATION_ANNOT
                 const cv::Point2i vCurrPt(int(vMousePos.x*vOrigSizes[nCurrTile].width),int(vMousePos.y*vOrigSizes[nCurrTile].height));
-                // @@@@ make middle mouse delete, left add & select if close enough?
-                if(!bDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONDOWN || oData.nEvent==cv::EVENT_LBUTTONDOWN)) {
+                if(nLineCreationStep==0 && !bDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONDOWN || oData.nEvent==cv::EVENT_LBUTTONDOWN)) {
                     lvAssert(nSelectedPoint==SIZE_MAX);
+                    double dMinDist = 9999.;
+                    for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[nCurrTile].size(); ++nPtIdx) {
+                        const double dCurrDist = cv::norm(vCurrPt-avCorrespPts[nCurrTile][nPtIdx].first);
+                        if(dCurrDist<dMaxSelectDist && dCurrDist<dMinDist) {
+                            dMinDist = dCurrDist;
+                            nSelectedPoint = nPtIdx;
+                        }
+                    }
                     if(oData.nEvent==cv::EVENT_MBUTTONDOWN) {
-                        double dMinDist = 9999.;
-                        for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[nCurrTile].size(); ++nPtIdx) {
-                            const double dCurrDist = cv::norm(vCurrPt-avCorrespPts[nCurrTile][nPtIdx].first);
-                            if(dCurrDist<dMaxSelectDist && dCurrDist<dMinDist) {
-                                dMinDist = dCurrDist;
-                                nSelectedPoint = nPtIdx;
-                            }
+                        if(nSelectedPoint!=SIZE_MAX) {
+                            avCorrespPts[nCurrTile].erase(avCorrespPts[nCurrTile].begin()+nSelectedPoint);
+                            avCorrespPts[nCurrTile^1].erase(avCorrespPts[nCurrTile^1].begin()+nSelectedPoint);
+                            nSelectedPoint = SIZE_MAX;
                         }
                     }
                     else if(oData.nEvent==cv::EVENT_LBUTTONDOWN) {
-                        nSelectedPoint = avCorrespPts[nCurrTile].size();
-                        avCorrespPts[nCurrTile].emplace_back(vCurrPt,0);
-                        avCorrespPts[nCurrTile^1].emplace_back(vCurrPt,0);
+                        if(nSelectedPoint==SIZE_MAX) {
+                            nSelectedPoint = avCorrespPts[nCurrTile].size();
+                            avCorrespPts[nCurrTile].emplace_back(vCurrPt,0);
+                            avCorrespPts[nCurrTile^1].emplace_back(vCurrPt,0);
+                        }
                     }
                     if(nSelectedPoint!=SIZE_MAX) {
                         lvAssert(nSelectedPoint<avCorrespPts[nCurrTile].size() && nSelectedPoint<avCorrespPts[nCurrTile^1].size());
@@ -254,29 +272,58 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                         bDragInProgress = true;
                     }
                 }
-                else if(bDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_MOUSEMOVE)) {
+                else if(nLineCreationStep==0 && bDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_MOUSEMOVE)) {
                     const int nDist = (nSelectedPointTile!=nCurrTile)?0:((vCurrPt.x-vInitDragPt.x)/8);
                     lvAssert(nSelectedPoint<avCorrespPts[nSelectedPointTile^1].size());
                     avCorrespPts[nSelectedPointTile][nSelectedPoint].second = nDist;
-                    avCorrespPts[nSelectedPointTile^1][nSelectedPoint].second = nDist;
-                    avCorrespPts[nSelectedPointTile^1][nSelectedPoint].first.x = avCorrespPts[nSelectedPointTile][nSelectedPoint].first.x+(nSelectedPointTile?-1:1)*nDist;
+                    avCorrespPts[nSelectedPointTile^1][nSelectedPoint].second = -nDist;
+                    avCorrespPts[nSelectedPointTile^1][nSelectedPoint].first.x = avCorrespPts[nSelectedPointTile][nSelectedPoint].first.x+nDist;
                     if(oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP) {
                         bDragInProgress = false;
                         nSelectedPointTile = -1;
                         nSelectedPoint = SIZE_MAX;
                     }
                 }
-                else if(oData.nEvent==cv::EVENT_RBUTTONDOWN) {
-                    // if mode is 'init'
-                    //     if first click, set line start in curr tile
-                    //     if second click, set line end in curr tile  (snaps to epipolar line)
-                    //        then, interp points on line (1 per 2px?)
-                    //        and set mode to 'select second pair' (disables other clicking)
-                    // if mode is 'select second pair'
-                    //     if first click, set line start in curr tile (snaps to epipolar line)
-                    //     if second click, set line end in curr tile  (snaps to epipolar line)
-                    //        then, interp points on line (1 per 2px?)
-                    //        and set mode to 'init' (reenables other clicking)
+                else if(!bDragInProgress && oData.nEvent==cv::EVENT_RBUTTONDOWN) {
+                    if(nLineCreationStep==0 || (nLineCreationStep==2 && nSelectedPointTile==nCurrTile)) {
+                        lvAssert(avTempPts[nCurrTile].empty());
+                        avTempPts[nCurrTile].push_back(vCurrPt);
+                        if(nLineCreationStep==2)
+                            avTempPts[nCurrTile][0].y = avTempPts[nCurrTile^1][0].y;
+                        nSelectedPointTile = nCurrTile;
+                        ++nLineCreationStep;
+                    }
+                    else if(nLineCreationStep==1 && nSelectedPointTile==nCurrTile) {
+                        const int nLineHeight = avTempPts[nCurrTile][0].y;
+                        avTempPts[nCurrTile].emplace_back(vCurrPt.x,nLineHeight);
+                        nSelectedPointTile = nCurrTile^1;
+                        ++nLineCreationStep;
+                    }
+                    else if(nLineCreationStep==3 && nSelectedPointTile==nCurrTile) {
+                        lvAssert(avTempPts[nCurrTile].size()==1u && avTempPts[nCurrTile^1].size()==2u);
+                        const int nLineHeight = avTempPts[nCurrTile][0].y;
+                        lvAssert(nLineHeight==avTempPts[nCurrTile^1][0].y && nLineHeight==avTempPts[nCurrTile^1][1].y);
+                        avTempPts[nCurrTile].emplace_back(vCurrPt.x,nLineHeight);
+                        const int nFirstPairDist = avTempPts[nCurrTile].back().x-avTempPts[nCurrTile].front().x;
+                        int nSecondPairDist = avTempPts[nCurrTile^1].back().x-avTempPts[nCurrTile^1].front().x;
+                        if((nFirstPairDist<0 && nSecondPairDist>0) || (nFirstPairDist>0 && nSecondPairDist<0)) {
+                            std::swap(avTempPts[nCurrTile^1].front(),avTempPts[nCurrTile^1].back());
+                            nSecondPairDist = -nSecondPairDist;
+                        }
+                        const int nMinLength = std::min(std::abs(nFirstPairDist),std::abs(nSecondPairDist));
+                        const int nInteriorPts = nMinLength/nLineSplitRatio;
+                        for(int nPtIdx=0; nPtIdx<=nInteriorPts; ++nPtIdx) {
+                            const cv::Point2i oFirstPt(avTempPts[nCurrTile].front().x+int(std::round(nPtIdx*float(nFirstPairDist)/std::max(nInteriorPts,1))),nLineHeight);
+                            const cv::Point2i oSecondPt(avTempPts[nCurrTile^1].front().x+int(std::round(nPtIdx*float(nSecondPairDist)/std::max(nInteriorPts,1))),nLineHeight);
+                            const int nDist = oSecondPt.x-oFirstPt.x;
+                            avCorrespPts[nCurrTile].emplace_back(oFirstPt,nDist);
+                            avCorrespPts[nCurrTile^1].emplace_back(oSecondPt,-nDist);
+                        }
+                        avTempPts[nCurrTile].clear();
+                        avTempPts[nCurrTile^1].clear();
+                        nSelectedPointTile = -1;
+                        nLineCreationStep = 0;
+                    }
                 }
             #endif //GEN_REGISTRATION_ANNOT
             }
@@ -343,60 +390,47 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 }
             }
         #if GEN_SEGMENTATION_ANNOT
-            aSegmMasks[0] = cv::imread(sRGBGTDir+lv::putf("%05d.png",(int)nCurrIdx),cv::IMREAD_GRAYSCALE);
-            if(aSegmMasks[0].empty()) {
-                aSegmMasks[0].create(vOrigSizes[0],CV_8UC1);
-                if(!oBodyIdxFrame.empty()) {
-                    aSegmMasks[0] = (oBodyIdxFrame<(BODY_COUNT));
-                    cv::medianBlur(aSegmMasks[0],aSegmMasks[0],5);
-                }
+            for(size_t a=0u; a<2u; ++a) {
+                if(!aSegmMasks[a].empty())
+                    aSegmMasks[a].copyTo(aPrevSegmMasks[a]);
                 else
-                    aSegmMasks[0] = 0u;
-            }
-            lvAssert(lv::MatInfo(aSegmMasks[0])==lv::MatInfo(vOrigSizes[0],CV_8UC1));
-            aSegmMasks[1] = cv::imread(sLWIRGTDir+lv::putf("%05d.png",(int)nCurrIdx),cv::IMREAD_GRAYSCALE);
-            if(aSegmMasks[1].empty()) {
-                aSegmMasks[1].create(vOrigSizes[1],CV_8UC1);
-                aSegmMasks[1] = 0u;
-                // @@@ try to reg w/ depth here?
-            }
-            lvAssert(lv::MatInfo(aSegmMasks[1])==lv::MatInfo(vOrigSizes[1],CV_8UC1));
-            aTempSegmMasks[0].create(vOrigSizes[0],CV_8UC1);
-            aTempSegmMasks[1].create(vOrigSizes[1],CV_8UC1);
-            aTempSegmMasks[0] = 0u;
-            aTempSegmMasks[1] = 0u;
-        #elif GEN_REGISTRATION_ANNOT
-            {
-                avCorrespPts[0].clear();
-                const cv::FileStorage oGTFS_RGB(sRGBGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::READ);
-                if(oGTFS_RGB.isOpened()) {
-                    int nPts;
-                    oGTFS_RGB["nbpts"] >> nPts;
-                    lvAssert(nPts>0);
-                    for(int nPtIdx=0; nPtIdx<nPts; ++nPtIdx) {
-                        const cv::FileNode oPtNode = oGTFS_RGB[lv::putf("pt%04d",nPtIdx)];
-                        lvAssert(!oPtNode.empty());
-                        int x,y,d;
-                        oPtNode["x"] >> x;
-                        oPtNode["y"] >> y;
-                        oPtNode["d"] >> d;
-                        avCorrespPts[0].emplace_back(cv::Point(x,y),d);
+                    aPrevSegmMasks[a] = cv::Mat(vOrigSizes[a],CV_8UC1,cv::Scalar(0));
+                aSegmMasks[a] = cv::imread(((a==0u)?sRGBGTDir:sLWIRGTDir)+lv::putf("%05d.png",(int)nCurrIdx),cv::IMREAD_GRAYSCALE);
+                if(aSegmMasks[a].empty()) {
+                    aSegmMasks[a].create(vOrigSizes[a],CV_8UC1);
+                    if(a==0u) {
+                        if(!oBodyIdxFrame.empty()) {
+                            aSegmMasks[a] = (oBodyIdxFrame<(BODY_COUNT));
+                            cv::medianBlur(aSegmMasks[a],aSegmMasks[a],5);
+                        }
+                        else
+                            aSegmMasks[a] = 0u;
+                    }
+                    else {
+                        aSegmMasks[1] = 0u;
+                        // @@@ try to reg w/ depth here?
                     }
                 }
-                avCorrespPts[1].clear();
-                const cv::FileStorage oGTFS_LWIR(sLWIRGTDir+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::READ);
-                if(oGTFS_LWIR.isOpened()) {
+                lvAssert(lv::MatInfo(aSegmMasks[a])==lv::MatInfo(vOrigSizes[a],CV_8UC1));
+                aTempSegmMasks[a].create(vOrigSizes[a],CV_8UC1);
+                aTempSegmMasks[a] = 0u;
+            }
+        #elif GEN_REGISTRATION_ANNOT
+            for(size_t a=0u; a<2u; ++a) {
+                avCorrespPts[a].clear();
+                const cv::FileStorage oGTFS(((a==0u)?sRGBGTDir:sLWIRGTDir)+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::READ);
+                if(oGTFS.isOpened()) {
                     int nPts;
-                    oGTFS_LWIR["nbpts"] >> nPts;
+                    oGTFS["nbpts"] >> nPts;
                     lvAssert(nPts>0);
                     for(int nPtIdx=0; nPtIdx<nPts; ++nPtIdx) {
-                        const cv::FileNode oPtNode = oGTFS_LWIR[lv::putf("pt%04d",nPtIdx)];
+                        const cv::FileNode oPtNode = oGTFS[lv::putf("pt%04d",nPtIdx)];
                         lvAssert(!oPtNode.empty());
                         int x,y,d;
                         oPtNode["x"] >> x;
                         oPtNode["y"] >> y;
                         oPtNode["d"] >> d;
-                        avCorrespPts[1].emplace_back(cv::Point(x,y),d);
+                        avCorrespPts[a].emplace_back(cv::Point(x,y),d);
                     }
                 }
             }
