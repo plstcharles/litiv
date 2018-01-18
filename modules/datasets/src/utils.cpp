@@ -182,7 +182,14 @@ lv::DataHandler::DataHandler(const std::string& sBatchName, const std::string& s
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 size_t lv::DataGroupHandler::getExpectedLoadSize() const {
-    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedLoadSize();});
+    uint64_t nLoad = lv::accumulateMembers<uint64_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedLoadSize();});
+#if !TARGET_PLATFORM_x64
+    if(sizeof(size_t)==4u && nLoad>(uint64_t)std::numeric_limits<size_t>::max()) {
+        lvWarn_("expected load size for batch group '%s' overflowing size_t; will set to SIZE_MAX instead",getName().c_str());
+        nLoad = SIZE_MAX;
+    }
+#endif //!TARGET_PLATFORM_x64
+    return (size_t)nLoad;
 }
 
 size_t lv::DataGroupHandler::getInputCount() const {
@@ -834,7 +841,16 @@ size_t lv::IDataProducer_<lv::DatasetSource_Video>::getGTCount() const {
 size_t lv::IDataProducer_<lv::DatasetSource_Video>::getExpectedLoadSize() const {
     const cv::Mat& oROI = getFrameROI();
     const lv::MatInfo& oMatInfo = getInputInfo();
-    return (oROI.empty()?oMatInfo.size.total():(size_t)cv::countNonZero(oROI))*oMatInfo.type.elemSize()*getFrameCount();
+    const uint64_t nROIElems = oROI.empty()?oMatInfo.size.total():(size_t)cv::countNonZero(oROI);
+    const uint64_t nElemSize = oMatInfo.type.elemSize();
+    uint64_t nLoad = nROIElems*nElemSize*getFrameCount();
+#if !TARGET_PLATFORM_x64
+    if(sizeof(size_t)==4u && nLoad>(uint64_t)std::numeric_limits<size_t>::max()) {
+        lvWarn_("expected load size for batch '%s' overflowing size_t; will set to SIZE_MAX instead",getName().c_str());
+        nLoad = SIZE_MAX;
+    }
+#endif //!TARGET_PLATFORM_x64
+    return (size_t)nLoad;
 }
 
 lv::IDataProducer_<lv::DatasetSource_Video>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
@@ -986,10 +1002,19 @@ size_t lv::IDataProducer_<lv::DatasetSource_VideoArray>::getExpectedLoadSize() c
     const std::vector<lv::MatInfo>& vMatInfos = getInputInfoArray();
     lvAssert_(vROIArray.size()==vMatInfos.size(),"internal array sizes mismatch");
     lvAssert_(vROIArray.size()==getInputStreamCount(),"internal array sizes mismatch");
-    size_t nLoad = size_t(0);
-    for(size_t nStreamIdx=0; nStreamIdx<vMatInfos.size(); ++nStreamIdx)
-        nLoad += (vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(/***@@@@@@@CHECKEXCEPT****/vROIArray[nStreamIdx]))*vMatInfos[nStreamIdx].type.elemSize()*getFrameCount();
-    return nLoad;
+    uint64_t nLoad = 0ULL;
+    for(size_t nStreamIdx=0; nStreamIdx<vMatInfos.size(); ++nStreamIdx) {
+        const uint64_t nROIElems = vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(vROIArray[nStreamIdx]);
+        const uint64_t nElemSize = vMatInfos[nStreamIdx].type.elemSize();
+        nLoad += nROIElems*nElemSize*getFrameCount();
+    }
+#if !TARGET_PLATFORM_x64
+    if(sizeof(size_t)==4u && nLoad>(uint64_t)std::numeric_limits<size_t>::max()) {
+        lvWarn_("expected load size for batch '%s' overflowing size_t; will set to SIZE_MAX instead",getName().c_str());
+        nLoad = SIZE_MAX;
+    }
+#endif //!TARGET_PLATFORM_x64
+    return (size_t)nLoad;
 }
 
 lv::IDataProducer_<lv::DatasetSource_VideoArray>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
@@ -1073,13 +1098,20 @@ size_t lv::IDataProducer_<lv::DatasetSource_Image>::getGTCount() const {
 }
 
 size_t lv::IDataProducer_<lv::DatasetSource_Image>::getExpectedLoadSize() const {
-    size_t nLoad = size_t(0);
+    uint64_t nLoad = 0ULL;
     for(size_t nPacketIdx=0; nPacketIdx<getInputCount(); ++nPacketIdx) {
         const cv::Mat& oROI = getInputROI(nPacketIdx);
         const lv::MatInfo& oMatInfo = getInputInfo(nPacketIdx);
-        nLoad += (oROI.empty()?oMatInfo.size.total():(size_t)cv::countNonZero(oROI))*oMatInfo.type.elemSize();
+        const uint64_t nROIElems = oROI.empty()?oMatInfo.size.total():(size_t)cv::countNonZero(oROI);
+        nLoad += nROIElems*oMatInfo.type.elemSize();
     }
-    return nLoad;
+#if !TARGET_PLATFORM_x64
+    if(sizeof(size_t)==4u && nLoad>(uint64_t)std::numeric_limits<size_t>::max()) {
+        lvWarn_("expected load size for batch '%s' overflowing size_t; will set to SIZE_MAX instead",getName().c_str());
+        nLoad = SIZE_MAX;
+    }
+#endif //!TARGET_PLATFORM_x64
+    return (size_t)nLoad;
 }
 
 lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Image>::getInputInfo(size_t nPacketIdx) const {
@@ -1181,16 +1213,24 @@ size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getGTCount() const {
 }
 
 size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getExpectedLoadSize() const {
-    size_t nLoad = size_t(0);
+    uint64_t nLoad = 0ULL;
     for(size_t nPacketIdx=0; nPacketIdx<getInputCount(); ++nPacketIdx) {
         const std::vector<cv::Mat>& vROIArray = getInputROIArray(nPacketIdx);
         const std::vector<lv::MatInfo>& vMatInfos = getInputInfoArray(nPacketIdx);
         lvAssert_(vROIArray.size()==vMatInfos.size(),"internal array sizes mismatch");
         lvAssert_(vROIArray.size()==getInputStreamCount(),"internal array sizes mismatch");
-        for(size_t nStreamIdx=0; nStreamIdx<vMatInfos.size(); ++nStreamIdx)
-            nLoad += (vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(vROIArray[nStreamIdx]))*vMatInfos[nStreamIdx].type.elemSize();
+        for(size_t nStreamIdx=0; nStreamIdx<vMatInfos.size(); ++nStreamIdx) {
+            const uint64_t nROIElems = vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(vROIArray[nStreamIdx]);
+            nLoad += nROIElems*vMatInfos[nStreamIdx].type.elemSize();
+        }
     }
-    return nLoad;
+#if !TARGET_PLATFORM_x64
+    if(sizeof(size_t)==4u && nLoad>(uint64_t)std::numeric_limits<size_t>::max()) {
+        lvWarn_("expected load size for batch '%s' overflowing size_t; will set to SIZE_MAX instead",getName().c_str());
+        nLoad = SIZE_MAX;
+    }
+#endif //!TARGET_PLATFORM_x64
+    return (size_t)nLoad;
 }
 
 std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputInfoArray(size_t nPacketIdx) const {
