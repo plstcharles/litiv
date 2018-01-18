@@ -960,6 +960,9 @@ namespace lv {
     /// computes & returns a logpolar lookup mask using the given output square matrix size & angular/radial bin counts
     void getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::Mat_<int>& oOutputMask, bool bUseLienhartMask=true, float fRadiusOffset=0.0f, int* pnFirstMaskIdx=nullptr, int* pnLastMaskIdx=nullptr);
 
+    /// copies pixels from the input image ROI to the output image ROI, where the latter can be out of bounds (both ROIs must have the same initial size); returns number of pixels copied
+    int copyValidPixelsTo(const cv::Mat& oInputImage, const cv::Rect& oInputROI, cv::Mat& oOutputImage, const cv::Rect& oOutputROI, cv::Rect* pValidOutputROI=nullptr, const cv::Mat_<uchar>& oMask=cv::Mat());
+
     /// writes a given text string on an image using the original cv::putText
     inline void putText(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false, const cv::Point2i& oOffset=cv::Point2i(4,15), int nThickness=2, double dScale=1.2) {
         cv::putText(oImg,sText,cv::Point(oOffset.x,bBottom?(oImg.rows-oOffset.y):oOffset.y),cv::FONT_HERSHEY_PLAIN,dScale,vColor,nThickness,cv::LINE_AA);

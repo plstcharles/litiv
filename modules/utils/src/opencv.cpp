@@ -114,6 +114,61 @@ void lv::getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::M
     }
 }
 
+int lv::copyValidPixelsTo(const cv::Mat& oInputImage, const cv::Rect& oInputROI, cv::Mat& oOutputImage, const cv::Rect& oOutputROI, cv::Rect* pValidOutputROI, const cv::Mat_<uchar>& oMask) {
+    lvAssert_(!oInputImage.empty() && !oOutputImage.empty(),"both matrices need to be allocated first!");
+    lvAssert_(oInputImage.dims==2 && oOutputImage.dims==2,"both matrices must be 2d");
+    lvAssert_(oInputROI.size()==oOutputROI.size(),"both rois must have the same size");
+    lvAssert_(oMask.empty() || oMask.size()==oInputImage.size(),"mask must be empty or match the size of the input image");
+    if(oInputROI.area()<=0) {
+        if(pValidOutputROI)
+            *pValidOutputROI = cv::Rect(oOutputROI.x,oOutputROI.y,0,0);
+        return 0;
+    }
+    lvAssert_(oInputROI.x>=0 && oInputROI.y>=0 && (oInputROI.x+oInputROI.width)<=oInputImage.cols && (oInputROI.y+oInputROI.height)<=oInputImage.rows,"input roi must be inside image bounds");
+    if((oOutputROI.x+oOutputROI.width)<=0 || oOutputROI.x>=oOutputImage.cols || (oOutputROI.y+oOutputROI.height)<=0 || oOutputROI.y>=oOutputImage.rows) {
+        if(pValidOutputROI)
+            *pValidOutputROI = cv::Rect(oOutputROI.x,oOutputROI.y,0,0);
+        return 0;
+    }
+    cv::Rect oROI_in = oInputROI;
+    cv::Rect oROI_out = oOutputROI;
+    if(oROI_out.x<0) {
+        oROI_in.x -= oROI_out.x;
+        oROI_in.width += oROI_out.x;
+        oROI_out.width += oROI_out.x;
+        oROI_out.x = 0;
+    }
+    if(oROI_out.y<0) {
+        oROI_in.y -= oROI_out.y;
+        oROI_in.height += oROI_out.y;
+        oROI_out.height += oROI_out.y;
+        oROI_out.y = 0;
+    }
+    if(oROI_out.x+oROI_out.width>oOutputImage.cols) {
+        const int nOffset = oROI_out.x+oROI_out.width-oOutputImage.cols;
+        oROI_in.width -= nOffset;
+        oROI_out.width -= nOffset;
+    }
+    if(oROI_out.y+oROI_out.height>oOutputImage.rows) {
+        const int nOffset = oROI_out.y+oROI_out.height-oOutputImage.rows;
+        oROI_in.height -= nOffset;
+        oROI_out.height -= nOffset;
+    }
+    lvDbgAssert(oROI_in.x>=0 && oROI_in.x+oROI_in.width<=oInputImage.cols);
+    lvDbgAssert(oROI_in.y>=0 && oROI_in.y+oROI_in.height<=oInputImage.rows);
+    lvDbgAssert(oROI_out.x>=0 && oROI_out.x+oROI_out.width<=oOutputImage.cols);
+    lvDbgAssert(oROI_out.y>=0 && oROI_out.y+oROI_out.height<=oOutputImage.rows);
+    lvDbgAssert(oROI_in.size()==oROI_out.size());
+    if(pValidOutputROI)
+        *pValidOutputROI = oROI_out;
+    if(!oMask.empty()) {
+        oInputImage(oROI_in).copyTo(oOutputImage(oROI_out),oMask(oROI_in));
+        return cv::countNonZero(oMask(oROI_in));
+    }
+    oInputImage(oROI_in).copyTo(oOutputImage(oROI_out));
+    return oROI_out.area();
+}
+
 cv::Mat lv::getFlowColorMap(const cv::Mat& oFlow) {
     if(oFlow.empty())
         return cv::Mat();
