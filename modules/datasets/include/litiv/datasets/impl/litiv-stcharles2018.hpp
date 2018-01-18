@@ -34,7 +34,7 @@
 #endif //ndef(DATASETS_LITIV2018_LOAD_CALIB_DATA)
 #define DATASETS_LITIV2018_RECTIFIED_SIZE cv::Size(640,480)
 #ifndef DATASETS_LITIV2018_DATA_VERSION
-#define DATASETS_LITIV2018_DATA_VERSION 2
+#define DATASETS_LITIV2018_DATA_VERSION 4
 #endif //ndef(DATASETS_LITIV2018_DATA_VERSION)
 #ifndef DATASETS_LITIV2018_FLIP_RGB
 #define DATASETS_LITIV2018_FLIP_RGB 1
@@ -67,8 +67,7 @@ namespace lv {
             LITIV2018_RGB=0,
             LITIV2018_LWIR=1,
             LITIV2018_Depth=2,
-            // @@@@ should add streams for body joints & nir images
-            //LITIV2018_NIR,
+            // @@@@ should add stream for body joints...
             //LITIV2018_Joints,
         };
     };
@@ -127,11 +126,13 @@ namespace lv {
             static const std::vector<std::string> s_vsWorkBatchDirs = {DATASETS_LITIV2018_CALIB_VERSION_STR};
         #else //!DATASETS_LITIV2018_LOAD_CALIB_DATA
         #if DATASETS_LITIV2018_DATA_VERSION==1
-            static const std::vector<std::string> s_vsWorkBatchDirs = {"vid01","vid02","vid03"};
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"vid01","vid02","vid03"}; // calib01, uncompr data
         #elif DATASETS_LITIV2018_DATA_VERSION==2
-            static const std::vector<std::string> s_vsWorkBatchDirs = {"scene04","scene05"};
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"vid04","vid05"}; // calib02, uncompr data
         #elif DATASETS_LITIV2018_DATA_VERSION==3
-            static const std::vector<std::string> s_vsWorkBatchDirs = {"testmini"};
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"vid06"}; // calib04 (~calib06)
+        #elif DATASETS_LITIV2018_DATA_VERSION==4 // 2018-01-18
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"vid04","vid05","vid06","vid07","vid08"}; // calib02 + calib04 + (calib06)
         #else //DATASETS_LITIV2018_DATA_VERSION==?
         #error "unknown dataset version"
         #endif //DATASETS_LITIV2018_DATA_VERSION==?
@@ -189,7 +190,7 @@ namespace lv {
             public IDataProducerWrapper_<eDatasetTask,DatasetSource_VideoArray,Dataset_LITIV_stcharles2018> {
         /// returns the number of parallel input streams (depends on whether loading depth or not)
         virtual size_t getInputStreamCount() const override final {
-            // @@@@ should add streams for body joints & nir images
+            // @@@@ should add stream for body joints...
             return size_t((m_bLoadDepth?3:2)*(m_nLoadInputMasks?2:1));
         }
         /// returns the number of parallel gt streams (depends on whether loading depth or not)
@@ -530,7 +531,7 @@ namespace lv {
                 lvAssert_(!this->m_oLWIRCameraParams.empty() && !this->m_oLWIRDistortParams.empty(),"failed to load LWIR camera calibration parameters");
                 cv::Size oUndistortRGBSize(oRGBSize),oUndistortLWIRSize(oLWIRSize);
                 if(this->m_bHorizRectify) {
-                    lvAssert_(!this->m_bLoadDepth,"missing depth image rectification impl"); // @@@
+                    lvAssert_(!this->m_bLoadDepth,"missing depth image rectification impl"); // @@@ could map to color, and use color's undistort map?
                     std::array<cv::Mat,2> aRectifRotMats,aRectifProjMats;
                     cv::Mat oDispToDepthMap,oRotMat,oTranslMat;
                     oParamsFS["oRotMat"] >> oRotMat;
@@ -543,7 +544,6 @@ namespace lv {
                     oUndistortRGBSize = oRectifSize;
                     oUndistortLWIRSize = oRectifSize;
                     lvAssert_(!this->m_oLWIRCameraParams.empty() && !this->m_oLWIRDistortParams.empty(),"failed to load LWIR camera calibration parameters");
-                    // @@@@ calib individual heads using cv::calibrateCamera, and recalc cam mats using 'getOptimalNewCameraMatrix' for common size (imageSize param)
                     cv::stereoRectify(this->m_oRGBCameraParams,this->m_oRGBDistortParams,
                                       this->m_oLWIRCameraParams,this->m_oLWIRDistortParams,
                                       oRectifSize,oRotMat,oTranslMat,
@@ -855,11 +855,13 @@ namespace lv {
             }
             ///////////////////////////////////////////////////////////////////////////////////
             if(this->m_bLoadDepth) {
+                cv::Mat oDepthPacket;
             #if DATASETS_LITIV2018_DATA_VERSION>=3
-                cv::Mat oDepthPacket = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY_LZ4);
-            #else //DATASETS_LITIV2018_DATA_VERSION<=2
-                cv::Mat oDepthPacket = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY);
-            #endif //DATASETS_LITIV2018_DATA_VERSION<=2
+                if(this->getName()!="vid04" && this->getName()!="vid05") // those two were made pre-lz4 impl
+                    oDepthPacket = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY_LZ4);
+                else
+            #endif //DATASETS_LITIV2018_DATA_VERSION>=3
+                    oDepthPacket = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY);
                 lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==oDepthSize);
                 if(oDepthPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
                     cv::resize(oDepthPacket,oDepthPacket,vInputInfos[nInputDepthStreamIdx].size(),0,0,cv::INTER_CUBIC);
