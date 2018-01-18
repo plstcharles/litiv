@@ -213,7 +213,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     const cv::Rect oInputRect(oShapeDragRect.x+1,oShapeDragRect.y+1,oShapeDragRect.width,oShapeDragRect.height);
                     lv::copyValidPixelsTo(aFloodFillMasks[nCurrTile],oInputRect,aTempSegmMasks[nCurrTile],oOutputRect);
                 }
-                else if(!bDragInProgress && oData.nEvent==cv::EVENT_LBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && (oData.nFlags&cv::EVENT_FLAG_LBUTTON))) {
+                else if(!bDragInProgress && (oData.nEvent==cv::EVENT_LBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && (oData.nFlags&cv::EVENT_FLAG_LBUTTON)))) {
                     const cv::Point2i vMousePos_FP2(int(vMousePos.x*vOrigSizes[nCurrTile].width*4),int(vMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vLastMousePos_FP2(int(vLastMousePos.x*vOrigSizes[nCurrTile].width*4),int(vLastMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vMousePosDiff = vMousePos_FP2-vLastMousePos_FP2;
@@ -224,7 +224,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     }
                     cv::circle(aSegmMasks[nCurrTile],vMousePos_FP2,(int)adSegmToolRadius[nCurrTile],cv::Scalar_<uchar>(255),-1,cv::LINE_8,2);
                 }
-                else if(!bDragInProgress && oData.nEvent==cv::EVENT_RBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && (oData.nFlags&cv::EVENT_FLAG_RBUTTON))) {
+                else if(!bDragInProgress && (oData.nEvent==cv::EVENT_RBUTTONDOWN || (oData.nEvent==cv::EVENT_MOUSEMOVE && (oData.nFlags&cv::EVENT_FLAG_RBUTTON)))) {
                     const cv::Point2i vMousePos_FP2(int(vMousePos.x*vOrigSizes[nCurrTile].width*4),int(vMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vLastMousePos_FP2(int(vLastMousePos.x*vOrigSizes[nCurrTile].width*4),int(vLastMousePos.y*vOrigSizes[nCurrTile].height*4));
                     const cv::Point2i vMousePosDiff = vMousePos_FP2-vLastMousePos_FP2;
@@ -235,7 +235,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     }
                     cv::circle(aSegmMasks[nCurrTile],vMousePos_FP2,(int)adSegmToolRadius[nCurrTile],cv::Scalar_<uchar>(0),-1,cv::LINE_8,2);
                 }
-                if(!bDragInProgress && oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
+                if(!bDragInProgress && (oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP)) {
                     for(size_t a=0u; a<2u; ++a)
                         cv::compare(aSegmMasks[a],128u,aSegmMasks[a],cv::CMP_GT);
                 }
