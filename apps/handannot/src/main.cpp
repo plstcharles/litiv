@@ -178,6 +178,8 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             if(vMousePos.x>=0.0f && vMousePos.y>=0.0f && vMousePos.x<1.0f && vMousePos.y<1.0f) {
                 nCurrTile = oData.oPosition.x/oData.oTileSize.width;
             #if GEN_SEGMENTATION_ANNOT
+                if(nCurrView!=2u)
+                    nCurrTile = (int)nCurrView;
                 if(!bDragInProgress && oData.nEvent==cv::EVENT_MOUSEWHEEL && cv::getMouseWheelDelta(oData.nFlags)>0) {
                     adSegmToolRadius[nCurrTile] = std::min(adSegmToolRadius[nCurrTile]+std::max(1.0,adSegmToolRadius[nCurrTile]/4),adSegmToolRadiusMax[nCurrTile]);
                     lvLog_(2,"\tnew tool size = %f",adSegmToolRadius[nCurrTile]);
@@ -429,16 +431,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 aSegmMasks[a] = cv::imread(((a==0u)?sRGBGTDir:sLWIRGTDir)+lv::putf("%05d.png",(int)nCurrIdx),cv::IMREAD_GRAYSCALE);
                 if(aSegmMasks[a].empty()) {
                     aSegmMasks[a].create(vOrigSizes[a],CV_8UC1);
-                    if(a==0u) {
-                        if(!oBodyIdxFrame.empty()) {
-                            aSegmMasks[a] = (oBodyIdxFrame<(BODY_COUNT));
-                            cv::medianBlur(aSegmMasks[a],aSegmMasks[a],5);
-                        }
-                        else
-                            aSegmMasks[a] = 0u;
-                    }
-                    else
-                        aSegmMasks[a] = 0u; // @@@ try to reg w/ depth here?
+                    aSegmMasks[a] = 0u;
                 }
                 lvAssert(lv::MatInfo(aSegmMasks[a])==lv::MatInfo(vOrigSizes[a],CV_8UC1));
                 aTempSegmMasks[a].create(vOrigSizes[a],CV_8UC1);
@@ -465,6 +458,9 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             }
         #endif //GEN_REGISTRATION_ANNOT
             lvLog_(1,"\t annot @ #%d ('%s') of %d",int(nCurrIdx),sPacketName.c_str(),int(nTotPacketCount));
+        #ifdef _MSC_VER
+            OutputDebugString(lv::convertStrToWStr(lv::putf("\t annot @ #%d ('%s') of %d\n",int(nCurrIdx),sPacketName.c_str(),int(nTotPacketCount))).c_str());
+        #endif //def(_MSC_VER)
         #if (GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
             int nKeyPressed = -1;
             while(nKeyPressed!=(int)'q' &&
@@ -475,6 +471,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 for(size_t a=0u; a<2u; ++a) {
                 #if GEN_SEGMENTATION_ANNOT
                     cv::cvtColor((aSegmMasks[a]|aTempSegmMasks[a]),aSegmMasks_3ch[a],cv::COLOR_GRAY2BGR);
+                    aSegmMasks_3ch[a] &= cv::Scalar_<uchar>(0,0,255);
                     cv::addWeighted(aInputs[a],(1-dSegmOpacity),aSegmMasks_3ch[a],dSegmOpacity,0.0,vvDisplayPairs[0][a].first);
                 #elif GEN_REGISTRATION_ANNOT
                     aInputs[a].copyTo(vvDisplayPairs[0][a].first);
@@ -515,13 +512,25 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 }
                 else if(nKeyPressed==(int)' ')
                     nCurrView = (nCurrView+1u)%3u;
+                else if(nKeyPressed==(int)'z') {
+                    for(size_t a=0u; a<2u; ++a) {
+                        if(a==0u && !oBodyIdxFrame.empty()) {
+                            aSegmMasks[a] = (oBodyIdxFrame<(BODY_COUNT));
+                            cv::medianBlur(aSegmMasks[a],aSegmMasks[a],5);
+                        }
+                        else
+                            aSegmMasks[a] = 0u;
+                    }
+                }
             #endif //GEN_SEGMENTATION_ANNOT
             }
         #if GEN_SEGMENTATION_ANNOT
             const bool bCurrFrameValid = (cv::countNonZero(aSegmMasks[0])!=0 || cv::countNonZero(aSegmMasks[1])!=0);
             if(bCurrFrameValid) {
-                cv::imwrite(sRGBGTDir+lv::putf("%05d.png",(int)nCurrIdx),aSegmMasks[0]);
-                cv::imwrite(sLWIRGTDir+lv::putf("%05d.png",(int)nCurrIdx),aSegmMasks[1]);
+                if(cv::countNonZero(aSegmMasks[0])!=0)
+                    cv::imwrite(sRGBGTDir+lv::putf("%05d.png",(int)nCurrIdx),aSegmMasks[0]);
+                if(cv::countNonZero(aSegmMasks[1])!=0)
+                    cv::imwrite(sLWIRGTDir+lv::putf("%05d.png",(int)nCurrIdx),aSegmMasks[1]);
             }
         #elif GEN_REGISTRATION_ANNOT
             const bool bCurrFrameValid = (!avCorrespPts[0].empty() || !avCorrespPts[1].empty());
