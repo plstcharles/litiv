@@ -16,6 +16,8 @@
 // limitations under the License.
 
 #include "litiv/utils/cxx.hpp"
+#include <locale>
+#include <codecvt>
 
 std::string lv::putf(const char* acFormat, ...) { // NOLINT; reused in non-C++11 projs
     va_list vArgs;
@@ -42,6 +44,16 @@ std::string lv::putf(const char* acFormat, ...) { // NOLINT; reused in non-C++11
         lvStdError_(runtime_error,"putf failed (2)");
     vBuffer.resize((size_t)nWritten2);
     return vBuffer;
+}
+
+std::wstring lv::convertStrToWStr(const std::string& sStr) {
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    return converter.from_bytes(sStr);
+}
+
+std::string lv::convertWStrToStr(const std::wstring& sStr) {
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    return converter.to_bytes(sStr);
 }
 
 bool lv::compare_lowercase(const std::string& i, const std::string& j) {

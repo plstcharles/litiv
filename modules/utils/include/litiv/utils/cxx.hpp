@@ -71,6 +71,10 @@ namespace lv {
 
     /// vsnprintf wrapper for std::string output (avoids using two buffers via C++11 string contiguous memory access)
     std::string putf(const char* acFormat, ...);
+    /// string to wstring converter wrapper used for msvc strings
+    std::wstring convertStrToWStr(const std::string& sStr);
+    /// wstring to string converter wrapper used for msvc strings
+    std::string convertWStrToStr(const std::wstring& sStr);
     /// returns the comparison of two strings, ignoring character case
     bool compare_lowercase(const std::string& i, const std::string& j);
     /// returns whether the input string contains any of the given tokens
