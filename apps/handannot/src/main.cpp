@@ -25,7 +25,7 @@
 ////////////////////////////////
 #define DATASETS_LITIV2018_CALIB_VERSION 4
 #define DATASETS_LITIV2018_DATA_VERSION 4
-#define DATASETS_START_IDX 0
+#define DATASETS_START_IDX 530
 
 #if (GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)>1
 #error "must select one type of annotation to generate"
@@ -41,6 +41,9 @@
 #include "litiv/datasets.hpp"
 #include "litiv/imgproc.hpp"
 #include <opencv2/calib3d.hpp>
+#ifdef _MSC_VER
+#include <windows.h>
+#endif //def(_MSC_VER)
 #if !USING_LZ4
 #error "lz4 required."
 #endif //USING_LZ4
@@ -152,7 +155,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     #if GEN_SEGMENTATION_ANNOT
         double dSegmOpacity = 0.5;
         std::array<double,2> adSegmToolRadius={10,3};
-        const std::array<double,2> adSegmToolRadiusMin={3,1},adSegmToolRadiusMax={80,40};
+        const std::array<double,2> adSegmToolRadiusMin={3,1},adSegmToolRadiusMax={150,60};
         std::array<cv::Mat,2> aSegmMasks,aPrevSegmMasks,aTempSegmMasks,aSegmMasks_3ch,aFloodFillMasks;
         bool bDragInProgress = false;
         int nShapeOriginTile;
@@ -513,15 +516,17 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 else if(nKeyPressed==(int)' ')
                     nCurrView = (nCurrView+1u)%3u;
                 else if(nKeyPressed==(int)'z') {
-                    for(size_t a=0u; a<2u; ++a) {
-                        if(a==0u && !oBodyIdxFrame.empty()) {
-                            aSegmMasks[a] = (oBodyIdxFrame<(BODY_COUNT));
-                            cv::medianBlur(aSegmMasks[a],aSegmMasks[a],5);
-                        }
-                        else
-                            aSegmMasks[a] = 0u;
+                    if(!oBodyIdxFrame.empty()) {
+                        aSegmMasks[0u] = (oBodyIdxFrame<(BODY_COUNT));
+                        cv::medianBlur(aSegmMasks[0u],aSegmMasks[0u],5);
                     }
+                    else
+                        aSegmMasks[0u] = 0u;
                 }
+                /*if(cv::countNonZero(aSegmMasks[0])==0) {
+                    nKeyPressed = 13;
+                    break;
+                }*/
             #endif //GEN_SEGMENTATION_ANNOT
             }
         #if GEN_SEGMENTATION_ANNOT
