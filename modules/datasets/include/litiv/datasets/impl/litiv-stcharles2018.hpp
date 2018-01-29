@@ -384,17 +384,20 @@ namespace lv {
             auto psDepthGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+(bEvalDisparityMaps?"depth_gt_disp":"depth_gt_masks"));
             auto psDepthMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depth_masks"+sDirNameSuffix);
             auto psDepthFramesDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depth"+sDirNameSuffix);
-            std::vector<std::string> vsDepthFramePaths,vsDepthMaskPaths,vsDepthGTPaths;
+            auto psC2DMapsDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"coordmap_c2d");
+            std::vector<std::string> vsDepthFramePaths,vsDepthMaskPaths,vsDepthGTPaths,vsC2DMapPaths;
             if(this->m_bLoadDepth) {
-                if(psDepthFramesDir==vsSubDirs.end())
-                    lvError_("LITIV-stcharles2018 sequence '%s' did not possess the required depth frame subdirectory",this->getName().c_str());
+                if(psDepthFramesDir==vsSubDirs.end() || psC2DMapsDir==vsSubDirs.end())
+                    lvError_("LITIV-stcharles2018 sequence '%s' did not possess the required depth frame and c2d map subdirectories",this->getName().c_str());
                 vsDepthFramePaths = lv::getFilesFromDir(*psDepthFramesDir);
                 vsDepthMaskPaths = (psDepthMasksDir==vsSubDirs.end())?std::vector<std::string>{}:lv::getFilesFromDir(*psDepthMasksDir);
                 vsDepthGTPaths = (psDepthGTDir==vsSubDirs.end())?std::vector<std::string>{}:lv::getFilesFromDir(*psDepthGTDir);
+                vsC2DMapPaths = lv::getFilesFromDir(*psC2DMapsDir);
                 lv::filterFilePaths(vsDepthFramePaths,{},{".bin"});
                 lv::filterFilePaths(vsDepthMaskPaths,{},{".png"});
                 lv::filterFilePaths(vsDepthGTPaths,{},{".png"});
-                lvAssert__(vsDepthFramePaths.size()>0u && vsDepthMaskPaths.size()<=vsDepthFramePaths.size() && vsDepthGTPaths.size()<=vsDepthFramePaths.size(),"bad input depth packet count for sequence '%s'",this->getName().c_str());
+                lv::filterFilePaths(vsC2DMapPaths,{},{".bin"});
+                lvAssert__(vsDepthFramePaths.size()>0u && vsDepthFramePaths.size()<=vsC2DMapPaths.size() && vsDepthMaskPaths.size()<=vsDepthFramePaths.size() && vsDepthGTPaths.size()<=vsDepthFramePaths.size(),"bad input depth packet count for sequence '%s'",this->getName().c_str());
             }
             ////////////////////////////////
             this->m_mRealSubset.clear();
@@ -404,7 +407,7 @@ namespace lv {
                 for(size_t nCurrIdx=0u; nCurrIdx<nTotInputPackets; ++nCurrIdx) {
                     lvAssert(extractPathIndex(vsRGBFramePaths[nCurrIdx])==nCurrIdx);
                     lvAssert(extractPathIndex(vsLWIRFramePaths[nCurrIdx])==nCurrIdx);
-                    lvAssert(!this->m_bLoadDepth || extractPathIndex(vsDepthFramePaths[nCurrIdx])==nCurrIdx);
+                    lvAssert(!this->m_bLoadDepth || (extractPathIndex(vsDepthFramePaths[nCurrIdx])==nCurrIdx && extractPathIndex(vsC2DMapPaths[nCurrIdx])==nCurrIdx));
                 }
                 lvAssert(vsRGBMaskPaths.empty() || extractPathIndex(vsRGBMaskPaths.back())<nTotInputPackets);
                 lvAssert(vsRGBGTPaths.empty() || extractPathIndex(vsRGBGTPaths.back())<nTotInputPackets);
@@ -482,6 +485,7 @@ namespace lv {
             cv::Mat oRGBROI = cv::imread(this->getDataPath()+"rgb_roi.png",cv::IMREAD_GRAYSCALE);
             cv::Mat oLWIRROI = cv::imread(this->getDataPath()+"lwir_roi.png",cv::IMREAD_GRAYSCALE);
             cv::Mat oDepthROI = cv::imread(this->getDataPath()+"depth_roi.png",cv::IMREAD_GRAYSCALE);
+            cv::Mat oDepthRemapROI = cv::imread(this->getDataPath()+"depth_remap_roi.png",cv::IMREAD_GRAYSCALE);
             if(!oRGBROI.empty()) {
                 lvAssert(oRGBROI.type()==CV_8UC1 && oRGBROI.size()==oRGBSize);
                 oRGBROI = oRGBROI>128;
@@ -500,6 +504,12 @@ namespace lv {
             }
             else
                 oDepthROI = cv::Mat(oDepthSize,CV_8UC1,cv::Scalar_<uchar>(255));
+            if(!oDepthRemapROI.empty()) {
+                lvAssert(oDepthRemapROI.type()==CV_8UC1 && oDepthRemapROI.size()==oRGBSize);
+                oDepthRemapROI = oDepthRemapROI>128;
+            }
+            else
+                oDepthRemapROI = cv::Mat(oRGBSize,CV_8UC1,cv::Scalar_<uchar>(255));
             ////////////////////////////////
             this->m_nMinDisp = size_t(0);
             this->m_nMaxDisp = size_t(100);
@@ -530,9 +540,8 @@ namespace lv {
                 oParamsFS["aCamMats1"] >> this->m_oLWIRCameraParams;
                 oParamsFS["aDistCoeffs1"] >> this->m_oLWIRDistortParams;
                 lvAssert_(!this->m_oLWIRCameraParams.empty() && !this->m_oLWIRDistortParams.empty(),"failed to load LWIR camera calibration parameters");
-                cv::Size oUndistortRGBSize(oRGBSize),oUndistortLWIRSize(oLWIRSize);
+                cv::Size oUndistortRGBSize(oRGBSize),oUndistortLWIRSize(oLWIRSize),oUndistortDepthSize(oRGBSize);
                 if(this->m_bHorizRectify) {
-                    lvAssert_(!this->m_bLoadDepth,"missing depth image rectification impl"); // @@@ could map to color, and use color's undistort map?
                     std::array<cv::Mat,2> aRectifRotMats,aRectifProjMats;
                     cv::Mat oDispToDepthMap,oRotMat,oTranslMat;
                     oParamsFS["oRotMat"] >> oRotMat;
@@ -544,6 +553,7 @@ namespace lv {
                     lvAssert(oRectifSize==oRectifSize_test);
                     oUndistortRGBSize = oRectifSize;
                     oUndistortLWIRSize = oRectifSize;
+                    oUndistortDepthSize = oRectifSize;
                     lvAssert_(!this->m_oLWIRCameraParams.empty() && !this->m_oLWIRDistortParams.empty(),"failed to load LWIR camera calibration parameters");
                     cv::stereoRectify(this->m_oRGBCameraParams,this->m_oRGBDistortParams,
                                       this->m_oLWIRCameraParams,this->m_oLWIRDistortParams,
@@ -572,28 +582,39 @@ namespace lv {
                 //////////////
                 cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
                 cv::remap(oLWIRROI.clone(),oLWIRROI,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
+                cv::remap(oDepthRemapROI.clone(),oDepthRemapROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
                 oRGBROI = oRGBROI>128;
                 oLWIRROI = oLWIRROI>128;
+                oDepthRemapROI = oDepthRemapROI>128;
                 if(this->m_nLWIRDispOffset!=0)
                     lv::shift(oLWIRROI.clone(),oLWIRROI,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
                 cv::erode(oRGBROI,oRGBROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 cv::erode(oLWIRROI,oLWIRROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
+                cv::erode(oDepthRemapROI,oDepthRemapROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 cv::Mat oRGBROI_undist = cv::imread(this->getDataPath()+"rgb_undist_roi.png",cv::IMREAD_GRAYSCALE);
-                cv::Mat oLWIRROI_undist = cv::imread(this->getDataPath()+"LWIR_undist_roi.png",cv::IMREAD_GRAYSCALE);
+                cv::Mat oLWIRROI_undist = cv::imread(this->getDataPath()+"lwir_undist_roi.png",cv::IMREAD_GRAYSCALE);
+                cv::Mat oDepthRemapROI_undist = cv::imread(this->getDataPath()+"depth_remap_undist_roi.png",cv::IMREAD_GRAYSCALE);
                 if(!oRGBROI_undist.empty()) {
-                    lvAssert(oRGBROI_undist.type()==CV_8UC1 && oRGBROI_undist.size()==oRGBSize);
+                    lvAssert(oRGBROI_undist.type()==CV_8UC1 && oRGBROI_undist.size()==oUndistortRGBSize);
                     oRGBROI_undist = oRGBROI_undist>128;
                 }
                 else
                     oRGBROI_undist = cv::Mat(oUndistortRGBSize,CV_8UC1,cv::Scalar_<uchar>(255));
                 if(!oLWIRROI_undist.empty()) {
-                    lvAssert(oLWIRROI_undist.type()==CV_8UC1 && oLWIRROI_undist.size()==oLWIRSize);
+                    lvAssert(oLWIRROI_undist.type()==CV_8UC1 && oLWIRROI_undist.size()==oUndistortLWIRSize);
                     oLWIRROI_undist = oLWIRROI_undist>128;
                 }
                 else
                     oLWIRROI_undist = cv::Mat(oUndistortLWIRSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                if(!oDepthRemapROI_undist.empty()) {
+                    lvAssert(oDepthRemapROI_undist.type()==CV_8UC1 && oDepthRemapROI_undist.size()==oUndistortDepthSize);
+                    oDepthRemapROI_undist = oDepthRemapROI_undist>128;
+                }
+                else
+                    oDepthRemapROI_undist = cv::Mat(oUndistortDepthSize,CV_8UC1,cv::Scalar_<uchar>(255));
                 oRGBROI &= oRGBROI_undist;
                 oLWIRROI &= oLWIRROI_undist;
+                oDepthRemapROI &= oDepthRemapROI_undist;
             }
             ////////////////////////////////
             this->m_vOrigGTInfos.resize(nGTStreamCount);
@@ -616,7 +637,9 @@ namespace lv {
                 cv::resize(oRGBROI,oRGBROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
                 cv::resize(oLWIRROI,oLWIRROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
                 cv::resize(oDepthROI,oDepthROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+                cv::resize(oDepthRemapROI,oDepthRemapROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             }
+            this->m_oOrigDepthROI = oDepthROI;
             this->m_vGTROIs.resize(nGTStreamCount);
             this->m_vGTInfos.resize(nGTStreamCount);
             this->m_vInputROIs.resize(nInputStreamCount);
@@ -630,10 +653,10 @@ namespace lv {
             this->m_vInputInfos[nInputRGBStreamIdx] = lv::MatInfo{oRGBROI.size(),CV_8UC3};
             this->m_vInputInfos[nInputLWIRStreamIdx] = lv::MatInfo{oLWIRROI.size(),CV_8UC1};
             if(this->m_bLoadDepth) {
-                this->m_vGTROIs[nGTDepthStreamIdx] = oDepthROI.clone();
-                this->m_vGTInfos[nGTDepthStreamIdx] = lv::MatInfo{oDepthROI};
-                this->m_vInputROIs[nInputDepthStreamIdx] = oDepthROI.clone();
-                this->m_vInputInfos[nInputDepthStreamIdx] = lv::MatInfo{oDepthROI.size(),CV_16UC1};
+                this->m_vGTROIs[nGTDepthStreamIdx] = oDepthRemapROI.clone();
+                this->m_vGTInfos[nGTDepthStreamIdx] = lv::MatInfo{oDepthRemapROI};
+                this->m_vInputROIs[nInputDepthStreamIdx] = oDepthRemapROI.clone();
+                this->m_vInputInfos[nInputDepthStreamIdx] = lv::MatInfo{oDepthRemapROI.size(),CV_16UC1};
             }
             if(bUseInterlacedMasks) {
                 this->m_vInputROIs[nInputRGBMaskStreamIdx] = oRGBROI.clone();
@@ -641,8 +664,8 @@ namespace lv {
                 this->m_vInputInfos[nInputRGBMaskStreamIdx] = lv::MatInfo{oRGBROI};
                 this->m_vInputInfos[nInputLWIRMaskStreamIdx] = lv::MatInfo{oLWIRROI};
                 if(this->m_bLoadDepth) {
-                    this->m_vInputROIs[nInputDepthMaskStreamIdx] = oLWIRROI.clone();
-                    this->m_vInputInfos[nInputDepthMaskStreamIdx] = lv::MatInfo{oDepthROI};
+                    this->m_vInputROIs[nInputDepthMaskStreamIdx] = oDepthRemapROI.clone();
+                    this->m_vInputInfos[nInputDepthMaskStreamIdx] = lv::MatInfo{oDepthRemapROI};
                 }
             }
             //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -667,14 +690,20 @@ namespace lv {
                 lvAssert(nMinDepthVal>=0 && nMaxDepthVal>nMinDepthVal);
                 if(vsDepthFramePaths.empty() || lv::MatInfo(oCurrDepthSize,nDepthType)!=this->m_vOrigInputInfos[nInputDepthStreamIdx])
                     lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected depth frame packet size/type",this->getName().c_str());
+            #if DATASETS_LITIV2018_DATA_VERSION>=3
+                if(vsC2DMapPaths.empty() || lv::MatInfo(lv::read(vsC2DMapPaths[0],lv::MatArchive_BINARY_LZ4))!=lv::MatInfo(oRGBSize,CV_32FC2))
+                    lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected c2d map packet size",this->getName().c_str());
+            #endif //DATASETS_LITIV2018_DATA_VERSION>=3
                 if(bUseInterlacedMasks && (vsDepthMaskPaths.empty() || lv::MatInfo(cv::imread(vsDepthMaskPaths[0],cv::IMREAD_GRAYSCALE))!=this->m_vOrigInputInfos[nInputDepthMaskStreamIdx]))
                     lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected depth mask packet size",this->getName().c_str());
             }
             if(bLoadFrameSubset) {
                 lSubsetCleaner(vsRGBFramePaths,this->m_mSubset);
                 lSubsetCleaner(vsLWIRFramePaths,this->m_mSubset);
-                if(this->m_bLoadDepth)
+                if(this->m_bLoadDepth) {
                     lSubsetCleaner(vsDepthFramePaths,this->m_mSubset);
+                    lSubsetCleaner(vsC2DMapPaths,this->m_mSubset);
+                }
                 if(bUseInterlacedMasks) {
                     lSubsetCleaner(vsRGBMaskPaths,this->m_mSubset);
                     lSubsetCleaner(vsLWIRMaskPaths,this->m_mSubset);
@@ -685,8 +714,10 @@ namespace lv {
             if(!bIsLoadingCalibData) {
                 lvAssert_(vsRGBFramePaths.size()==nInputPackets,"missing RGB frame indices");
                 lvAssert_(vsLWIRFramePaths.size()==nInputPackets,"missing LWIR frame indices");
-                if(this->m_bLoadDepth)
+                if(this->m_bLoadDepth) {
                     lvAssert_(vsDepthFramePaths.size()==nInputPackets,"missing depth frame indices");
+                    lvAssert_(vsC2DMapPaths.size()>=nInputPackets,"missing c2d map indices");
+                }
                 if(bUseInterlacedMasks) {
                     lvAssert_(vsRGBFramePaths.size()==vsRGBMaskPaths.size(),"bad RGB frame/mask index overlap");
                     lvAssert_(vsLWIRFramePaths.size()==vsLWIRMaskPaths.size(),"bad LWIR frame/mask index overlap");
@@ -715,6 +746,7 @@ namespace lv {
                 lvAssert(vsDepthGTPaths.size()<=nInputPackets);
             //////////////////////////////////////////////////////////////////////////////////////////////////
             this->m_vvsInputPaths.resize(nInputPackets);
+            this->m_vsC2DMapPaths.resize(nInputPackets);
             for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx) {
                 const size_t nOrigPacketIdx = *std::next(this->m_mSubset.begin(),nInputPacketIdx);
                 this->m_vvsInputPaths[nInputPacketIdx].resize(nInputStreamCount);
@@ -743,7 +775,9 @@ namespace lv {
                     this->m_vvsInputPaths[nInputPacketIdx][nInputLWIRStreamIdx] = vsLWIRFramePaths[nInputPacketIdx];
                     if(this->m_bLoadDepth) {
                         lvAssert(extractPathIndex(vsDepthFramePaths[nInputPacketIdx])==nOrigPacketIdx);
+                        lvAssert(extractPathIndex(vsC2DMapPaths[nInputPacketIdx])==nOrigPacketIdx);
                         this->m_vvsInputPaths[nInputPacketIdx][nInputDepthStreamIdx] = vsDepthFramePaths[nInputPacketIdx];
+                        this->m_vsC2DMapPaths[nInputPacketIdx] = vsC2DMapPaths[nInputPacketIdx];
                     }
                     if(bUseInterlacedMasks) {
                         lvAssert(extractPathIndex(vsRGBMaskPaths[nInputPacketIdx])==nOrigPacketIdx);
@@ -791,6 +825,7 @@ namespace lv {
             if(nPacketIdx>=this->m_vvsInputPaths.size())
                 return std::vector<cv::Mat>(this->getInputStreamCount());
             const cv::Size oRGBSize(1920,1080),oLWIRSize(320,240),oDepthSize(512,424);
+            const cv::Size oRectifSize(DATASETS_LITIV2018_RECTIFIED_SIZE);
             const bool bIsLoadingCalibData = bool(DATASETS_LITIV2018_LOAD_CALIB_DATA);
             const bool bUseInterlacedMasks = this->m_nLoadInputMasks!=0;
             const bool bFlipDisparities = this->isFlippingDisparities();
@@ -802,6 +837,11 @@ namespace lv {
             const size_t nInputDepthMaskStreamIdx = nInputDepthStreamIdx+1;
             const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
             lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==this->getInputStreamCount());
+            lvDbgAssert(this->m_vsC2DMapPaths.size()>nPacketIdx);
+            const std::string& sC2DMapPath = this->m_vsC2DMapPaths[nPacketIdx];
+            lvDbgAssert(!this->m_bLoadDepth || !sC2DMapPath.empty());
+            const std::vector<lv::MatInfo>& vOrigInputInfos = this->m_vOrigInputInfos;
+            lvDbgAssert(!vOrigInputInfos.empty() && vOrigInputInfos.size()==getInputStreamCount());
             const std::vector<lv::MatInfo>& vInputInfos = this->m_vInputInfos;
             lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
             std::vector<cv::Mat> vInputs(getInputStreamCount());
@@ -813,18 +853,26 @@ namespace lv {
             const bool bFlipRGBPacket = (DATASETS_LITIV2018_FLIP_RGB && (!bIsLoadingCalibData || DATASETS_LITIV2018_CALIB_VERSION!=1));
             if(bFlipRGBPacket)
                 cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
+            lvDbgAssert(oRGBPacket.size()==vOrigInputInfos[nInputRGBStreamIdx].size());
+            if(this->m_bUndistort || this->m_bHorizRectify) {
+                if(this->m_bHorizRectify && oRGBPacket.size()!=oRectifSize)
+                    cv::resize(oRGBPacket,oRGBPacket,oRectifSize,0,0,cv::INTER_CUBIC);
+                cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_CUBIC);
+            }
             if(oRGBPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
                 cv::resize(oRGBPacket,oRGBPacket,vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_CUBIC);
-            if(this->m_bUndistort || this->m_bHorizRectify)
-                cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_CUBIC);
             vInputs[nInputRGBStreamIdx] = oRGBPacket;
             if(bUseInterlacedMasks) {
                 cv::Mat oRGBMaskPacket = cv::imread(vsInputPaths[nInputRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oRGBMaskPacket.empty() && oRGBMaskPacket.type()==CV_8UC1 && oRGBMaskPacket.size()==oRGBSize);
+                lvDbgAssert(oRGBMaskPacket.size()==vOrigInputInfos[nInputRGBStreamIdx].size());
+                if(this->m_bUndistort || this->m_bHorizRectify) {
+                    if(this->m_bHorizRectify && oRGBMaskPacket.size()!=oRectifSize)
+                        cv::resize(oRGBMaskPacket,oRGBMaskPacket,oRectifSize,0,0,cv::INTER_LINEAR);
+                    cv::remap(oRGBMaskPacket.clone(),oRGBMaskPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                }
                 if(oRGBMaskPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
                     cv::resize(oRGBMaskPacket,oRGBMaskPacket,vInputInfos[nInputRGBStreamIdx].size(),cv::INTER_LINEAR);
-                if(this->m_bUndistort || this->m_bHorizRectify)
-                    cv::remap(oRGBMaskPacket.clone(),oRGBMaskPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
                 oRGBMaskPacket = oRGBMaskPacket>128;
                 vInputs[nInputRGBMaskStreamIdx] = oRGBMaskPacket;
             }
@@ -833,48 +881,87 @@ namespace lv {
                 lvAssert__(!vsInputPaths[nInputLWIRStreamIdx].empty(),"could not open LWIR input frame #%d (empty path)",(int)nPacketIdx);
             cv::Mat oLWIRPacket = vsInputPaths[nInputLWIRStreamIdx].empty()?cv::Mat(oLWIRSize,CV_8UC1,cv::Scalar::all(0)):cv::imread(vsInputPaths[nInputLWIRStreamIdx],cv::IMREAD_GRAYSCALE);
             lvAssert(!oLWIRPacket.empty() && oLWIRPacket.type()==CV_8UC1 && oLWIRPacket.size()==oLWIRSize);
-            if(oLWIRPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
-                cv::resize(oLWIRPacket,oLWIRPacket,vInputInfos[nInputLWIRStreamIdx].size(),0,0,cv::INTER_CUBIC);
+            lvDbgAssert(oLWIRPacket.size()==vOrigInputInfos[nInputLWIRStreamIdx].size());
             if(this->m_bUndistort || this->m_bHorizRectify) {
+                if(this->m_bHorizRectify && oLWIRPacket.size()!=oRectifSize)
+                    cv::resize(oLWIRPacket,oLWIRPacket,oRectifSize,0,0,cv::INTER_CUBIC);
                 cv::remap(oLWIRPacket.clone(),oLWIRPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_CUBIC);
                 if(this->m_nLWIRDispOffset!=0)
                     lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
             }
+            if(oLWIRPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
+                cv::resize(oLWIRPacket,oLWIRPacket,vInputInfos[nInputLWIRStreamIdx].size(),0,0,cv::INTER_CUBIC);
             vInputs[nInputLWIRStreamIdx] = oLWIRPacket;
             if(bUseInterlacedMasks) {
                 cv::Mat oLWIRMaskPacket = cv::imread(vsInputPaths[nInputLWIRMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oLWIRMaskPacket.empty() && oLWIRMaskPacket.type()==CV_8UC1 && oLWIRMaskPacket.size()==oLWIRSize);
-                if(oLWIRMaskPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
-                    cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,vInputInfos[nInputLWIRStreamIdx].size(),cv::INTER_LINEAR);
+                lvDbgAssert(oLWIRMaskPacket.size()==vOrigInputInfos[nInputLWIRStreamIdx].size());
                 if(this->m_bUndistort || this->m_bHorizRectify) {
+                    if(this->m_bHorizRectify && oLWIRMaskPacket.size()!=oRectifSize)
+                        cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                     cv::remap(oLWIRMaskPacket.clone(),oLWIRMaskPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
                     if(this->m_nLWIRDispOffset!=0)
                         lv::shift(oLWIRMaskPacket.clone(),oLWIRMaskPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
                 }
+                if(oLWIRMaskPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
+                    cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,vInputInfos[nInputLWIRStreamIdx].size(),cv::INTER_LINEAR);
                 oLWIRMaskPacket = oLWIRMaskPacket>128;
                 vInputs[nInputLWIRMaskStreamIdx] = oLWIRMaskPacket;
             }
             ///////////////////////////////////////////////////////////////////////////////////
             if(this->m_bLoadDepth) {
-                cv::Mat oDepthPacket;
+                cv::Mat oDepthPacket_raw,oDepthPacket,oC2DMapPacket;
             #if DATASETS_LITIV2018_DATA_VERSION>=3
-                if(this->getName()!="vid04" && this->getName()!="vid05") // those two were made pre-lz4 impl
-                    oDepthPacket = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY_LZ4);
+                if(this->getName()!="vid04" && this->getName()!="vid05") { // those two were made pre-lz4 impl
+                    oDepthPacket_raw = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY_LZ4);
+                    oC2DMapPacket = lv::read(sC2DMapPath,lv::MatArchive_BINARY_LZ4);
+                }
                 else
             #endif //DATASETS_LITIV2018_DATA_VERSION>=3
-                    oDepthPacket = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY);
-                lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==oDepthSize);
+                {
+                    oDepthPacket_raw = lv::read(vsInputPaths[nInputDepthStreamIdx],lv::MatArchive_BINARY);
+                    oC2DMapPacket = lv::read(sC2DMapPath,lv::MatArchive_BINARY);
+                }
+                lvAssert(!oDepthPacket_raw.empty() && oDepthPacket_raw.type()==CV_16UC1 && oDepthPacket_raw.size()==oDepthSize);
+                lvDbgAssert(oDepthPacket_raw.size()==vOrigInputInfos[nInputDepthStreamIdx].size());
+                lvAssert(!oC2DMapPacket.empty() && oC2DMapPacket.type()==CV_32FC2 && oC2DMapPacket.size()==oRGBSize);
+                oDepthPacket.create(oRGBSize,CV_16UC1);
+                oDepthPacket = 0u; // 'dont care' default value
+                for(size_t nPxIter=0u; nPxIter<(size_t)oRGBSize.area(); ++nPxIter) {
+                    const cv::Vec2f vRealPt = ((cv::Vec2f*)oC2DMapPacket.data)[nPxIter];
+                    if(vRealPt[0]>=0 && vRealPt[0]<oDepthSize.width && vRealPt[1]>=0 && vRealPt[1]<oDepthSize.height)
+                        ((ushort*)oDepthPacket.data)[nPxIter] = oDepthPacket_raw.at<ushort>((int)std::round(vRealPt[1]),(int)std::round(vRealPt[0]));
+                }
+                if(bFlipRGBPacket)
+                    cv::flip(oDepthPacket,oDepthPacket,1);
+                if(this->m_bUndistort || this->m_bHorizRectify) {
+                    if(this->m_bHorizRectify && oDepthPacket.size()!=oRectifSize)
+                        cv::resize(oDepthPacket,oDepthPacket,oRectifSize,0,0,cv::INTER_NEAREST);
+                    cv::remap(oDepthPacket.clone(),oDepthPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST,cv::BORDER_CONSTANT,cv::Scalar_<ushort>(0));
+                }
                 if(oDepthPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
-                    cv::resize(oDepthPacket,oDepthPacket,vInputInfos[nInputDepthStreamIdx].size(),0,0,cv::INTER_CUBIC);
-                // depth should be already undistorted
-                lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
+                    cv::resize(oDepthPacket,oDepthPacket,vInputInfos[nInputDepthStreamIdx].size(),0,0,cv::INTER_NEAREST);
                 vInputs[nInputDepthStreamIdx] = oDepthPacket;
                 if(bUseInterlacedMasks) {
-                    cv::Mat oDepthMaskPacket = cv::imread(vsInputPaths[nInputDepthMaskStreamIdx],cv::IMREAD_GRAYSCALE);
-                    lvAssert(!oDepthMaskPacket.empty() && oDepthMaskPacket.type()==CV_8UC1 && oDepthMaskPacket.size()==oDepthSize);
+                    cv::Mat oDepthMaskPacket,oDepthMaskPacket_raw = cv::imread(vsInputPaths[nInputDepthMaskStreamIdx],cv::IMREAD_GRAYSCALE);
+                    lvAssert(!oDepthMaskPacket_raw.empty() && oDepthMaskPacket_raw.type()==CV_8UC1 && oDepthMaskPacket_raw.size()==oDepthSize);
+                    lvDbgAssert(oDepthMaskPacket_raw.size()==vOrigInputInfos[nInputDepthStreamIdx].size());
+                    oDepthMaskPacket.create(oRGBSize,CV_8UC1);
+                    oDepthMaskPacket = 0u; // 'background' default value
+                    for(size_t nPxIter=0u; nPxIter<(size_t)oRGBSize.area(); ++nPxIter) {
+                        const cv::Vec2f vRealPt = ((cv::Vec2f*)oC2DMapPacket.data)[nPxIter];
+                        if(vRealPt[0]>=0 && vRealPt[0]<oDepthSize.width && vRealPt[1]>=0 && vRealPt[1]<oDepthSize.height)
+                            ((uchar*)oDepthMaskPacket.data)[nPxIter] = oDepthMaskPacket_raw.at<uchar>((int)std::round(vRealPt[1]),(int)std::round(vRealPt[0]));
+                    }
+                    if(bFlipRGBPacket)
+                        cv::flip(oDepthMaskPacket,oDepthMaskPacket,1);
+                    if(this->m_bUndistort || this->m_bHorizRectify) {
+                        if(this->m_bHorizRectify && oDepthMaskPacket.size()!=oRectifSize)
+                            cv::resize(oDepthMaskPacket,oDepthMaskPacket,oRectifSize,0,0,cv::INTER_LINEAR);
+                        cv::remap(oDepthMaskPacket.clone(),oDepthMaskPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                    }
                     if(oDepthMaskPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
                         cv::resize(oDepthMaskPacket,oDepthMaskPacket,vInputInfos[nInputDepthStreamIdx].size(),cv::INTER_LINEAR);
-                    lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
                     oDepthMaskPacket = oDepthMaskPacket>128;
                     vInputs[nInputDepthMaskStreamIdx] = oDepthMaskPacket;
                 }
@@ -888,6 +975,7 @@ namespace lv {
         virtual std::vector<cv::Mat> getRawGTArray(size_t nPacketIdx) override final {
             lvDbgExceptionWatch;
             const cv::Size oRGBSize(1920,1080),oLWIRSize(320,240),oDepthSize(512,424);
+            const cv::Size oRectifSize(DATASETS_LITIV2018_RECTIFIED_SIZE);
             const bool bFlipDisparities = this->isFlippingDisparities();
             const bool bEvalDisparityMaps = this->isEvaluatingDisparities();
             const size_t nGTRGBStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_RGB);
@@ -897,22 +985,28 @@ namespace lv {
             if(this->m_mGTIndexLUT.count(nPacketIdx)) {
                 const size_t nGTIdx = this->m_mGTIndexLUT[nPacketIdx];
                 lvDbgAssert(nGTIdx<this->m_vvsGTPaths.size());
+                lvDbgAssert(this->m_vsC2DMapPaths.size()>nPacketIdx);
+                const std::string& sC2DMapPath = this->m_vsC2DMapPaths[nPacketIdx];
+                lvDbgAssert(!this->m_bLoadDepth || !sC2DMapPath.empty());
                 const std::vector<std::string>& vsGTMasksPaths = this->m_vvsGTPaths[nGTIdx];
                 lvDbgAssert(!vsGTMasksPaths.empty() && vsGTMasksPaths.size()==getGTStreamCount());
+                const std::vector<lv::MatInfo>& vOrigGTInfos = this->m_vOrigGTInfos;
+                lvDbgAssert(!vOrigGTInfos.empty() && vOrigGTInfos.size()==getGTStreamCount());
                 const std::vector<lv::MatInfo>& vGTInfos = this->m_vGTInfos;
                 lvDbgAssert(!vGTInfos.empty() && vGTInfos.size()==getGTStreamCount());
                 cv::Mat oRGBPacket = cv::imread(vsGTMasksPaths[nGTRGBStreamIdx],cv::IMREAD_GRAYSCALE);
-                lvAssert(oRGBPacket.empty() || (oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==oRGBSize));
+                lvAssert(oRGBPacket.empty() || (oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==oRGBSize && lv::MatInfo(oRGBPacket)==vOrigGTInfos[nGTRGBStreamIdx]));
                 cv::Mat oLWIRPacket = cv::imread(vsGTMasksPaths[nGTLWIRStreamIdx],cv::IMREAD_GRAYSCALE);
-                lvAssert(oLWIRPacket.empty() || (oLWIRPacket.type()==CV_8UC1 && oLWIRPacket.size()==oLWIRSize));
-                cv::Mat oDepthPacket;
+                lvAssert(oLWIRPacket.empty() || (oLWIRPacket.type()==CV_8UC1 && oLWIRPacket.size()==oLWIRSize && lv::MatInfo(oLWIRPacket)==vOrigGTInfos[nGTLWIRStreamIdx]));
+                cv::Mat oDepthPacket_raw,oDepthPacket,oC2DMapPacket;
                 if(this->m_bLoadDepth) {
-                    oDepthPacket = cv::imread(vsGTMasksPaths[nGTDepthStreamIdx],cv::IMREAD_GRAYSCALE);
-                    lvAssert(oDepthPacket.empty() || (oDepthPacket.type()==CV_8UC1 && oDepthPacket.size()==oDepthSize));
+                    oDepthPacket_raw = cv::imread(vsGTMasksPaths[nGTDepthStreamIdx],cv::IMREAD_GRAYSCALE);
+                    lvAssert(oDepthPacket_raw.empty() || (oDepthPacket_raw.type()==CV_8UC1 && oDepthPacket_raw.size()==oDepthSize && lv::MatInfo(oDepthPacket_raw)==vOrigGTInfos[nGTDepthStreamIdx]));
                 }
                 if(bEvalDisparityMaps) {
                     // assume loaded gt packets are already properly rectified
                     if(!oRGBPacket.empty() && oRGBPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size()) {
+                        // ... and flipped (if needed)
                         cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTLWIRStreamIdx].size(),0,0,cv::INTER_NEAREST);
                         cv::Mat oOldDontCareMask = (oRGBPacket==255);
                         oRGBPacket *= this->getScaleFactor();
@@ -925,6 +1019,7 @@ namespace lv {
                         cv::Mat_<uchar>(oLWIRPacket.size(),uchar(255)).copyTo(oLWIRPacket,oOldDontCareMask);
                     }
                     if(this->m_bLoadDepth && !oDepthPacket.empty() && oDepthPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size()) {
+                        // ... and flipped (if needed)
                         cv::resize(oDepthPacket,oDepthPacket,vGTInfos[nGTLWIRStreamIdx].size(),0,0,cv::INTER_NEAREST);
                         cv::Mat oOldDontCareMask = (oDepthPacket==255);
                         oDepthPacket *= this->getScaleFactor();
@@ -935,26 +1030,51 @@ namespace lv {
                     if(!oRGBPacket.empty()) {
                         if(DATASETS_LITIV2018_FLIP_RGB)
                             cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
+                        if(this->m_bUndistort || this->m_bHorizRectify) {
+                            if(this->m_bHorizRectify && oRGBPacket.size()!=oRectifSize)
+                                cv::resize(oRGBPacket,oRGBPacket,oRectifSize,0,0,cv::INTER_LINEAR);
+                            cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                        }
                         if(oRGBPacket.size()!=vGTInfos[nGTRGBStreamIdx].size())
                             cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBStreamIdx].size(),0,0,cv::INTER_LINEAR);
-                        if(this->m_bUndistort || this->m_bHorizRectify)
-                            cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
                         oRGBPacket = oRGBPacket>128;
                     }
                     if(!oLWIRPacket.empty()) {
-                        if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
-                            cv::resize(oLWIRPacket,oLWIRPacket,vGTInfos[nGTLWIRStreamIdx].size(),0,0,cv::INTER_LINEAR);
                         if(this->m_bUndistort || this->m_bHorizRectify) {
+                            if(this->m_bHorizRectify && oLWIRPacket.size()!=oRectifSize)
+                                cv::resize(oLWIRPacket,oLWIRPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                             cv::remap(oLWIRPacket.clone(),oLWIRPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
                             if(this->m_nLWIRDispOffset!=0)
                                 lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
                         }
+                        if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
+                            cv::resize(oLWIRPacket,oLWIRPacket,vGTInfos[nGTLWIRStreamIdx].size(),0,0,cv::INTER_LINEAR);
                         oLWIRPacket = oLWIRPacket>128;
                     }
-                    if(this->m_bLoadDepth && !oDepthPacket.empty()) {
+                    if(this->m_bLoadDepth && !oDepthPacket_raw.empty()) {
+                    #if DATASETS_LITIV2018_DATA_VERSION>=3
+                        if(this->getName()!="vid04" && this->getName()!="vid05") // those two were made pre-lz4 impl
+                            oC2DMapPacket = lv::read(sC2DMapPath,lv::MatArchive_BINARY_LZ4);
+                        else
+                    #endif //DATASETS_LITIV2018_DATA_VERSION>=3
+                            oC2DMapPacket = lv::read(sC2DMapPath,lv::MatArchive_BINARY);
+                        lvAssert(!oC2DMapPacket.empty() && oC2DMapPacket.type()==CV_32FC2 && oC2DMapPacket.size()==oRGBSize);
+                        oDepthPacket.create(oRGBSize,CV_8UC1);
+                        oDepthPacket = 0u; // 'background' default value
+                        for(size_t nPxIter=0u; nPxIter<(size_t)oRGBSize.area(); ++nPxIter) {
+                            const cv::Vec2f vRealPt = ((cv::Vec2f*)oC2DMapPacket.data)[nPxIter];
+                            if(vRealPt[0]>=0 && vRealPt[0]<oDepthSize.width && vRealPt[1]>=0 && vRealPt[1]<oDepthSize.height)
+                                ((uchar*)oDepthPacket.data)[nPxIter] = oDepthPacket_raw.at<uchar>((int)std::round(vRealPt[1]),(int)std::round(vRealPt[0]));
+                        }
+                        if(DATASETS_LITIV2018_FLIP_RGB)
+                            cv::flip(oDepthPacket,oDepthPacket,1);
+                        if(this->m_bUndistort || this->m_bHorizRectify) {
+                            if(this->m_bHorizRectify && oDepthPacket.size()!=oRectifSize)
+                                cv::resize(oDepthPacket,oDepthPacket,oRectifSize,0,0,cv::INTER_LINEAR);
+                            cv::remap(oDepthPacket.clone(),oDepthPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                        }
                         if(oDepthPacket.size()!=vGTInfos[nGTDepthStreamIdx].size())
                             cv::resize(oDepthPacket,oDepthPacket,vGTInfos[nGTDepthStreamIdx].size(),0,0,cv::INTER_LINEAR);
-                        lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
                         oDepthPacket = oDepthPacket>128;
                     }
                 }
@@ -987,6 +1107,7 @@ namespace lv {
         int m_nLWIRDispOffset;
         size_t m_nMinDisp,m_nMaxDisp;
         std::string m_sFeaturesDirName;
+        cv::Mat m_oOrigDepthROI;
         cv::Mat m_oRGBCameraParams;
         cv::Mat m_oLWIRCameraParams;
         cv::Mat m_oRGBDistortParams;
@@ -994,6 +1115,7 @@ namespace lv {
         cv::Mat m_oRGBCalibMap1,m_oRGBCalibMap2;
         cv::Mat m_oLWIRCalibMap1,m_oLWIRCalibMap2;
         std::vector<lv::MatInfo> m_vOrigInputInfos,m_vOrigGTInfos;
+        std::vector<std::string> m_vsC2DMapPaths;
     public:
     #if DATASETS_LITIV2018_LOAD_CALIB_DATA
         std::vector<bool> isCalibInputValid(size_t nPacketIdx) {

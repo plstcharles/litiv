@@ -16,16 +16,16 @@
 // limitations under the License.
 
 ////////////////////////////////
-#define GEN_SEGMENTATION_ANNOT  1
-#define GEN_REGISTRATION_ANNOT  0
+#define GEN_SEGMENTATION_ANNOT  0
+#define GEN_REGISTRATION_ANNOT  1
 #define SAVE_C2D_MAPPING        0
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
-#define DATASET_PRECACHING      1
+#define DATASET_PRECACHING      0
 ////////////////////////////////
 #define DATASETS_LITIV2018_CALIB_VERSION 4
 #define DATASETS_LITIV2018_DATA_VERSION 4
-#define DATASETS_START_IDX 530
+#define DATASETS_START_IDX 666
 
 #if (GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)>1
 #error "must select one type of annotation to generate"
@@ -57,7 +57,7 @@ int main(int, char**) {
                 DATASET_OUTPUT_PATH, // const std::string& sOutputDirName
                 false, //bool bSaveOutput
                 false, //bool bUseEvaluator
-                (GEN_SEGMENTATION_ANNOT==1 || SAVE_C2D_MAPPING==1), //bool bLoadDepth
+                true, //bool bLoadDepth
                 (GEN_REGISTRATION_ANNOT==1), //bool bUndistort
                 (GEN_REGISTRATION_ANNOT==1), //bool bHorizRectify
                 false, //bool bEvalDisparities
@@ -118,7 +118,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 
         lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pDisplayHelper->setContinuousUpdates(true);
-        pDisplayHelper->setDisplayCursor(false);
+        pDisplayHelper->setDisplayCursor(GEN_REGISTRATION_ANNOT);
         //const cv::Size oDisplayTileSize(1024,768);
         const cv::Size oDisplayTileSize(1200,1000);
         std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
@@ -170,10 +170,11 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         int nSelectedPointTile = -1, nLineCreationStep = 0;
         cv::Point2i vInitDragPt;
         const double dMaxSelectDist = 5.0;
-        const int nLineSplitRatio = 3;
+        const int nLineSplitRatio = 5;
         const std::array<int,2> anMarkerSizes{2,2};
     #endif //GEN_REGISTRATION_ANNOT
         cv::Point2f vMousePos(0.5f,0.5f),vLastMousePos(0.5f,0.5f);
+        cv::Mat oDepthFrame,oBodyIdxFrame;
         int nCurrTile = -1;
         pDisplayHelper->setContinuousUpdates(true);
         pDisplayHelper->setMouseCallback([&](const lv::DisplayHelper::CallbackData& oData) {
@@ -308,12 +309,17 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     }
                 }
                 else if(nLineCreationStep==0 && bDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_MOUSEMOVE)) {
-                    const int nDist = (nSelectedPointTile!=nCurrTile)?0:((vCurrPt.x-vInitDragPt.x)/8);
+                    const int nDist = (nSelectedPointTile!=nCurrTile)?0:((vCurrPt.x-vInitDragPt.x)/2);
                     lvAssert(nSelectedPoint<avCorrespPts[nSelectedPointTile^1].size());
                     avCorrespPts[nSelectedPointTile][nSelectedPoint].second = nDist;
                     avCorrespPts[nSelectedPointTile^1][nSelectedPoint].second = -nDist;
                     avCorrespPts[nSelectedPointTile^1][nSelectedPoint].first.x = avCorrespPts[nSelectedPointTile][nSelectedPoint].first.x+nDist;
                     if(oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP) {
+                        if(!oDepthFrame.empty()) {
+                            lvAssert(oDepthFrame.size()==vOrigSizes[0] && oDepthFrame.type()==CV_16UC1);
+                            lvLog_(1,"depth @ pt [%d,%d] = %d     (disp = %d)",avCorrespPts[0][nSelectedPoint].first.x,avCorrespPts[0][nSelectedPoint].first.y,
+                                (int)oDepthFrame.at<ushort>(avCorrespPts[0][nSelectedPoint].first.y,avCorrespPts[0][nSelectedPoint].first.x),nDist);
+                        }
                         bDragInProgress = false;
                         nSelectedPointTile = -1;
                         nSelectedPoint = SIZE_MAX;
@@ -382,50 +388,50 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             lvAssert(!oRGBFrame.empty() && !oLWIRFrame.empty());
             lvAssert(oRGBFrame.size()==vOrigSizes[0] && oLWIRFrame.size()==vOrigSizes[1]);
             lvAssert(oRGBFrame.type()==CV_8UC3 && oLWIRFrame.type()==CV_8UC3);
-            cv::Mat oDepthFrame,oBodyIdxFrame;
+            const bool bTooOldForLZ4 = (oBatch.getName()=="vid04") || (oBatch.getName()=="vid05");
+            lvIgnore(bTooOldForLZ4);
+        #if SAVE_C2D_MAPPING
+            {
+                cv::Mat oDepthFrame_raw = lv::read(oBatch.getDataPath()+"depth/"+sPacketName+".bin",bTooOldForLZ4?lv::MatArchive_BINARY:lv::MatArchive_BINARY_LZ4);
+                lvAssert(!oDepthFrame_raw.empty() && oDepthFrame_raw.size()==cv::Size(512,424) && oDepthFrame_raw.type()==CV_16UC1);
+                cv::Mat oCoordMapFrame_c2d(oRGBFrame.size(),CV_32FC2);
+                lvAssertHR(pCoordMapper->MapColorFrameToDepthSpace((UINT)oDepthFrame_raw.total(),(uint16_t*)oDepthFrame_raw.data,(UINT)oRGBFrame.total(),(DepthSpacePoint*)oCoordMapFrame_c2d.data));
+                lv::write(sC2DMappingDir+sPacketName+".bin",oCoordMapFrame_c2d,lv::MatArchive_BINARY_LZ4);
+            }
+        #endif //SAVE_C2D_MAPPING
             if(vCurrInputs.size()>=3) {
-                cv::Mat oDepthFrame_raw = vCurrInputs[2].clone();
-                lvAssert(!oDepthFrame_raw.empty());
-                lvAssert(oDepthFrame_raw.size()==vOrigSizes[2]);
-                lvAssert(oDepthFrame_raw.type()==CV_16UC1);
-                const bool bTooOldForLZ4 = (oBatch.getName()=="vid04") || (oBatch.getName()=="vid05");
+                oDepthFrame = vCurrInputs[2];
+                lvAssert(oDepthFrame.size()==oRGBFrame.size() && oDepthFrame.type()==CV_16UC1);
+                cv::Mat oDepthFrameDisplay;
+                cv::normalize(oDepthFrame,oDepthFrameDisplay,1.0,0.0,cv::NORM_MINMAX,CV_32FC1);
+                cv::applyColorMap(oDepthFrameDisplay,oDepthFrameDisplay,cv::COLORMAP_BONE);
+                cv::resize(oDepthFrameDisplay,oDepthFrameDisplay,cv::Size(),0.5,0.5);
+                cv::imshow("oDepthFrameDisplay",oDepthFrameDisplay);
+                cv::waitKey(1);
+            }
+        #if GEN_SEGMENTATION_ANNOT
+            {
                 cv::Mat oBodyIdxFrame_raw = lv::read(oBatch.getDataPath()+"/bodyidx/"+sPacketName+".bin",bTooOldForLZ4?lv::MatArchive_BINARY:lv::MatArchive_BINARY_LZ4);
-                lvAssert(oBodyIdxFrame_raw.size()==oDepthFrame_raw.size() && oBodyIdxFrame_raw.type()==CV_8UC1);
-            #if SAVE_C2D_MAPPING
-                {
-                    cv::Mat oCoordMapFrame_c2d(oRGBFrame.size(),CV_32FC2);
-                    lvAssertHR(pCoordMapper->MapColorFrameToDepthSpace((UINT)oDepthFrame_raw.total(),(uint16_t*)oDepthFrame_raw.data,(UINT)oRGBFrame.total(),(DepthSpacePoint*)oCoordMapFrame_c2d.data));
-                    lv::write(sC2DMappingDir+sPacketName+".bin",oCoordMapFrame_c2d,lv::MatArchive_BINARY_LZ4);
-                }
-            #endif //SAVE_C2D_MAPPING
+                lvAssert(!oBodyIdxFrame_raw.empty() && oBodyIdxFrame_raw.size()==cv::Size(512,424) && oBodyIdxFrame_raw.type()==CV_8UC1);
                 const cv::Mat oCoordMapFrame_c2d = lv::read(sC2DMappingDir+sPacketName+".bin",lv::MatArchive_BINARY_LZ4);
                 if(!oCoordMapFrame_c2d.empty()) {
                     lvAssert(oCoordMapFrame_c2d.size()==oRGBFrame.size() && oCoordMapFrame_c2d.type()==CV_32FC2);
-                    oDepthFrame.create(oRGBFrame.size(),CV_16UC1);
                     oBodyIdxFrame.create(oRGBFrame.size(),CV_8UC1);
-                    oDepthFrame = 0u; // 'dont care'
                     oBodyIdxFrame = 255u; // 'dont care'
                     for(size_t nPxIter=0u; nPxIter<oRGBFrame.total(); ++nPxIter) {
                         const cv::Vec2f vRealPt = ((cv::Vec2f*)oCoordMapFrame_c2d.data)[nPxIter];
-                        if(vRealPt[0]>=0 && vRealPt[0]<oDepthFrame_raw.cols && vRealPt[1]>=0 && vRealPt[1]<oDepthFrame_raw.rows) {
-                            ((ushort*)oDepthFrame.data)[nPxIter] = oDepthFrame_raw.at<ushort>((int)std::round(vRealPt[1]),(int)std::round(vRealPt[0]));
+                        if(vRealPt[0]>=0 && vRealPt[0]<oBodyIdxFrame_raw.cols && vRealPt[1]>=0 && vRealPt[1]<oBodyIdxFrame_raw.rows) {
                             ((uchar*)oBodyIdxFrame.data)[nPxIter] = oBodyIdxFrame_raw.at<uchar>((int)std::round(vRealPt[1]),(int)std::round(vRealPt[0]));
                         }
                     }
-                    cv::flip(oDepthFrame,oDepthFrame,1);
                     cv::flip(oBodyIdxFrame,oBodyIdxFrame,1);
-                    //cv::Mat oDepthFrameDisplay,oBodyIdxFrameDisplay;
-                    //cv::normalize(oDepthFrame,oDepthFrameDisplay,1.0,0.0,cv::NORM_MINMAX,CV_32FC1);
-                    //cv::applyColorMap(oDepthFrameDisplay,oDepthFrameDisplay,cv::COLORMAP_BONE);
+                    //cv::Mat oBodyIdxFrameDisplay;
                     //oBodyIdxFrameDisplay = (oBodyIdxFrame<(BODY_COUNT));
-                    //cv::resize(oDepthFrameDisplay,oDepthFrameDisplay,cv::Size(),0.5,0.5);
                     //cv::resize(oBodyIdxFrameDisplay,oBodyIdxFrameDisplay,cv::Size(),0.5,0.5);
-                    //cv::imshow("oDepthFrameDisplay",oDepthFrameDisplay);
                     //cv::imshow("oBodyIdxFrameDisplay",oBodyIdxFrameDisplay);
                     //cv::waitKey(1);
                 }
             }
-        #if GEN_SEGMENTATION_ANNOT
             for(size_t a=0u; a<2u; ++a) {
                 if(!aSegmMasks[a].empty())
                     aSegmMasks[a].copyTo(aPrevSegmMasks[a]);
@@ -523,7 +529,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     else
                         aSegmMasks[0u] = 0u;
                 }
-                /*if(cv::countNonZero(aSegmMasks[0])==0) {
+                /*if(cv::countNonZero(aSegmMasks[0])==0 && cv::countNonZero(aSegmMasks[1])==0) {
                     nKeyPressed = 13;
                     break;
                 }*/
