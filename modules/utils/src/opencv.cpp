@@ -293,7 +293,10 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
                 cv::rectangle(oImageBYTE3,cv::Rect(0,oDisplayPt.y,oImageBYTE3.cols,1),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
                 cv::rectangle(oImageBYTE3,cv::Rect(oDisplayPt.x,0,1,oImageBYTE3.rows),cv::Scalar_<uchar>::all(128),-1,cv::LINE_4);
             #endif //DISPLAY_HELPER_USE_LARGE_CROSSHAIR
-                cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar::all(255));
+                if((m_oLatestMouseEvent.oPosition.x/m_oLatestMouseEvent.oTileSize.width)==(int)nColIdx && (m_oLatestMouseEvent.oPosition.y/m_oLatestMouseEvent.oTileSize.height)==(int)nRowIdx)
+                    cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar(83,83,255));
+                else
+                    cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar::all(172));
             }
             if(oOutputRow.empty())
                 oOutputRow = oImageBYTE3;
