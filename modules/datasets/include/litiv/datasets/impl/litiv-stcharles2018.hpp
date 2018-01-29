@@ -586,7 +586,7 @@ namespace lv {
                 oRGBROI = oRGBROI>128;
                 oLWIRROI = oLWIRROI>128;
                 oDepthRemapROI = oDepthRemapROI>128;
-                if(this->m_nLWIRDispOffset!=0)
+                if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                     lv::shift(oLWIRROI.clone(),oLWIRROI,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
                 cv::erode(oRGBROI,oRGBROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 cv::erode(oLWIRROI,oLWIRROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
@@ -886,7 +886,7 @@ namespace lv {
                 if(this->m_bHorizRectify && oLWIRPacket.size()!=oRectifSize)
                     cv::resize(oLWIRPacket,oLWIRPacket,oRectifSize,0,0,cv::INTER_CUBIC);
                 cv::remap(oLWIRPacket.clone(),oLWIRPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_CUBIC);
-                if(this->m_nLWIRDispOffset!=0)
+                if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                     lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
             }
             if(oLWIRPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
@@ -900,7 +900,7 @@ namespace lv {
                     if(this->m_bHorizRectify && oLWIRMaskPacket.size()!=oRectifSize)
                         cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                     cv::remap(oLWIRMaskPacket.clone(),oLWIRMaskPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
-                    if(this->m_nLWIRDispOffset!=0)
+                    if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                         lv::shift(oLWIRMaskPacket.clone(),oLWIRMaskPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
                 }
                 if(oLWIRMaskPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
@@ -1044,7 +1044,7 @@ namespace lv {
                             if(this->m_bHorizRectify && oLWIRPacket.size()!=oRectifSize)
                                 cv::resize(oLWIRPacket,oLWIRPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                             cv::remap(oLWIRPacket.clone(),oLWIRPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
-                            if(this->m_nLWIRDispOffset!=0)
+                            if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                                 lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
                         }
                         if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
