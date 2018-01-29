@@ -841,6 +841,7 @@ namespace lv {
             const std::string& sC2DMapPath = this->m_vsC2DMapPaths[nPacketIdx];
             lvDbgAssert(!this->m_bLoadDepth || !sC2DMapPath.empty());
             const std::vector<lv::MatInfo>& vOrigInputInfos = this->m_vOrigInputInfos;
+            lvIgnore(vOrigInputInfos);
             lvDbgAssert(!vOrigInputInfos.empty() && vOrigInputInfos.size()==getInputStreamCount());
             const std::vector<lv::MatInfo>& vInputInfos = this->m_vInputInfos;
             lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
