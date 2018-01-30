@@ -379,10 +379,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 cv::FileNode oCorrespNode = oGTMetadataFS["totcorresp"];
                 lvAssert(!oCorrespNode.empty());
                 for(int nIdx : vnPrevSubsetIdxs) {
-                    const cv::FileNode oCurrCorrespNode = oCorrespNode[lv::putf("f%04d",nIdx)];
+                    const cv::FileNode oCurrCorrespNode = oCorrespNode[lv::putf("f%04dncorresp",nIdx)];
                     lvAssert(!oCurrCorrespNode.empty());
                     int nCurrCorresp;
-                    oCurrCorrespNode["ncorresp"] >> nCurrCorresp;
+                    oCurrCorrespNode >> nCurrCorresp;
                     lvAssert(nCurrCorresp>0);
                     mnTotCorresps[(size_t)nIdx] = (size_t)nCurrCorresp;
                 }
@@ -619,9 +619,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             oGTMetadataFS << "totcorresp" << "{";
             for(auto oPair : mnTotCorresps) {
                 lvAssert(oPair.second>0u);
-                oGTMetadataFS << (lv::putf("f%04d",(int)oPair.first).c_str()) << "{";
-                oGTMetadataFS << "ncorresp" << (int)oPair.second;
-                oGTMetadataFS << "}";
+                oGTMetadataFS << (lv::putf("f%04dncorresp",(int)oPair.first).c_str()) << (int)oPair.second;
             }
             oGTMetadataFS << "}";
         #endif //GEN_REGISTRATION_ANNOT
