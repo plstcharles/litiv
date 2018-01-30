@@ -133,7 +133,7 @@ namespace lv {
             static const std::vector<std::string> s_vsWorkBatchDirs = {"vid06"}; // calib04 (~calib06)
         #elif DATASETS_LITIV2018_DATA_VERSION==4 // 2018-01-18
             //static const std::vector<std::string> s_vsWorkBatchDirs = {"vid04","vid06","vid07","vid08"}; // calib02 + calib04 + (calib06)
-            static const std::vector<std::string> s_vsWorkBatchDirs = {"vid07"}; // calib02 + calib04 + (calib06)
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"vid08"}; // calib02 + calib04 + (calib06)
         #else //DATASETS_LITIV2018_DATA_VERSION==?
         #error "unknown dataset version"
         #endif //DATASETS_LITIV2018_DATA_VERSION==?
@@ -366,7 +366,7 @@ namespace lv {
             std::vector<std::string> vsRGBGTPaths = (psRGBGTDir==vsSubDirs.end())?std::vector<std::string>{}:lv::getFilesFromDir(*psRGBGTDir);
             lv::filterFilePaths(vsRGBFramePaths,{},{".jpg"});
             lv::filterFilePaths(vsRGBMaskPaths,{},{".png"});
-            lv::filterFilePaths(vsRGBGTPaths,{},{".png"});
+            lv::filterFilePaths(vsRGBGTPaths,{},{".png",".yml"});
             lvAssert__(vsRGBFramePaths.size()>0u && vsRGBMaskPaths.size()<=vsRGBFramePaths.size() && vsRGBGTPaths.size()<=vsRGBFramePaths.size(),"bad input rgb packet count for sequence '%s'",this->getName().c_str());
             auto psLWIRGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+(bEvalDisparityMaps?"lwir_gt_disp":"lwir_gt_masks"));
             auto psLWIRMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"lwir_masks"+sDirNameSuffix);
@@ -378,7 +378,7 @@ namespace lv {
             std::vector<std::string> vsLWIRGTPaths = (psLWIRGTDir==vsSubDirs.end())?std::vector<std::string>{}:lv::getFilesFromDir(*psLWIRGTDir);
             lv::filterFilePaths(vsLWIRFramePaths,{},{".jpg"});
             lv::filterFilePaths(vsLWIRMaskPaths,{},{".png"});
-            lv::filterFilePaths(vsLWIRGTPaths,{},{".png"});
+            lv::filterFilePaths(vsLWIRGTPaths,{},{".png",".yml"});
             lvAssert__(vsLWIRFramePaths.size()>0u && vsLWIRMaskPaths.size()<=vsLWIRFramePaths.size() && vsLWIRGTPaths.size()<=vsLWIRFramePaths.size(),"bad input lwir packet count for sequence '%s'",this->getName().c_str());
             const size_t nTotInputPackets = bIsLoadingCalibData?std::max(vsRGBFramePaths.size(),vsLWIRFramePaths.size()):vsRGBFramePaths.size();
             auto psDepthGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+(bEvalDisparityMaps?"depth_gt_disp":"depth_gt_masks"));
@@ -395,7 +395,7 @@ namespace lv {
                 vsC2DMapPaths = lv::getFilesFromDir(*psC2DMapsDir);
                 lv::filterFilePaths(vsDepthFramePaths,{},{".bin"});
                 lv::filterFilePaths(vsDepthMaskPaths,{},{".png"});
-                lv::filterFilePaths(vsDepthGTPaths,{},{".png"});
+                lv::filterFilePaths(vsDepthGTPaths,{},{".png",".yml"});
                 lv::filterFilePaths(vsC2DMapPaths,{},{".bin"});
                 lvAssert__(vsDepthFramePaths.size()>0u && vsDepthFramePaths.size()<=vsC2DMapPaths.size() && vsDepthMaskPaths.size()<=vsDepthFramePaths.size() && vsDepthGTPaths.size()<=vsDepthFramePaths.size(),"bad input depth packet count for sequence '%s'",this->getName().c_str());
             }
@@ -726,13 +726,25 @@ namespace lv {
                 }
             }
             //////////////////////////////////////////////////////////////////////////////////////////////////
-            if(!vsRGBGTPaths.empty() && lv::MatInfo(cv::imread(vsRGBGTPaths[0],cv::IMREAD_GRAYSCALE))!=this->m_vOrigGTInfos[nGTRGBStreamIdx])
-                lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected RGB GT packet size/type",this->getName().c_str());
-            if(!vsLWIRGTPaths.empty() && lv::MatInfo(cv::imread(vsLWIRGTPaths[0],cv::IMREAD_GRAYSCALE))!=this->m_vOrigGTInfos[nGTLWIRStreamIdx])
-                lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected LWIR GT packet size/type",this->getName().c_str());
-            if(this->m_bLoadDepth) {
-                if(!vsDepthGTPaths.empty() && lv::MatInfo(cv::imread(vsDepthGTPaths[0],cv::IMREAD_GRAYSCALE))!=this->m_vOrigGTInfos[nGTDepthStreamIdx])
-                    lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected depth GT packet size/type",this->getName().c_str());
+            if(bEvalDisparityMaps) {
+                if(!vsRGBGTPaths.empty() && cv::FileStorage(vsRGBGTPaths[0],cv::FileStorage::READ).isOpened())
+                    lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected RGB GT packet size/type",this->getName().c_str());
+                if(!vsLWIRGTPaths.empty() && cv::FileStorage(vsLWIRGTPaths[0],cv::FileStorage::READ).isOpened())
+                    lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected LWIR GT packet size/type",this->getName().c_str());
+                if(this->m_bLoadDepth) {
+                    if(!vsDepthGTPaths.empty() && cv::FileStorage(vsDepthGTPaths[0],cv::FileStorage::READ).isOpened())
+                        lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected depth GT packet size/type",this->getName().c_str());
+                }
+            }
+            else {
+                if(!vsRGBGTPaths.empty() && lv::MatInfo(cv::imread(vsRGBGTPaths[0],cv::IMREAD_GRAYSCALE))!=this->m_vOrigGTInfos[nGTRGBStreamIdx])
+                    lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected RGB GT packet size/type",this->getName().c_str());
+                if(!vsLWIRGTPaths.empty() && lv::MatInfo(cv::imread(vsLWIRGTPaths[0],cv::IMREAD_GRAYSCALE))!=this->m_vOrigGTInfos[nGTLWIRStreamIdx])
+                    lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected LWIR GT packet size/type",this->getName().c_str());
+                if(this->m_bLoadDepth) {
+                    if(!vsDepthGTPaths.empty() && lv::MatInfo(cv::imread(vsDepthGTPaths[0],cv::IMREAD_GRAYSCALE))!=this->m_vOrigGTInfos[nGTDepthStreamIdx])
+                        lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected depth GT packet size/type",this->getName().c_str());
+                }
             }
             if(bLoadFrameSubset || bEvalOnlyFrameSubset) {
                 lSubsetCleaner(vsRGBGTPaths,this->m_mRealSubset,false);

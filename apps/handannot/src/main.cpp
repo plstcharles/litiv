@@ -25,7 +25,7 @@
 ////////////////////////////////
 #define DATASETS_LITIV2018_CALIB_VERSION 4
 #define DATASETS_LITIV2018_DATA_VERSION 4
-#define DATASETS_START_IDX 666
+#define DATASETS_START_IDX 0
 
 #if (GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)>1
 #error "must select one type of annotation to generate"
@@ -57,7 +57,7 @@ int main(int, char**) {
                 DATASET_OUTPUT_PATH, // const std::string& sOutputDirName
                 false, //bool bSaveOutput
                 false, //bool bUseEvaluator
-                true, //bool bLoadDepth
+                false, //bool bLoadDepth
                 (GEN_REGISTRATION_ANNOT==1), //bool bUndistort
                 (GEN_REGISTRATION_ANNOT==1), //bool bHorizRectify
                 false, //bool bEvalDisparities
@@ -140,17 +140,6 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         lv::createDirIfNotExist(sRGBGTDir);
         lv::createDirIfNotExist(sLWIRGTDir);
         std::set<int> mnSubsetIdxs;
-        {
-            cv::FileStorage oGTMetadataFS(oBatch.getDataPath()+sGTName+"_metadata.yml",cv::FileStorage::READ);
-            if(oGTMetadataFS.isOpened()) {
-                int nPrevPacketCount;
-                oGTMetadataFS["npackets"] >> nPrevPacketCount;
-                lvAssert(nPrevPacketCount==(int)nTotPacketCount);
-                std::vector<int> vnPrevSubsetIdxs;
-                oGTMetadataFS["subsetidxs"] >> vnPrevSubsetIdxs;
-                mnSubsetIdxs.insert(vnPrevSubsetIdxs.begin(),vnPrevSubsetIdxs.end());
-            }
-        }
     #if (GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
     #if GEN_SEGMENTATION_ANNOT
         double dSegmOpacity = 0.5;
@@ -171,6 +160,8 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         cv::Point2i vInitDragPt;
         const double dMaxSelectDist = 5.0;
         const int nLineSplitRatio = 5;
+        int nMinDisp=0,nMaxDisp=0;
+        std::map<size_t,size_t> mnTotCorresps;
         const std::array<int,2> anMarkerSizes{2,2};
     #endif //GEN_REGISTRATION_ANNOT
         cv::Point2f vMousePos(0.5f,0.5f),vLastMousePos(0.5f,0.5f);
@@ -373,6 +364,31 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             vLastMousePos = vMousePos;
         });
     #endif //(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
+        {
+            cv::FileStorage oGTMetadataFS(oBatch.getDataPath()+sGTName+"_metadata.yml",cv::FileStorage::READ);
+            if(oGTMetadataFS.isOpened()) {
+                int nPrevPacketCount;
+                oGTMetadataFS["npackets"] >> nPrevPacketCount;
+                lvAssert(nPrevPacketCount==(int)nTotPacketCount);
+                std::vector<int> vnPrevSubsetIdxs;
+                oGTMetadataFS["subsetidxs"] >> vnPrevSubsetIdxs;
+                mnSubsetIdxs.insert(vnPrevSubsetIdxs.begin(),vnPrevSubsetIdxs.end());
+            #if GEN_REGISTRATION_ANNOT
+                oGTMetadataFS["mindisp"] >> nMinDisp;
+                oGTMetadataFS["maxdisp"] >> nMaxDisp;
+                cv::FileNode oCorrespNode = oGTMetadataFS["totcorresp"];
+                lvAssert(!oCorrespNode.empty());
+                for(int nIdx : vnPrevSubsetIdxs) {
+                    const cv::FileNode oCurrCorrespNode = oCorrespNode[lv::putf("f%04d",nIdx)];
+                    lvAssert(!oCurrCorrespNode.empty());
+                    int nCurrCorresp;
+                    oCurrCorrespNode["ncorresp"] >> nCurrCorresp;
+                    lvAssert(nCurrCorresp>0);
+                    mnTotCorresps[(size_t)nIdx] = (size_t)nCurrCorresp;
+                }
+            #endif //GEN_REGISTRATION_ANNOT
+            }
+        }
         lvLog(1,"Annotation edit mode initialized...");
         nCurrIdx = size_t(DATASETS_START_IDX);
         while(nCurrIdx<nTotPacketCount) {
@@ -403,7 +419,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 oDepthFrame = vCurrInputs[2];
                 lvAssert(oDepthFrame.size()==oRGBFrame.size() && oDepthFrame.type()==CV_16UC1);
                 cv::Mat oDepthFrameDisplay;
-                cv::normalize(oDepthFrame,oDepthFrameDisplay,1.0,0.0,cv::NORM_MINMAX,CV_32FC1);
+                cv::normalize(oDepthFrame,oDepthFrameDisplay,255.0,0.0,cv::NORM_MINMAX,CV_8UC1);
                 cv::applyColorMap(oDepthFrameDisplay,oDepthFrameDisplay,cv::COLORMAP_BONE);
                 cv::resize(oDepthFrameDisplay,oDepthFrameDisplay,cv::Size(),0.5,0.5);
                 cv::imshow("oDepthFrameDisplay",oDepthFrameDisplay);
@@ -462,7 +478,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                         oPtNode["y"] >> y;
                         oPtNode["d"] >> d;
                         avCorrespPts[a].emplace_back(cv::Point(x,y),d);
+                        if(a==0u)
+                            lvAssert(nMinDisp<=d && nMaxDisp>=d);
                     }
+                    //lvAssert(mnTotCorresps[nCurrIdx]==(size_t)nPts);
                 }
             }
         #endif //GEN_REGISTRATION_ANNOT
@@ -559,7 +578,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                         oGTFS << "y" << avCorrespPts[a][nPtIdx].first.y;
                         oGTFS << "d" << avCorrespPts[a][nPtIdx].second;
                         oGTFS << "}";
+                        if(a==0u) {
+                            nMinDisp = std::min(nMinDisp,avCorrespPts[a][nPtIdx].second);
+                            nMaxDisp = std::max(nMaxDisp,avCorrespPts[a][nPtIdx].second);
+                        }
                     }
+                    mnTotCorresps[nCurrIdx] = (size_t)avCorrespPts[a].size();
                 }
             }
         #endif //GEN_REGISTRATION_ANNOT
@@ -587,6 +611,20 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             oGTMetadataFS << "date" << lv::getTimeStamp();
             oGTMetadataFS << "npackets" << (int)nTotPacketCount;
             oGTMetadataFS << "subsetidxs" << std::vector<int>(mnSubsetIdxs.begin(),mnSubsetIdxs.end());
+        #if GEN_REGISTRATION_ANNOT
+            oGTMetadataFS << "mindisp" << nMinDisp;
+            oGTMetadataFS << "maxdisp" << nMaxDisp;
+            const int nTotCorresp = std::accumulate(mnTotCorresps.begin(),mnTotCorresps.end(),0,[](int nSum, const std::pair<size_t,size_t>& p){return nSum+(int)p.second;});
+            oGTMetadataFS << "ntotcorresp" << nTotCorresp;
+            oGTMetadataFS << "totcorresp" << "{";
+            for(auto oPair : mnTotCorresps) {
+                lvAssert(oPair.second>0u);
+                oGTMetadataFS << (lv::putf("f%04d",(int)oPair.first).c_str()) << "{";
+                oGTMetadataFS << "ncorresp" << (int)oPair.second;
+                oGTMetadataFS << "}";
+            }
+            oGTMetadataFS << "}";
+        #endif //GEN_REGISTRATION_ANNOT
         }
         lvLog(1,"... batch done.\n");
     }
