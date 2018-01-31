@@ -508,7 +508,8 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                             cv::rectangle(vvDisplayPairs[0][a].first,cv::Rect(avCorrespPts[a][nPtIdx].first.x,0,1,vOrigSizes[a].height),cv::Scalar_<uchar>(0,0,172));
                         if(nSelectedPoint==nPtIdx)
                             cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a]*2,cv::Scalar::all(1u),-1);
-                        cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a],cv::Scalar_<uchar>(lv::getBGRFromHSL(360*float(nPtIdx)/avCorrespPts[a].size(),1.0f,0.5f)),-1);
+                        const cv::Vec3b vColor = lv::getBGRFromHSL(((float(std::min(std::max(avCorrespPts[0][nPtIdx].second,nMinDisp),nMaxDisp))-nMinDisp)/(nMaxDisp-nMinDisp))*240,1.0f,0.5f);
+                        cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a],cv::Scalar_<uchar>(vColor),-1);
                     }
                     for(size_t nPtIdx=0u; nPtIdx<avTempPts[a].size(); ++nPtIdx) {
                         cv::circle(vvDisplayPairs[0][a].first,avTempPts[a][nPtIdx],anMarkerSizes[a]*2,cv::Scalar::all(255),-1);
