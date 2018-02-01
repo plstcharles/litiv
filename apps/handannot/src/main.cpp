@@ -481,7 +481,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                         if(a==0u)
                             lvAssert(nMinDisp<=d && nMaxDisp>=d);
                     }
-                    //lvAssert(mnTotCorresps[nCurrIdx]==(size_t)nPts);
+                    lvAssert(mnTotCorresps[nCurrIdx]==(size_t)nPts);
                 }
             }
         #endif //GEN_REGISTRATION_ANNOT
