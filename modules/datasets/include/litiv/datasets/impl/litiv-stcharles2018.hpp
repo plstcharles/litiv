@@ -519,11 +519,18 @@ namespace lv {
             this->m_nMinDisp = 0;
             this->m_nMaxDisp = 100;
             this->m_nLWIRDispOffset = 0;
+            this->m_bFlipDisparitiesInternal = false;
             std::ifstream oDispRangeFile(this->getDataPath()+"drange.txt");
             if(oDispRangeFile.is_open() && !oDispRangeFile.eof()) {
                 oDispRangeFile >> this->m_nMinDisp;
                 if(!oDispRangeFile.eof())
                     oDispRangeFile >> this->m_nMaxDisp;
+            }
+            if(std::abs(this->m_nMinDisp)>std::abs(this->m_nMaxDisp)) {
+                this->m_bFlipDisparitiesInternal = true;
+                std::swap(this->m_nMinDisp,this->m_nMaxDisp);
+                this->m_nMinDisp = -this->m_nMinDisp;
+                this->m_nMaxDisp = -this->m_nMaxDisp;
             }
             if(this->m_nMinDisp!=0) {
                 this->m_nLWIRDispOffset = -this->m_nMinDisp;
@@ -840,11 +847,12 @@ namespace lv {
                     this->m_mGTIndexLUT[nGTPacketIdx] = nGTPacketIdx; // direct gt path index to frame index mapping
             }
             //////////////////////////////////////////////////////////////////////////////////////////////////
-            if(bFlipDisparities) {
+            if(bFlipDisparities ^ this->m_bFlipDisparitiesInternal) {
                 for(size_t nStreamIdx=0; nStreamIdx<this->getInputStreamCount(); ++nStreamIdx)
                     cv::flip(this->m_vInputROIs[nStreamIdx],this->m_vInputROIs[nStreamIdx],1);
                 for(size_t nStreamIdx=0; nStreamIdx<this->getGTStreamCount(); ++nStreamIdx)
                     cv::flip(this->m_vGTROIs[nStreamIdx],this->m_vGTROIs[nStreamIdx],1);
+                cv::flip(this->m_oOrigDepthROI,this->m_oOrigDepthROI,1);
             }
         }
         virtual std::vector<cv::Mat> getRawInputArray(size_t nPacketIdx) override final {
@@ -994,7 +1002,7 @@ namespace lv {
                     vInputs[nInputDepthMaskStreamIdx] = oDepthMaskPacket;
                 }
             }
-            if(bFlipDisparities)
+            if(bFlipDisparities ^ this->m_bFlipDisparitiesInternal)
                 for(size_t nInputStreamIdx=0; nInputStreamIdx<this->getInputStreamCount(); ++nInputStreamIdx)
                     if(!vInputs[nInputStreamIdx].empty())
                         cv::flip(vInputs[nInputStreamIdx],vInputs[nInputStreamIdx],1);
@@ -1050,9 +1058,9 @@ namespace lv {
                         oLWIRPtNode["d"] >> oLWIRCorresp.second;
                         lvAssert(oRGBCorresp.first+cv::Point2i(oRGBCorresp.second,0)==oLWIRCorresp.first);
                         lvAssert(oLWIRCorresp.first+cv::Point2i(oLWIRCorresp.second,0)==oRGBCorresp.first);
-                        const int nRGBDisp = oRGBCorresp.second-this->m_nLWIRDispOffset;
-                        const int nLWIRDisp = oLWIRCorresp.second+this->m_nLWIRDispOffset;
-                        const int nMaxDisp = ILITIVStCharles2018Dataset::s_nDontCareDispLabel-1;
+                        static constexpr int nMaxDisp = ILITIVStCharles2018Dataset::s_nDontCareDispLabel-1;
+                        const int nRGBDisp = (this->m_bFlipDisparitiesInternal?-oRGBCorresp.second:oRGBCorresp.second)-this->m_nLWIRDispOffset;
+                        const int nLWIRDisp = (this->m_bFlipDisparitiesInternal?-oLWIRCorresp.second:oLWIRCorresp.second)+this->m_nLWIRDispOffset;
                         lvAssert_(nRGBDisp>0 && nRGBDisp<=nMaxDisp && nLWIRDisp>0 && nLWIRDisp<=nMaxDisp,"bad corresp disp offset");
                         oRGBPacket.at<uchar>(oRGBCorresp.first) = (uchar)nRGBDisp;
                         oLWIRPacket.at<uchar>(oLWIRCorresp.first) = (uchar)nLWIRDisp;
@@ -1136,7 +1144,7 @@ namespace lv {
                 vGTs[nGTLWIRStreamIdx] = oLWIRPacket;
                 if(this->m_bLoadDepth)
                     vGTs[nGTDepthStreamIdx] = oDepthPacket;
-                if(bFlipDisparities)
+                if(bFlipDisparities ^ this->m_bFlipDisparitiesInternal)
                     for(size_t nGTStreamIdx=0; nGTStreamIdx<this->getGTStreamCount(); ++nGTStreamIdx)
                         if(!vGTs[nGTStreamIdx].empty())
                             cv::flip(vGTs[nGTStreamIdx],vGTs[nGTStreamIdx],1);
@@ -1156,7 +1164,7 @@ namespace lv {
             return (size_t)std::stoi(sFileName);
         }
         std::set<size_t> m_mRealSubset,m_mSubset;
-        bool m_bLoadDepth,m_bUndistort,m_bHorizRectify;
+        bool m_bLoadDepth,m_bUndistort,m_bHorizRectify,m_bFlipDisparitiesInternal;
         int m_nLoadInputMasks;
         int m_nLWIRDispOffset;
         int m_nMinDisp,m_nMaxDisp;
