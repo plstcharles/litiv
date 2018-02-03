@@ -134,8 +134,7 @@ namespace lv {
         #elif DATASETS_LITIV2018_DATA_VERSION==3
             static const std::vector<std::string> s_vsWorkBatchDirs = {"vid06"}; // calib04 (~calib06)
         #elif DATASETS_LITIV2018_DATA_VERSION==4 // 2018-01-18
-            //static const std::vector<std::string> s_vsWorkBatchDirs = {"vid04","vid06","vid07","vid08"}; // calib02 + calib04 + (calib06)
-            static const std::vector<std::string> s_vsWorkBatchDirs = {"vid08"}; // calib02 + calib04 + (calib06)
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"vid04","vid07","vid08"}; // calib02 + calib04 + (calib06)
         #else //DATASETS_LITIV2018_DATA_VERSION==?
         #error "unknown dataset version"
         #endif //DATASETS_LITIV2018_DATA_VERSION==?
@@ -280,8 +279,7 @@ namespace lv {
             if(nPacketIdx==0u)
                 return true;
             const bool bLoadFrameSubset = this->isLoadingFrameSubset();
-            const bool bEvalOnlyFrameSubset = this->isEvaluatingOnlyFrameSubset();
-            if(!bLoadFrameSubset && !bEvalOnlyFrameSubset)
+            if(!bLoadFrameSubset)
                 return false;
             lvAssert_(!m_mSubset.empty(),"must parse data first");
             const int nEvalTemporalWindowSize = this->getEvalTemporalWindowSize();
@@ -436,6 +434,9 @@ namespace lv {
                                 this->m_mSubset.insert(size_t(nOffsetIdx));
                     }
                     lvAssert(this->m_mSubset.size()>0);
+                    if(!bLoadFrameSubset)
+                        for(size_t nCurrIdx=0u; nCurrIdx<nTotInputPackets; ++nCurrIdx)
+                            this->m_mSubset.insert(nCurrIdx);
                 }
                 else {
                     for(size_t nCurrIdx=0u; nCurrIdx<nTotInputPackets; ++nCurrIdx) {
@@ -809,18 +810,26 @@ namespace lv {
                 const auto lIndexMatcher = [&](const std::string& sFilePath) {
                     return sFilePath.find(lv::putf("%05d",(int)nGTPacketIdx))!=std::string::npos;
                 };
+                bool bGotPacket = false;
                 auto pRGBGTPath = std::find_if(vsRGBGTPaths.begin(),vsRGBGTPaths.end(),lIndexMatcher);
-                if(pRGBGTPath!=vsRGBGTPaths.end())
+                if(pRGBGTPath!=vsRGBGTPaths.end()) {
                     this->m_vvsGTPaths[nGTPacketIdx][nGTRGBStreamIdx] = *pRGBGTPath;
+                    bGotPacket = true;
+                }
                 auto pLWIRGTPath = std::find_if(vsLWIRGTPaths.begin(),vsLWIRGTPaths.end(),lIndexMatcher);
-                if(pLWIRGTPath!=vsLWIRGTPaths.end())
+                if(pLWIRGTPath!=vsLWIRGTPaths.end()) {
                     this->m_vvsGTPaths[nGTPacketIdx][nGTLWIRStreamIdx] = *pLWIRGTPath;
+                    bGotPacket = true;
+                }
                 if(this->m_bLoadDepth) {
                     auto pDepthGTPath = std::find_if(vsDepthGTPaths.begin(),vsDepthGTPaths.end(),lIndexMatcher);
-                    if(pDepthGTPath!=vsDepthGTPaths.end())
+                    if(pDepthGTPath!=vsDepthGTPaths.end()) {
                         this->m_vvsGTPaths[nGTPacketIdx][nGTDepthStreamIdx] = *pDepthGTPath;
+                        bGotPacket = true;
+                    }
                 }
-                this->m_mGTIndexLUT[nGTPacketIdx] = nGTPacketIdx; // direct gt path index to frame index mapping
+                if(bGotPacket)
+                    this->m_mGTIndexLUT[nGTPacketIdx] = nGTPacketIdx; // direct gt path index to frame index mapping
             }
             //////////////////////////////////////////////////////////////////////////////////////////////////
             if(bFlipDisparities) {
@@ -1057,8 +1066,6 @@ namespace lv {
                     oRGBPacket = cv::imread(vsGTMasksPaths[nGTRGBStreamIdx],cv::IMREAD_GRAYSCALE);
                     if(!oRGBPacket.empty()) {
                         lvAssert(oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==oRGBSize && lv::MatInfo(oRGBPacket)==vOrigGTInfos[nGTRGBStreamIdx]);
-                        if(DATASETS_LITIV2018_FLIP_RGB)
-                            cv::flip(oRGBPacket,oRGBPacket,1); // must pre-flip rgb frames due to original camera flip
                         if(this->m_bUndistort || this->m_bHorizRectify) {
                             if(this->m_bHorizRectify && oRGBPacket.size()!=oRectifSize)
                                 cv::resize(oRGBPacket,oRGBPacket,oRectifSize,0,0,cv::INTER_LINEAR);
@@ -1068,6 +1075,8 @@ namespace lv {
                             cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBStreamIdx].size(),0,0,cv::INTER_LINEAR);
                         oRGBPacket = oRGBPacket>128;
                     }
+                    else
+                        oRGBPacket = cv::Mat(vGTInfos[nGTRGBStreamIdx].size(),vGTInfos[nGTRGBStreamIdx].type(),cv::Scalar::all(DATASETUTILS_OUTOFSCOPE_VAL));
                     oLWIRPacket = cv::imread(vsGTMasksPaths[nGTLWIRStreamIdx],cv::IMREAD_GRAYSCALE);
                     if(!oLWIRPacket.empty()) {
                         lvAssert(oLWIRPacket.type()==CV_8UC1 && oLWIRPacket.size()==oLWIRSize && lv::MatInfo(oLWIRPacket)==vOrigGTInfos[nGTLWIRStreamIdx]);
@@ -1082,6 +1091,8 @@ namespace lv {
                             cv::resize(oLWIRPacket,oLWIRPacket,vGTInfos[nGTLWIRStreamIdx].size(),0,0,cv::INTER_LINEAR);
                         oLWIRPacket = oLWIRPacket>128;
                     }
+                    else
+                        oLWIRPacket = cv::Mat(vGTInfos[nGTLWIRStreamIdx].size(),vGTInfos[nGTLWIRStreamIdx].type(),cv::Scalar::all(DATASETUTILS_OUTOFSCOPE_VAL));
                     if(this->m_bLoadDepth) {
                         cv::Mat oC2DMapPacket,oDepthPacket_raw = cv::imread(vsGTMasksPaths[nGTDepthStreamIdx],cv::IMREAD_GRAYSCALE);
                         if(!oDepthPacket_raw.empty()) {
@@ -1100,8 +1111,6 @@ namespace lv {
                                 if(vRealPt[0]>=0 && vRealPt[0]<oDepthSize.width && vRealPt[1]>=0 && vRealPt[1]<oDepthSize.height)
                                     ((uchar*)oDepthPacket.data)[nPxIter] = oDepthPacket_raw.at<uchar>((int)std::round(vRealPt[1]),(int)std::round(vRealPt[0]));
                             }
-                            if(DATASETS_LITIV2018_FLIP_RGB)
-                                cv::flip(oDepthPacket,oDepthPacket,1);
                             if(this->m_bUndistort || this->m_bHorizRectify) {
                                 if(this->m_bHorizRectify && oDepthPacket.size()!=oRectifSize)
                                     cv::resize(oDepthPacket,oDepthPacket,oRectifSize,0,0,cv::INTER_LINEAR);
@@ -1111,6 +1120,8 @@ namespace lv {
                                 cv::resize(oDepthPacket,oDepthPacket,vGTInfos[nGTDepthStreamIdx].size(),0,0,cv::INTER_LINEAR);
                             oDepthPacket = oDepthPacket>128;
                         }
+                        else
+                            oDepthPacket = cv::Mat(vGTInfos[nGTDepthStreamIdx].size(),vGTInfos[nGTDepthStreamIdx].type(),cv::Scalar::all(DATASETUTILS_OUTOFSCOPE_VAL));
                     }
                 }
                 vGTs[nGTRGBStreamIdx] = oRGBPacket;
