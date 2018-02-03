@@ -491,6 +491,8 @@ namespace lv {
             cv::Mat oDepthRemapROI = cv::imread(this->getDataPath()+"depth_remap_roi.png",cv::IMREAD_GRAYSCALE);
             if(!oRGBROI.empty()) {
                 lvAssert(oRGBROI.type()==CV_8UC1 && oRGBROI.size()==oRGBSize);
+                if(DATASETS_LITIV2018_FLIP_RGB)
+                    cv::flip(oRGBROI,oRGBROI,1); // must pre-flip rgb frames due to original camera flip
                 oRGBROI = oRGBROI>128;
             }
             else
@@ -523,7 +525,7 @@ namespace lv {
                 if(!oDispRangeFile.eof())
                     oDispRangeFile >> this->m_nMaxDisp;
             }
-            if(this->m_nMinDisp>0) {
+            if(this->m_nMinDisp!=0) {
                 this->m_nLWIRDispOffset = -this->m_nMinDisp;
                 this->m_nMaxDisp -= this->m_nMinDisp;
                 this->m_nMinDisp = 0;
@@ -572,6 +574,12 @@ namespace lv {
                     cv::initUndistortRectifyMap(this->m_oLWIRCameraParams,this->m_oLWIRDistortParams,
                                                 aRectifRotMats[1],aRectifProjMats[1],oRectifSize,
                                                 CV_16SC2,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2);
+                    if(oRGBROI.size()!=oRectifSize)
+                        cv::resize(oRGBROI,oRGBROI,oRectifSize,0,0,cv::INTER_LINEAR);
+                    if(oLWIRROI.size()!=oRectifSize)
+                        cv::resize(oLWIRROI,oLWIRROI,oRectifSize,0,0,cv::INTER_LINEAR);
+                    if(oDepthRemapROI.size()!=oRectifSize)
+                        cv::resize(oDepthRemapROI,oDepthRemapROI,oRectifSize,0,0,cv::INTER_LINEAR);
                 }
                 else {
                     const double dUndistortMapCameraMatrixAlpha = -1.0;
@@ -583,14 +591,14 @@ namespace lv {
                                                 oLWIRSize,CV_16SC2,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2);
                 }
                 //////////////
-                cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
-                cv::remap(oLWIRROI.clone(),oLWIRROI,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
-                cv::remap(oDepthRemapROI.clone(),oDepthRemapROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
+                cv::remap(oLWIRROI.clone(),oLWIRROI,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
+                cv::remap(oDepthRemapROI.clone(),oDepthRemapROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 oRGBROI = oRGBROI>128;
                 oLWIRROI = oLWIRROI>128;
                 oDepthRemapROI = oDepthRemapROI>128;
                 if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
-                    lv::shift(oLWIRROI.clone(),oLWIRROI,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
+                    lv::shift(oLWIRROI.clone(),oLWIRROI,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
                 cv::erode(oRGBROI,oRGBROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 cv::erode(oLWIRROI,oLWIRROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 cv::erode(oDepthRemapROI,oDepthRemapROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
@@ -907,7 +915,7 @@ namespace lv {
                     cv::resize(oLWIRPacket,oLWIRPacket,oRectifSize,0,0,cv::INTER_CUBIC);
                 cv::remap(oLWIRPacket.clone(),oLWIRPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_CUBIC);
                 if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
-                    lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
+                    lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
             }
             if(oLWIRPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
                 cv::resize(oLWIRPacket,oLWIRPacket,vInputInfos[nInputLWIRStreamIdx].size(),0,0,cv::INTER_CUBIC);
@@ -921,7 +929,7 @@ namespace lv {
                         cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                     cv::remap(oLWIRMaskPacket.clone(),oLWIRMaskPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
                     if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
-                        lv::shift(oLWIRMaskPacket.clone(),oLWIRMaskPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
+                        lv::shift(oLWIRMaskPacket.clone(),oLWIRMaskPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
                 }
                 if(oLWIRMaskPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
                     cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,vInputInfos[nInputLWIRStreamIdx].size(),cv::INTER_LINEAR);
@@ -1050,7 +1058,7 @@ namespace lv {
                         oLWIRPacket.at<uchar>(oLWIRCorresp.first) = (uchar)nLWIRDisp;
                     }
                     if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
-                        lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
+                        lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
                     if(oRGBPacket.size()!=vGTInfos[nGTRGBStreamIdx].size())
                         cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBStreamIdx].size(),0,0,cv::INTER_NEAREST);
                     if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
@@ -1085,7 +1093,7 @@ namespace lv {
                                 cv::resize(oLWIRPacket,oLWIRPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                             cv::remap(oLWIRPacket.clone(),oLWIRPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
                             if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
-                                lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(0.0f,-float(this->m_nLWIRDispOffset)));
+                                lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
                         }
                         if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
                             cv::resize(oLWIRPacket,oLWIRPacket,vGTInfos[nGTLWIRStreamIdx].size(),0,0,cv::INTER_LINEAR);
