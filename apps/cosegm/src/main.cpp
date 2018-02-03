@@ -26,14 +26,15 @@
 #define EVALUATE_OUTPUT         1
 #define GLOBAL_VERBOSITY        2
 ////////////////////////////////
-#define DATASET_VAPTRIMOD       1
+#define DATASET_VAPTRIMOD       0
 #define DATASET_LITIV2014       0
+#define DATASET_LITIV2018       1
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
-#define DATASET_OUTPUT_PATH     "results_cosegm_out_default"
+#define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      0
 #define DATASET_SCALE_FACTOR    1//0.5
-#define DATASET_WORKTHREADS     2
+#define DATASET_WORKTHREADS     1
 ////////////////////////////////
 #define DATASET_FORCE_RECALC_FEATURES      1
 #define DATASET_EVAL_DISPARITY_MASKS       0
@@ -41,12 +42,12 @@
 #define DATASET_EVAL_APPROX_MASKS_ONLY     0
 #define DATASET_EVAL_OUTPUT_MASKS_ONLY     0
 #define DATASET_EVAL_INPUT_SUBSET          1
-#define DATASET_EVAL_GT_SUBSET             1
+#define DATASET_EVAL_GT_SUBSET             0
 #define DATASET_EVAL_FINAL_UPDATE          1
 #define DATASET_BATCH_START_INDEX          0
 #define DATASET_BATCH_STOP_MAX_INDEX       9999
 
-#if (DATASET_VAPTRIMOD+DATASET_LITIV2014+DATASET_MINI_TESTS/*+...*/)!=1
+#if (DATASET_VAPTRIMOD+DATASET_LITIV2014+DATASET_LITIV2018+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
 #endif //(DATASET_+.../*+...*/)!=1
 #if (DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_MASKS_ONLY)>1
@@ -87,6 +88,22 @@
     true,                                         /* bool bFlipDisparities=false */\
     true,                                         /* bool bLoadFrameSubset=true */\
     -1,                                           /* int nLoadPersonSets=-1 */\
+    PROCESS_PREPROC?0:1,                          /* int nLoadInputMasks=0 */\
+    DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
+#elif DATASET_LITIV2018
+#define DATASET_ID Dataset_LITIV_stcharles2018
+#define DATASET_PARAMS \
+    DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
+    bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
+    bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
+    false,                                        /* bool bLoadDepth=true */\
+    PROCESS_PREPROC?false:true,                   /* bool bUndistort=true */\
+    PROCESS_PREPROC?false:true,                   /* bool bHorizRectify=false */\
+    DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=false */\
+    false,                                        /* bool bFlipDisparities=false*/\
+    PROCESS_PREPROC_BGSEGM?false:DATASET_EVAL_INPUT_SUBSET,/* bool bLoadFrameSubset=false */\
+    DATASET_EVAL_GT_SUBSET,                       /* bool bEvalOnlyFrameSubset=false */\
+    PROCESS_PREPROC?0:(int)SegmMatcher::getTemporalDepth(),/* int nEvalTemporalWindowSize=0*/\
     PROCESS_PREPROC?0:1,                          /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
@@ -166,7 +183,6 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
         lvAssert(vInitInput.size()==oBatch.getInputStreamCount());
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
-            lvAssert(vInitInput[nStreamIdx].size()==vInitInput[0].size());
             lvLog_(2,"\tinput %d := %s   (roi=%s)",(int)nStreamIdx,lv::MatInfo(vInitInput[nStreamIdx]).str().c_str(),lv::MatInfo(vROIs[nStreamIdx]).str().c_str());
             if(lv::getVerbosity()>=5) {
                 cv::imshow(std::string("vInitInput_")+std::to_string(nStreamIdx),vInitInput[nStreamIdx]);
@@ -176,7 +192,6 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         if(lv::getVerbosity()>=5)
             cv::waitKey(0);
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
-        const lv::MatSize oFrameSize = oInfoArray[0].size;
         lv::DisplayHelperPtr pDisplayHelper;
         if(lv::getVerbosity()>=1) {
             pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
@@ -186,13 +201,24 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
 #if PROCESS_PREPROC_BGSEGM
         lvAssert(!EVALUATE_OUTPUT || !DATASET_EVAL_DISPARITY_MASKS);
         constexpr size_t nExpectedAlgoInputCount = 2u;
+        lvIgnore(nExpectedAlgoInputCount);
         std::vector<std::shared_ptr<IBackgroundSubtractor>> vAlgos = {
             std::make_shared<BGSEGM_ALGO_TYPE>(),
             std::make_shared<BGSEGM_ALGO_TYPE>(/*2,30*/)
         };
         const double dDefaultLearningRate = vAlgos[0]->getDefaultLearningRate();
-        for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx)
-            vAlgos[nCamIdx]->initialize(vInitInput[nCamIdx],vROIs[nCamIdx]);
+        for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx) {
+            cv::Mat oCurrInput = vInitInput[nCamIdx].clone();
+            cv::Mat oCurrROI = vROIs[nCamIdx].clone();
+            while(oCurrInput.size().area()>1000*1000) {
+                cv::resize(oCurrInput,oCurrInput,cv::Size(),0.5,0.5);
+                cv::resize(oCurrROI,oCurrROI,cv::Size(),0.5,0.5,cv::INTER_NEAREST);
+            }
+            lvAssert(oCurrInput.size()==oCurrROI.size());
+            if(oCurrInput.size()!=vInitInput[nCamIdx].size())
+                lvLog_(2,"\tdownsizing input #%d to %dx%d...",(int)nCamIdx,oCurrInput.cols,oCurrInput.rows);
+            vAlgos[nCamIdx]->initialize(oCurrInput,oCurrROI);
+        }
         std::vector<cv::Mat> vCurrFGMasks(2);
 #if PROCESS_PREPROC_BGSEGM>1
         const size_t nMaxInitLoops = 50, nMaxInitLoopIdx = 6;
@@ -417,7 +443,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             lvDbgAssert(vCurrInput.size()==oBatch.getInputStreamCount());
             lvDbgAssert(vCurrInput.size()==nExpectedAlgoInputCount);
             for(size_t nStreamIdx=0; nStreamIdx<vCurrInput.size(); ++nStreamIdx) {
-                lvDbgAssert(oFrameSize==vCurrInput[nStreamIdx].size());
+                lvDbgAssert(oInfoArray[nStreamIdx].size()==vCurrInput[nStreamIdx].size());
             #if PROCESS_PREPROC_BGSEGM>2
                 if(nCurrInitLoop<nMaxInitLoops) {
                     const float fStdDev = 0.01;
@@ -436,27 +462,42 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             #if USING_OPENMP
                 #pragma omp section
             #endif //USING_OPENMP
-                {vAlgos[0]->apply(vCurrInput[0],vCurrFGMasks[0],dCurrLearningRate);}
+                {
+                    cv::Mat oCurrInput = vCurrInput[0].clone();
+                    while(oCurrInput.size().area()>1000*1000)
+                        cv::resize(oCurrInput,oCurrInput,cv::Size(),0.5,0.5);
+                    cv::Mat oCurrOutput(oCurrInput.size(),CV_8UC1);
+                    vAlgos[0]->apply(oCurrInput,oCurrOutput,dCurrLearningRate);
+                    if(vCurrInput[0].size()!=oCurrInput.size())
+                        cv::resize(oCurrOutput,oCurrOutput,vInitInput[0].size(),0,0,cv::INTER_NEAREST);
+                    oCurrOutput.copyTo(vCurrFGMasks[0]);
+                }
             #if USING_OPENMP
                 #pragma omp section
             #endif //USING_OPENMP
-                {vAlgos[1]->apply(vCurrInput[1],vCurrFGMasks[1],dCurrLearningRate);}
+                {
+                    lvAssert(vCurrInput[1].size().area()<1000*1000);
+                    vAlgos[1]->apply(vCurrInput[1],vCurrFGMasks[1],dCurrLearningRate);
+                }
             }
             if(lv::getVerbosity()>=3) {
                 std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(2);
+                const std::vector<cv::Mat>& vCurrEvalRes = oBatch.getColoredMaskArray(vCurrFGMasks,nCurrIdx);
                 for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx) {
                     vvDisplayPairs[nCamIdx].resize(3);
                     vvDisplayPairs[nCamIdx][0].first = vCurrInput[nCamIdx];
                     vvDisplayPairs[nCamIdx][0].second = std::to_string(nCurrIdx);
                     vAlgos[nCamIdx]->getBackgroundImage(vvDisplayPairs[nCamIdx][1].first);
-                    vCurrFGMasks[nCamIdx].copyTo(vvDisplayPairs[nCamIdx][2].first);
+                    if(vvDisplayPairs[nCamIdx][1].first.size()!=vCurrInput[nCamIdx].size())
+                        cv::resize(vvDisplayPairs[nCamIdx][1].first,vvDisplayPairs[nCamIdx][1].first,vCurrInput[nCamIdx].size());
+                    vCurrEvalRes[nCamIdx].copyTo(vvDisplayPairs[nCamIdx][2].first);
                     if(!vROIs[nCamIdx].empty()) {
                         cv::bitwise_or(vvDisplayPairs[nCamIdx][1].first,UCHAR_MAX/2,vvDisplayPairs[nCamIdx][1].first,vROIs[nCamIdx]==0);
                         cv::bitwise_or(vvDisplayPairs[nCamIdx][2].first,UCHAR_MAX/2,vvDisplayPairs[nCamIdx][2].first,vROIs[nCamIdx]==0);
                     }
                 }
                 lvAssert(pDisplayHelper);
-                pDisplayHelper->display(vvDisplayPairs,oFrameSize);
+                pDisplayHelper->display(vvDisplayPairs,cv::Size(640,480));
                 const int nKeyPressed = pDisplayHelper->waitKey();
                 if(nKeyPressed==(int)'q')
                     break;
@@ -553,10 +594,10 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         #if DATASET_EVAL_OUTPUT_MASKS_ONLY
                 if(oBatch.isEvaluatingDisparities()) {
                     vArchivedOutput[nCamIdx].convertTo(vCurrOutput[nOutputDispIdx],CV_32S);
-                    cv::Mat_<OutputType>(oFrameSize(),OutputType(0)).copyTo(vCurrOutput[nOutputMaskIdx]); // only to fool output checks
+                    cv::Mat_<OutputType>(oInfoArray[nCamIdx].size(),OutputType(0)).copyTo(vCurrOutput[nOutputMaskIdx]); // only to fool output checks
                 }
                 else {
-                    cv::Mat_<OutputType>(oFrameSize(),OutputType(0)).copyTo(vCurrOutput[nOutputDispIdx]); // only to fool output checks
+                    cv::Mat_<OutputType>(oInfoArray[nCamIdx].size(),OutputType(0)).copyTo(vCurrOutput[nOutputDispIdx]); // only to fool output checks
                     vArchivedOutput[nCamIdx].convertTo(vCurrOutput[nOutputMaskIdx],CV_32S);
                 }
         #endif //DATASET_EVAL_OUTPUT_MASKS_ONLY
@@ -596,7 +637,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             using OutputLabelType = SegmMatcher::LabelType;
             for(size_t nOutputArrayIdx=0; nOutputArrayIdx<vCurrOutput.size(); ++nOutputArrayIdx) {
                 lvAssert(vCurrOutput[nOutputArrayIdx].type()==lv::MatRawType_<OutputLabelType>());
-                lvAssert(vCurrOutput[nOutputArrayIdx].size()==oFrameSize());
+                lvAssert(vCurrOutput[nOutputArrayIdx].size()==oInfoArray[nOutputArrayIdx].size());
                 const size_t nRealOutputArrayIdx = nOutputArrayIdx/SegmMatcher::OutputPackOffset;
                 if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Disp) {
                     double dMin,dMax;
@@ -638,7 +679,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                     lvDbgAssert(aUpdatedOutputs.size()==nExpectedAlgoOutputCount);
                     for(size_t nOutputArrayIdx=0; nOutputArrayIdx<aUpdatedOutputs.size(); ++nOutputArrayIdx) {
                         lvAssert(aUpdatedOutputs[nOutputArrayIdx].type()==lv::MatRawType_<OutputLabelType>());
-                        lvAssert(aUpdatedOutputs[nOutputArrayIdx].size()==oFrameSize());
+                        lvAssert(aUpdatedOutputs[nOutputArrayIdx].size()==oInfoArray[nOutputArrayIdx].size());
                         const size_t nRealOutputArrayIdx = nOutputArrayIdx/SegmMatcher::OutputPackOffset;
                         if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Disp) {
                             double dMin,dMax;
@@ -664,7 +705,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 lvDbgAssert(aUpdatedOutputs.size()==nExpectedAlgoOutputCount);
                 for(size_t nOutputArrayIdx=0; nOutputArrayIdx<aUpdatedOutputs.size(); ++nOutputArrayIdx) {
                     lvAssert(aUpdatedOutputs[nOutputArrayIdx].type()==lv::MatRawType_<OutputLabelType>());
-                    lvAssert(aUpdatedOutputs[nOutputArrayIdx].size()==oFrameSize());
+                    lvAssert(aUpdatedOutputs[nOutputArrayIdx].size()==oInfoArray[nOutputArrayIdx].size());
                     const size_t nRealOutputArrayIdx = nOutputArrayIdx/SegmMatcher::OutputPackOffset;
                     if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Disp) {
                         double dMin,dMax;
