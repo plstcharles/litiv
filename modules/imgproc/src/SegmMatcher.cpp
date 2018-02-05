@@ -143,7 +143,8 @@ namespace {
 
     using ExplicitFunction = lv::gm::ExplicitViewFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit view function
     using ExplicitAllocFunction = opengm::ExplicitFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit allocated function
-    using FunctionTypeList = opengm::meta::TypeListGenerator<ExplicitFunction,ExplicitAllocFunction>::type;  ///< list of all functions the models can use
+    using ExplicitScaledFunction = lv::gm::ExplicitScaledViewFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit scaled view function
+    using FunctionTypeList = opengm::meta::TypeListGenerator<ExplicitFunction,ExplicitAllocFunction,ExplicitScaledFunction>::type;  ///< list of all functions the models can use
     constexpr size_t s_nEpipolarCliqueOrder = SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN?size_t(3):size_t(0); ///< epipolar clique order (i.e. node count)
     constexpr size_t s_nEpipolarCliqueEdges = SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN?size_t(2):size_t(0); ///< epipolar clique edge count (i.e. connections to main node)
     constexpr size_t s_nEpipolarCliqueStride = SEGMMATCH_HOENERGY_STEREO_STRIDE; ///< epipolar clique stride size (i.e. skipped connections; 1=fully connected)
@@ -154,10 +155,10 @@ namespace {
     constexpr size_t s_nTemporalCliqueStride = SEGMMATCH_HOENERGY_RESEGM_STRIDE; ///< temporal clique stride size (i.e. skipped connections; 1=fully connected)
     static_assert(s_nTemporalCliqueStride>size_t(0),"resegm clique stride must be strictly positive");
     static constexpr size_t getTemporalLayerCount() {return s_nTemporalCliqueDepth+1;} ///< returns the expected temporal layer count
-    using PairwClique = lv::gm::Clique<size_t(2),ValueType,IndexType,InternalLabelType,ExplicitFunction>; ///< pairwise clique implementation wrapper
-    using EpipolarClique = lv::gm::Clique<s_nEpipolarCliqueOrder,ValueType,IndexType,InternalLabelType,ExplicitFunction>; ///< stereo epipolar line clique implementation wrapper
-    using TemporalClique = lv::gm::Clique<s_nTemporalCliqueOrder,ValueType,IndexType,InternalLabelType,ExplicitFunction>; ///< resegm temporal clique implementation wrapper
-    using Clique = lv::gm::IClique<ValueType,IndexType,InternalLabelType,ExplicitFunction>; ///< general-use clique implementation wrapper for all terms
+    using PairwClique = lv::gm::Clique<size_t(2),ValueType,IndexType,InternalLabelType>; ///< pairwise clique implementation wrapper
+    using EpipolarClique = lv::gm::Clique<s_nEpipolarCliqueOrder,ValueType,IndexType,InternalLabelType>; ///< stereo epipolar line clique implementation wrapper
+    using TemporalClique = lv::gm::Clique<s_nTemporalCliqueOrder,ValueType,IndexType,InternalLabelType>; ///< resegm temporal clique implementation wrapper
+    using Clique = lv::gm::IClique<ValueType,IndexType,InternalLabelType>; ///< general-use clique implementation wrapper for all terms
     using StereoSpaceType = opengm::SimpleDiscreteSpace<IndexType,InternalLabelType>; ///< shortcut for discrete stereo space type (simple = all nodes have the same # of labels)
     using ResegmSpaceType = opengm::StaticSimpleDiscreteSpace<2,IndexType,InternalLabelType>; ///< shortcut for discrete resegm space type (binary labels for fg/bg)
     using StereoModelType = opengm::GraphicalModel<ValueType,opengm::Adder,FunctionTypeList,StereoSpaceType>; ///< shortcut for stereo graphical model type
@@ -165,6 +166,7 @@ namespace {
     static_assert(std::is_same<StereoModelType::FunctionIdentifier,ResegmModelType::FunctionIdentifier>::value,"mismatched function identifier for stereo/resegm graphs");
     using FuncIdentifType = StereoModelType::FunctionIdentifier; ///< shortcut for graph model function identifier type (for both stereo and resegm models)
     using FuncPairType = std::pair<FuncIdentifType,ExplicitFunction&>; ///< funcid-funcobj pair used as viewer to explicit data (for both stereo and resegm models)
+    using ScaledFuncPairType = std::pair<FuncIdentifType,ExplicitScaledFunction&>; ///< funcid-funcobj pair used as scaled viewer to explicit data (for stereo pairw factors)
     constexpr size_t s_nMaxOrder = lv::get_next_pow2((uint32_t)std::max(std::max(s_nTemporalCliqueOrder,s_nEpipolarCliqueOrder),size_t(2))); ///< used to limit internal static array sizes
     constexpr size_t s_nPairwOrients = size_t(2); ///< number of pairwise links owned by each node in the graph (2 = 1st order neighb connections)
     static_assert(s_nPairwOrients>size_t(0),"pairwise orientation count must be strictly positive");
@@ -229,10 +231,10 @@ namespace {
         ExplicitFunction* pUnaryFunc;
         /// weights for this node's pairwise costs (mutable for possible updates during inference)
         mutable std::array<float,s_nPairwOrients> afPairwWeights;
-        /// array of pairwise cliques owned by this node as 1st member (evaluates to true only if valid)
-        std::array<PairwClique,s_nPairwOrients> aPairwCliques;
         /// vector of pointers to all (valid) cliques owned by this node as 1st member (all must evaluate to true)
         lv::AutoBuffer<Clique*,4> vpCliques;
+        /// array of pairwise cliques owned by this node as 1st member (evaluates to true only if valid)
+        std::array<PairwClique,s_nPairwOrients> aPairwCliques;
         /// LUT of membership pairs (global clique idx + internal node idx) for all cliques this node belongs to
         lv::AutoBuffer<std::pair<IndexType,IndexType>,4> vCliqueMemberLUT;
     };
@@ -444,7 +446,7 @@ protected:
                          const std::vector<TNode>& vNodeMap,
                          const std::vector<size_t>& vGraphIdxToMapIdxLUT);
     /// setup graph, dual, and cliques for later inference using SoSPD (returns active clique count)
-    template<typename TNode>
+    template<typename TFunc, typename TNode>
     size_t setupPrimalDual(const std::vector<TNode>& vNodeMap,
                            const std::vector<size_t>& vGraphIdxToMapIdxLUT,
                            const cv::Mat_<InternalLabelType>& oLabeling,
@@ -452,7 +454,7 @@ protected:
                            cv::Mat_<ValueType>& oHeightMap,
                            size_t nTotLabels, size_t nMaxCliques);
     /// solves a move operation using the SoSPD algo of Fix et al.; see "A Primal-Dual Algorithm for Higher-Order Multilabel Markov Random Fields" in CVPR2014 for more info
-    template<typename TNode>
+    template<typename TFunc, typename TNode>
     void solvePrimalDual(sospd::SubmodularIBFS<ValueType,IndexType>& oMinimizer,
                          const std::vector<TNode>& vNodeMap,
                          const std::vector<size_t>& vGraphIdxToMapIdxLUT,
@@ -984,7 +986,7 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
         cv::erode(m_aROIs[nCamIdx],m_aDescROIs[nCamIdx],cv::getStructuringElement(cv::MORPH_RECT,oDescWinSize),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>::all(0));
     }
     const size_t nStereoUnaryFuncDataSize = anValidGraphNodes[m_nPrimaryCamIdx]*m_nStereoLabels;
-    const size_t nStereoPairwFuncDataSize = anValidGraphNodes[m_nPrimaryCamIdx]*s_nPairwOrients*(m_nStereoLabels*m_nStereoLabels);
+    const size_t nStereoPairwFuncDataSize = 0u;/*removed 2018/02, now using scaled view arrays*/ //anValidGraphNodes[m_nPrimaryCamIdx]*s_nPairwOrients*(m_nStereoLabels*m_nStereoLabels);
     const size_t nStereoEpipolarFuncDataSize = SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN?(anValidGraphNodes[m_nPrimaryCamIdx]*(int)std::pow((int)m_nStereoLabels,(int)s_nEpipolarCliqueOrder)):size_t(0); // epipolar stride not taken into account here
     const size_t nStereoFuncDataSize = nStereoUnaryFuncDataSize+nStereoPairwFuncDataSize+nStereoEpipolarFuncDataSize;
     CamArray<size_t> anResegmUnaryFuncDataSize={},anResegmPairwFuncDataSize={},anResegmTemporalFuncDataSize={},anResegmFuncDataSize={};
@@ -1124,10 +1126,11 @@ void SegmMatcher::GraphModelData::buildStereoModel() {
     lvDbgExceptionWatch;
     lvLog(2,"\tadding base functions to stereo graph...");
     // reserves on graph created below need to be accurate (or larger than needed), otherwise function vectors will be reallocated, and pointers will be bad
-    const size_t nStereoMaxFactorsPerNode = /*unary*/size_t(1) + /*pairw*/s_nPairwOrients + /*ho*/(SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN?size_t(1):size_t(0)); // epipolar stride not taken into account here
-    m_pStereoModel = std::make_unique<StereoModelType>(StereoSpaceType(m_nValidStereoGraphNodes,(InternalLabelType)m_nStereoLabels),nStereoMaxFactorsPerNode);
-    m_pStereoModel->reserveFunctions<ExplicitFunction>(m_nValidStereoGraphNodes*nStereoMaxFactorsPerNode);
-    m_pStereoModel->reserveFunctions<ExplicitAllocFunction>(size_t(1));
+    const size_t nStereoMaxMultiFactorsPerNode = /*pairw*/s_nPairwOrients + /*ho*/(SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN?size_t(1):size_t(0)); // epipolar stride not taken into account here
+    m_pStereoModel = std::make_unique<StereoModelType>(StereoSpaceType(m_nValidStereoGraphNodes,(InternalLabelType)m_nStereoLabels),nStereoMaxMultiFactorsPerNode+1u);
+    m_pStereoModel->reserveFunctions<ExplicitFunction>(m_nValidStereoGraphNodes); // unary factors only
+    m_pStereoModel->reserveFunctions<ExplicitScaledFunction>(m_nValidStereoGraphNodes*nStereoMaxMultiFactorsPerNode);
+    m_pStereoModel->reserveFunctions<ExplicitAllocFunction>(size_t(1)); // for pairw func base
     const std::vector<size_t> aPairwStereoFuncDims(s_nPairwOrients,m_nStereoLabels);
     m_oStereoPairwFuncID_base = m_pStereoModel->addFunction(ExplicitAllocFunction(aPairwStereoFuncDims.begin(),aPairwStereoFuncDims.end()));
     ExplicitAllocFunction& oStereoBaseFunc = m_pStereoModel->getFunction<ExplicitAllocFunction>(m_oStereoPairwFuncID_base);
@@ -1185,11 +1188,12 @@ void SegmMatcher::GraphModelData::buildStereoModel() {
         const auto lPairwCliqueCreator = [&](size_t nOrientIdx, size_t nOffsetLUTNodeIdx) {
             StereoNodeInfo& oOffsetNode = m_vStereoNodeMap[nOffsetLUTNodeIdx];
             if(oOffsetNode.bValidGraphNode) {
-                FuncPairType oStereoFunc = m_pStereoModel->addFunctionWithRefReturn(ExplicitFunction());
-                oStereoFunc.second.assign(aPairwStereoFuncDims.begin(),aPairwStereoFuncDims.end(),m_pStereoPairwFuncsDataBase+((nGraphNodeIdx*s_nPairwOrients+nOrientIdx)*m_nStereoLabels*m_nStereoLabels));
-                lvDbgAssert(&oStereoFunc.second(0,0)<m_pStereoEpipolarFuncsDataBase);
+                ScaledFuncPairType oStereoFunc = m_pStereoModel->addFunctionWithRefReturn(ExplicitScaledFunction());
+                //oStereoFunc.second.assign(aPairwStereoFuncDims.begin(),aPairwStereoFuncDims.end(),m_pStereoPairwFuncsDataBase+((nGraphNodeIdx*s_nPairwOrients+nOrientIdx)*m_nStereoLabels*m_nStereoLabels));
+                //lvDbgAssert(&oStereoFunc.second(0,0)<m_pStereoEpipolarFuncsDataBase);
+                oStereoFunc.second.assign(aPairwStereoFuncDims.begin(),aPairwStereoFuncDims.end(),&oStereoBaseFunc.operator()(size_t(0)));
                 lvDbgAssert(oStereoFunc.second.strides(0)==1 && oStereoFunc.second.strides(1)==m_nStereoLabels); // expect last-idx-major
-                lvDbgAssert((&m_pStereoModel->getFunction<ExplicitFunction>(oStereoFunc.first))==(&oStereoFunc.second));
+                lvDbgAssert((&m_pStereoModel->getFunction<ExplicitScaledFunction>(oStereoFunc.first))==(&oStereoFunc.second));
                 PairwClique& oPairwClique = oBaseNode.aPairwCliques[nOrientIdx];
                 oPairwClique.m_bValid = true;
                 const std::array<size_t,2> aLUTNodeIndices = {nBaseLUTNodeIdx,nOffsetLUTNodeIdx};
@@ -1310,7 +1314,6 @@ void SegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
         vUnaryStereoLUT(m_nDontCareLabelIdx) = cost_cast(10000); // @@@@ check roi, if dc set to 0, otherwise set to inf
         vUnaryStereoLUT(m_nOccludedLabelIdx) = cost_cast(10000);//SEGMMATCH_IMGSIM_COST_OCCLUDED_CST;
         if(bInit) { // inter-spectral pairwise/epipolar term updates do not change w.r.t. segm or stereo updates
-            ExplicitAllocFunction& vPairwiseStereoBaseFunc = m_pStereoModel->getFunction<ExplicitAllocFunction>(m_oStereoPairwFuncID_base);
             for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
                 PairwClique& oPairwClique = oNode.aPairwCliques[nOrientIdx];
                 if(oPairwClique) {
@@ -1320,17 +1323,14 @@ void SegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
                     lvDbgAssert(oPairwClique.m_anGraphNodeIdxs[0]!=SIZE_MAX && oPairwClique.m_anLUTNodeIdxs[0]!=SIZE_MAX);
                     lvDbgAssert(oPairwClique.m_anGraphNodeIdxs[1]!=SIZE_MAX && oPairwClique.m_anLUTNodeIdxs[1]!=SIZE_MAX);
                     lvDbgAssert(m_vStereoNodeMap[oPairwClique.m_anLUTNodeIdxs[1]].bValidGraphNode && oPairwClique.m_pGraphFunctionPtr);
-                    ExplicitFunction& vPairwiseStereoFunc = *oPairwClique.m_pGraphFunctionPtr;
+                    ExplicitScaledFunction& vPairwiseStereoFunc = *(ExplicitScaledFunction*)oPairwClique.m_pGraphFunctionPtr;
                     lvDbgAssert(vPairwiseStereoFunc.dimension()==2 && vPairwiseStereoFunc.size()==m_nStereoLabels*m_nStereoLabels);
                     const int nLocalGrad = (int)((nOrientIdx==0)?oGradY:(nOrientIdx==1)?oGradX:oGradMag)(nRowIdx,nColIdx);
                     const float fGradScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
-                    lvDbgAssert(fGradScaleFact==(float)std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE));
                     const float fPairwWeight = (float)(fGradScaleFact*SEGMMATCH_LBLSIM_STEREO_SCALE_CST); // should be constant & uncapped for use in fastpd/bcd
-                    oNode.afPairwWeights[nOrientIdx] = fPairwWeight;
                     // all stereo pairw functions are identical, but weighted differently (see base init in constructor)
-                    for(InternalLabelType nLabelIdx1=0; nLabelIdx1<m_nStereoLabels; ++nLabelIdx1)
-                        for(InternalLabelType nLabelIdx2=0; nLabelIdx2<m_nStereoLabels; ++nLabelIdx2)
-                            vPairwiseStereoFunc(nLabelIdx1,nLabelIdx2) = cost_cast(vPairwiseStereoBaseFunc(nLabelIdx1,nLabelIdx2)*fPairwWeight);
+                    oNode.afPairwWeights[nOrientIdx] = fPairwWeight;
+                    vPairwiseStereoFunc.setScale(fPairwWeight);
                 }
             }
             lvAssert(!SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN); // add epipolar terms update here; missing impl
@@ -1488,7 +1488,7 @@ void SegmMatcher::GraphModelData::buildResegmModel() {
     const std::vector<size_t> aPairwResegmFuncDims(s_nPairwOrients,s_nResegmLabels);
     m_pResegmModel = std::make_unique<ResegmModelType>(ResegmSpaceType(m_nValidResegmGraphNodes),nResegmMaxFactorsPerNode);
     m_pResegmModel->reserveFunctions<ExplicitFunction>(m_nValidResegmGraphNodes*nResegmMaxFactorsPerNode);
-    m_pResegmModel->reserveFunctions<ExplicitAllocFunction>(size_t(1));
+    m_pResegmModel->reserveFunctions<ExplicitAllocFunction>(size_t(1)); // for pairw func base
     m_oResegmPairwFuncID_base = m_pResegmModel->addFunction(ExplicitAllocFunction(aPairwResegmFuncDims.begin(),aPairwResegmFuncDims.end()));
     ExplicitAllocFunction& oResegmBaseFunc = m_pResegmModel->getFunction<ExplicitAllocFunction>(m_oResegmPairwFuncID_base);
     lvDbgAssert(oResegmBaseFunc.size()==s_nResegmLabels*s_nResegmLabels);
@@ -1828,14 +1828,12 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
                     lvDbgAssert(oPairwClique.m_anGraphNodeIdxs[0]!=SIZE_MAX && oPairwClique.m_anLUTNodeIdxs[0]!=SIZE_MAX);
                     lvDbgAssert(oPairwClique.m_anGraphNodeIdxs[1]!=SIZE_MAX && oPairwClique.m_anLUTNodeIdxs[1]!=SIZE_MAX);
                     lvDbgAssert(m_vResegmNodeMap[oPairwClique.m_anLUTNodeIdxs[1]].bValidGraphNode && oPairwClique.m_pGraphFunctionPtr);
-                    ExplicitFunction& vPairwResegmLUT = *oPairwClique.m_pGraphFunctionPtr;
+                    ExplicitFunction& vPairwResegmLUT = *(ExplicitFunction*)oPairwClique.m_pGraphFunctionPtr;
                     lvDbgAssert(vPairwResegmLUT.dimension()==2 && vPairwResegmLUT.size()==s_nResegmLabels*s_nResegmLabels);
                     const int nLocalGrad = (int)(((nOrientIdx==0)?aaGradY[nLayerIdx][nCamIdx]:(nOrientIdx==1)?aaGradX[nLayerIdx][nCamIdx]:aaGradMag[nLayerIdx][nCamIdx])(nRowIdx,nColIdx));
                     const int nOffsetGrad = (int)(((nOrientIdx==0)?aaGradY[nLayerIdx][nCamIdx^1]:(nOrientIdx==1)?aaGradX[nLayerIdx][nCamIdx^1]:aaGradMag[nLayerIdx][nCamIdx^1])(nRowIdx,nOffsetColIdx));
                     const float fLocalScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
                     const float fOffsetScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nOffsetGrad);
-                    lvDbgAssert(fLocalScaleFact==(float)std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE));
-                    lvDbgAssert(fOffsetScaleFact==(float)std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nOffsetGrad)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE));
                     const float fScaleFact = std::min(fLocalScaleFact,fOffsetScaleFact/fInterSpectrScale); // simplified, and better w/ more layers
                     //const float fScaleFact = (fLocalScaleFact+fOffsetScaleFact*fInterSpectrScale)/(fInterSpectrScale+1.0f);
                     for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
@@ -1868,11 +1866,10 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
                     lvDbgAssert(oPairwClique.m_anGraphNodeIdxs[0]!=SIZE_MAX && oPairwClique.m_anLUTNodeIdxs[0]!=SIZE_MAX);
                     lvDbgAssert(oPairwClique.m_anGraphNodeIdxs[1]!=SIZE_MAX && oPairwClique.m_anLUTNodeIdxs[1]!=SIZE_MAX);
                     lvDbgAssert(m_vResegmNodeMap[oPairwClique.m_anLUTNodeIdxs[1]].bValidGraphNode && oPairwClique.m_pGraphFunctionPtr);
-                    ExplicitFunction& vPairwResegmLUT = *oPairwClique.m_pGraphFunctionPtr;
+                    ExplicitFunction& vPairwResegmLUT = *(ExplicitFunction*)oPairwClique.m_pGraphFunctionPtr;
                     lvDbgAssert(vPairwResegmLUT.dimension()==2 && vPairwResegmLUT.size()==s_nResegmLabels*s_nResegmLabels);
                     const int nLocalGrad = (int)(((nOrientIdx==0)?aaGradY[nLayerIdx][nCamIdx]:(nOrientIdx==1)?aaGradX[nLayerIdx][nCamIdx]:aaGradMag[nLayerIdx][nCamIdx])(nRowIdx,nColIdx));
                     const float fLocalScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
-                    lvDbgAssert(fLocalScaleFact==(float)std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE));
                     for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
                         for(InternalLabelType nLabelIdx2=0; nLabelIdx2<s_nResegmLabels; ++nLabelIdx2) {
                             vPairwResegmLUT(nLabelIdx1,nLabelIdx2) = cost_cast((nLabelIdx1^nLabelIdx2)*fLocalScaleFact*SEGMMATCH_LBLSIM_RESEGM_SCALE_CST);
@@ -1966,7 +1963,7 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
                         for(size_t nOffsetLayerIdx=0; nOffsetLayerIdx<nTemporalLayerCount; ++nOffsetLayerIdx)
                             m_vResegmNodeMap[vnLUTNodeIdxs[nOffsetLayerIdx]].vCliqueMemberLUT.push_back(std::make_pair(nCurrCliqueIdx,nOffsetLayerIdx));
                     }
-                    ExplicitFunction& vTemporalResegmLUT = *oTemporalClique.m_pGraphFunctionPtr;
+                    ExplicitFunction& vTemporalResegmLUT = *(ExplicitFunction*)oTemporalClique.m_pGraphFunctionPtr;
                     lvDbgAssert(vTemporalResegmLUT.dimension()==oTemporalClique.getSize() && vTemporalResegmLUT.size()==std::pow(s_nResegmLabels,oTemporalClique.getSize()));
                     lvDbgAssert(&vTemporalResegmLUT(0)<m_pResegmFuncsDataEnd && vTemporalResegmLUT.strides(0)==1 && vTemporalResegmLUT.strides(1)==s_nResegmLabels); // expect last-idx-major
                     std::array<InternalLabelType,s_nTemporalCliqueOrder> aCliqueLabels{};
@@ -1984,7 +1981,6 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
                                 const size_t nPreviousMapIdx = vnMapIdxs[nPreviousLayer];
                                 const int nTemporalGradient = int(oPrevToCurrTempDiffMap.data[nPreviousMapIdx]);
                                 const float fTemporalScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nTemporalGradient);
-                                lvDbgAssert(fTemporalScaleFact==(float)std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nTemporalGradient)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE));
                                 fCliqueCoeffs += fTemporalScaleFact;
                                 if(bDisplayDbgMaps) {
                                     const size_t nCurrStackedIdx = nLayerSize*nCurrLayer+vnMapIdxs[nCurrLayer];
@@ -2377,12 +2373,14 @@ void SegmMatcher::GraphModelData::calcShapeDistFeatures(const cv::Mat_<InternalL
     cv::divide(1.0,oFGDist,oFGDist);
     oFGDist -= 1.0f;
     cv::min(oFGDist,SEGMMATCH_SHPDIST_PX_MAX_CST,oFGDist);
+    oFGDist.setTo(SEGMMATCH_SHPDIST_PX_MAX_CST,oFGDist<0.0f);
     cv::Mat& oBGDist = vFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_BGDist];
     cv::distanceTransform(oInputMask>0,oBGDist,cv::DIST_L2,cv::DIST_MASK_PRECISE,CV_32F);
     cv::exp((-1.0f/SEGMMATCH_SHPDIST_PX_MAX_CST)*oBGDist,oBGDist);
     cv::divide(1.0,oBGDist,oBGDist);
     oBGDist -= 1.0f;
     cv::min(oBGDist,SEGMMATCH_SHPDIST_PX_MAX_CST,oBGDist);
+    oBGDist.setTo(SEGMMATCH_SHPDIST_PX_MAX_CST,oBGDist<0.0f);
 }
 
 void SegmMatcher::GraphModelData::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oROI, size_t nCamIdx) {
@@ -2679,7 +2677,7 @@ size_t SegmMatcher::GraphModelData::initMinimizer(sospd::SubmodularIBFS<ValueTyp
     return nCliqueCount;
 }
 
-template<typename TNode>
+template<typename TFunc, typename TNode>
 size_t SegmMatcher::GraphModelData::setupPrimalDual(const std::vector<TNode>& vNodeMap,
                                                     const std::vector<size_t>& vGraphIdxToMapIdxLUT,
                                                     const cv::Mat_<InternalLabelType>& oLabeling,
@@ -2711,9 +2709,9 @@ size_t SegmMatcher::GraphModelData::setupPrimalDual(const std::vector<TNode>& vN
                 lvDbgAssert(nOffsetLUTNodeIdx!=SIZE_MAX && nOffsetLUTNodeIdx<oLabeling.total());
                 aLabelingBuffer[nDimIdx] = ((InternalLabelType*)oLabeling.data)[nOffsetLUTNodeIdx];
             }
-            const ExplicitFunction* pvEnergyLUT = oClique.getFunctionPtr();
+            const TFunc* pvEnergyLUT = (TFunc*)oClique.getFunctionPtr();
             lvDbgAssert(pvEnergyLUT);
-            const ExplicitFunction& vEnergyLUT = *pvEnergyLUT;
+            const TFunc& vEnergyLUT = *pvEnergyLUT;
             const ValueType tCurrCost = vEnergyLUT(aLabelingBuffer.data());
             lvDbgAssert(tCurrCost>=cost_cast(0));
             lvDbgAssert(nCliqueCount<nMaxCliques);
@@ -2737,7 +2735,7 @@ size_t SegmMatcher::GraphModelData::setupPrimalDual(const std::vector<TNode>& vN
     return nCliqueCount;
 }
 
-template<typename TNode>
+template<typename TFunc, typename TNode>
 void SegmMatcher::GraphModelData::solvePrimalDual(sospd::SubmodularIBFS<ValueType,IndexType>& oMinimizer,
                                                   const std::vector<TNode>& vNodeMap,
                                                   const std::vector<size_t>& vGraphIdxToMapIdxLUT,
@@ -2786,7 +2784,7 @@ void SegmMatcher::GraphModelData::solvePrimalDual(sospd::SubmodularIBFS<ValueTyp
                 current_lambda[i] = pLambdas[i*nTotLabels+current_labels[i]];
                 fusion_lambda[i] = pLambdas[i*nTotLabels+fusion_labels[i]];
             }
-            const ExplicitFunction& vCliqueLUT = *oClique.getFunctionPtr();
+            const TFunc& vCliqueLUT = *(TFunc*)oClique.getFunctionPtr();
             // compute costs of all fusion assignments
             sospd::Assgn last_gray = 0;
             for(size_t i_idx = 0; i_idx < nCliqueSize; ++i_idx)
@@ -2887,7 +2885,7 @@ void SegmMatcher::GraphModelData::solvePrimalDual(sospd::SubmodularIBFS<ValueTyp
                 label_buf[nDimIdx] = ((InternalLabelType*)oLabeling.data)[vGraphIdxToMapIdxLUT[oMinimizer_c.Nodes()[nDimIdx]]];
                 lambdaSum += oDualMap((int)nCliqueIdx,int(nDimIdx*nTotLabels+label_buf[nDimIdx]));
             }
-            const ExplicitFunction& vCliqueLUT = *oClique.getFunctionPtr();
+            const TFunc& vCliqueLUT = *(TFunc*)oClique.getFunctionPtr();
             const ValueType energy = vCliqueLUT(label_buf.data());
             const ValueType correction = energy - lambdaSum;
             lvDbgAssert__(correction<=0,"bad clique in post edit dual; id=%d, corr=%d, energy=%d, lambdasum=%d",(int)nCliqueIdx,(int)correction,(int)energy,(int)lambdaSum);
@@ -2982,7 +2980,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
     sospd::SubmodularIBFS<ValueType,IndexType> oStereoMinimizer;
     const size_t nInternalStereoCliqueCount = initMinimizer(oStereoMinimizer,m_vStereoNodeMap,m_vStereoGraphIdxToMapIdxLUT);
     lvAssert(nInternalStereoCliqueCount==m_nStereoCliqueCount);
-    const size_t nSetupStereoCliqueCount = setupPrimalDual(m_vStereoNodeMap,m_vStereoGraphIdxToMapIdxLUT,oCurrStereoLabeling,m_oStereoDualMap,m_oStereoHeightMap,m_nStereoLabels,m_nStereoCliqueCount);
+    const size_t nSetupStereoCliqueCount = setupPrimalDual<ExplicitScaledFunction>(m_vStereoNodeMap,m_vStereoGraphIdxToMapIdxLUT,oCurrStereoLabeling,m_oStereoDualMap,m_oStereoHeightMap,m_nStereoLabels,m_nStereoCliqueCount);
     lvAssert(nSetupStereoCliqueCount==m_nStereoCliqueCount);
 #endif //SEGMMATCH_CONFIG_USE_..._STEREO_INF
 #if SEGMMATCH_CONFIG_USE_FGBZ_RESEGM_INF
@@ -3049,9 +3047,9 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                 oStereoReducer.AddUnaryTerm((int)nGraphNodeIdx,tUnaryCost);
             }
             for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx)
-                lv::gm::factorReducer(oNode.aPairwCliques[nOrientIdx],oStereoReducer,nStereoAlphaLabel,(InternalLabelType*)oCurrStereoLabeling.data);
+                lv::gm::factorReducer<ExplicitScaledFunction>(oNode.aPairwCliques[nOrientIdx],oStereoReducer,nStereoAlphaLabel,(InternalLabelType*)oCurrStereoLabeling.data);
         #if SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN
-            lv::gm::factorReducer(oNode.oEpipolarClique,oStereoReducer,nStereoAlphaLabel,(InternalLabelType*)oCurrStereoLabeling.data);
+            lv::gm::factorReducer<ExplicitScaledFunction>(oNode.oEpipolarClique,oStereoReducer,nStereoAlphaLabel,(InternalLabelType*)oCurrStereoLabeling.data);
         #endif //SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN
         }
         oStereoMinimizer.Reset();
@@ -3086,16 +3084,16 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
         });
         TemporalArray<CamArray<size_t>> aanChangedStereoLabels{};
         if(bStereoMoveCanFlipLabels)
-            solvePrimalDual(oStereoMinimizer,
-                            m_vStereoNodeMap,
-                            m_vStereoGraphIdxToMapIdxLUT,
-                            m_oStereoUnaryCosts,
-                            oCurrStereoLabeling,
-                            m_oStereoDualMap,
-                            m_oStereoHeightMap,
-                            nStereoAlphaLabel,
-                            m_nStereoLabels,true,
-                            aanChangedStereoLabels);
+            solvePrimalDual<ExplicitScaledFunction>(oStereoMinimizer,
+                                                    m_vStereoNodeMap,
+                                                    m_vStereoGraphIdxToMapIdxLUT,
+                                                    m_oStereoUnaryCosts,
+                                                    oCurrStereoLabeling,
+                                                    m_oStereoDualMap,
+                                                    m_oStereoHeightMap,
+                                                    nStereoAlphaLabel,
+                                                    m_nStereoLabels,true,
+                                                    aanChangedStereoLabels);
         const bool bGotStereoLabelChange = aanChangedStereoLabels[0][m_nPrimaryCamIdx]>0;
         ++nStereoLabelOrderingIdx %= m_vStereoLabelOrdering.size();
         nConsecUnchangedStereoLabels = bGotStereoLabelChange?0:nConsecUnchangedStereoLabels+1;
@@ -3180,9 +3178,9 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                         oResegmReducer.AddUnaryTerm((int)nGraphNodeIdx,tUnaryCost);
                     }
                     for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx)
-                        lv::gm::factorReducer(oNode.aPairwCliques[nOrientIdx],oResegmReducer,nResegmAlphaLabel,(InternalLabelType*)m_oSuperStackedResegmLabeling.data);
+                        lv::gm::factorReducer<ExplicitFunction>(oNode.aPairwCliques[nOrientIdx],oResegmReducer,nResegmAlphaLabel,(InternalLabelType*)m_oSuperStackedResegmLabeling.data);
                 #if SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
-                    lv::gm::factorReducer(oNode.oTemporalClique,oResegmReducer,nResegmAlphaLabel,(InternalLabelType*)m_oSuperStackedResegmLabeling.data);
+                    lv::gm::factorReducer<ExplicitFunction>(oNode.oTemporalClique,oResegmReducer,nResegmAlphaLabel,(InternalLabelType*)m_oSuperStackedResegmLabeling.data);
                 #endif //SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
                 }
                 oResegmMinimizer.Reset();
@@ -3205,7 +3203,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                         nInternalResegmCliqueCount = initMinimizer(oResegmMinimizer,m_vResegmNodeMap,m_vResegmGraphIdxToMapIdxLUT);
                         lvDbgAssert(nInternalResegmCliqueCount<=m_nResegmCliqueCount);
                     }
-                    const size_t nSetupResegmCliqueCount = setupPrimalDual(m_vResegmNodeMap,m_vResegmGraphIdxToMapIdxLUT,m_oSuperStackedResegmLabeling,m_oResegmDualMap,m_oResegmHeightMap,s_nResegmLabels,m_nResegmCliqueCount);
+                    const size_t nSetupResegmCliqueCount = setupPrimalDual<ExplicitFunction>(m_vResegmNodeMap,m_vResegmGraphIdxToMapIdxLUT,m_oSuperStackedResegmLabeling,m_oResegmDualMap,m_oResegmHeightMap,s_nResegmLabels,m_nResegmCliqueCount);
                     lvAssert(nSetupResegmCliqueCount==nInternalResegmCliqueCount && nSetupResegmCliqueCount<=m_nResegmCliqueCount);
                 }
                 calcResegmMoveCosts(nResegmAlphaLabel);
@@ -3219,16 +3217,16 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                 //cv::imshow("costtest",costtest);
                 //cv::waitKey(1);
                 if(bResegmMoveCanFlipLabels)
-                    solvePrimalDual(oResegmMinimizer,
-                                    m_vResegmNodeMap,
-                                    m_vResegmGraphIdxToMapIdxLUT,
-                                    m_oResegmUnaryCosts,
-                                    m_oSuperStackedResegmLabeling,
-                                    m_oResegmDualMap,
-                                    m_oResegmHeightMap,
-                                    nResegmAlphaLabel,
-                                    s_nResegmLabels,false,
-                                    aanChangedResegmLabels);
+                    solvePrimalDual<ExplicitFunction>(oResegmMinimizer,
+                                                      m_vResegmNodeMap,
+                                                      m_vResegmGraphIdxToMapIdxLUT,
+                                                      m_oResegmUnaryCosts,
+                                                      m_oSuperStackedResegmLabeling,
+                                                      m_oResegmDualMap,
+                                                      m_oResegmHeightMap,
+                                                      nResegmAlphaLabel,
+                                                      s_nResegmLabels,false,
+                                                      aanChangedResegmLabels);
             #endif //SEGMMATCH_CONFIG_USE_..._RESEGM_INF
                 const ValueType tCurrResegmEnergy = m_pResegmInf->value();
                 lvDbgAssert(tCurrResegmEnergy>=cost_cast(0));
