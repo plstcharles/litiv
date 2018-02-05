@@ -27,10 +27,8 @@
 #define DATASETS_LITIV2018_DATA_VERSION 4
 #define DATASETS_START_IDX 0
 #define DATASETS_SCAN_ONLY 0
-#if GEN_SEGMENTATION_ANNOT
-#define DATASETS_FLIP_GT_MASKS 1
-#define DATSETS_USE_RAW_MASKS 0
-#endif //GEN_SEGMENTATION_ANNOT
+#define DATASETS_FLIP_MASKS 1
+#define DATASETS_USE_RAW_MASKS 0
 
 #if (GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)>1
 #error "must select one type of annotation to generate"
@@ -67,13 +65,13 @@ int main(int, char**) {
                 true, //bool bUndistort
                 true, //bool bHorizRectify
             #elif GEN_SEGMENTATION_ANNOT
-            #if DATSETS_USE_RAW_MASKS
+            #if DATASETS_USE_RAW_MASKS
                 true, //bool bUndistort
                 true, //bool bHorizRectify
-            #else //!DATSETS_USE_RAW_MASKS
+            #else //!DATASETS_USE_RAW_MASKS
                 false, //bool bUndistort
                 false, //bool bHorizRectify
-            #endif //!DATSETS_USE_RAW_MASKS
+            #endif //!DATASETS_USE_RAW_MASKS
             #endif //GEN_SEGMENTATION_ANNOT
                 false, //bool bEvalDisparities
                 false, //bool bFlipDisparities
@@ -149,7 +147,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         oDepthData["min_reliable_dist"] >> nMinDepthVal;
         oDepthData["max_reliable_dist"] >> nMaxDepthVal;
         lvAssert(nMinDepthVal>=0 && nMaxDepthVal>nMinDepthVal);
-        const std::string sGTName = (GEN_REGISTRATION_ANNOT?"gt_disp":(DATSETS_USE_RAW_MASKS?"masks":"gt_masks"));
+        const std::string sGTName = (GEN_REGISTRATION_ANNOT?"gt_disp":(DATASETS_USE_RAW_MASKS?"masks":"gt_masks"));
         const std::string sRGBGTDir = oBatch.getDataPath()+"rgb_"+sGTName+"/";
         const std::string sLWIRGTDir = oBatch.getDataPath()+"lwir_"+sGTName+"/";
         lv::createDirIfNotExist(sRGBGTDir);
@@ -477,10 +475,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     aSegmMasks[a].create(vOrigSizes[a],CV_8UC1);
                     aSegmMasks[a] = 0u;
                 }
-            #if DATASETS_FLIP_GT_MASKS
+            #if DATASETS_FLIP_MASKS
                 else
                     cv::flip(aSegmMasks[a],aSegmMasks[a],1);
-            #endif //DATASETS_FLIP_GT_MASKS
+            #endif //DATASETS_FLIP_MASKS
                 lvAssert(lv::MatInfo(aSegmMasks[a])==lv::MatInfo(vOrigSizes[a],CV_8UC1));
                 aTempSegmMasks[a].create(vOrigSizes[a],CV_8UC1);
                 aTempSegmMasks[a] = 0u;
@@ -585,10 +583,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         #if GEN_SEGMENTATION_ANNOT
             const bool bCurrFrameValid = (cv::countNonZero(aSegmMasks[0])!=0 || cv::countNonZero(aSegmMasks[1])!=0);
             if(bCurrFrameValid) {
-            #if DATASETS_FLIP_GT_MASKS
+            #if DATASETS_FLIP_MASKS
                 cv::flip(aSegmMasks[0],aSegmMasks[0],1);
                 cv::flip(aSegmMasks[1],aSegmMasks[1],1);
-            #endif //DATASETS_FLIP_GT_MASKS
+            #endif //DATASETS_FLIP_MASKS
                 if(cv::countNonZero(aSegmMasks[0])!=0)
                     cv::imwrite(sRGBGTDir+lv::putf("%05d.png",(int)nCurrIdx),aSegmMasks[0]);
                 if(cv::countNonZero(aSegmMasks[1])!=0)
