@@ -26,6 +26,11 @@
 #define DATASETS_LITIV2018_CALIB_VERSION 4
 #define DATASETS_LITIV2018_DATA_VERSION 4
 #define DATASETS_START_IDX 0
+#define DATASETS_SCAN_ONLY 0
+#if GEN_SEGMENTATION_ANNOT
+#define DATASETS_FLIP_GT_MASKS 1
+#define DATSETS_USE_RAW_MASKS 0
+#endif //GEN_SEGMENTATION_ANNOT
 
 #if (GEN_SEGMENTATION_ANNOT+GEN_REGISTRATION_ANNOT)>1
 #error "must select one type of annotation to generate"
@@ -58,8 +63,18 @@ int main(int, char**) {
                 false, //bool bSaveOutput
                 false, //bool bUseEvaluator
                 false, //bool bLoadDepth
-                (GEN_REGISTRATION_ANNOT==1), //bool bUndistort
-                (GEN_REGISTRATION_ANNOT==1), //bool bHorizRectify
+            #if GEN_REGISTRATION_ANNOT
+                true, //bool bUndistort
+                true, //bool bHorizRectify
+            #elif GEN_SEGMENTATION_ANNOT
+            #if DATSETS_USE_RAW_MASKS
+                true, //bool bUndistort
+                true, //bool bHorizRectify
+            #else //!DATSETS_USE_RAW_MASKS
+                false, //bool bUndistort
+                false, //bool bHorizRectify
+            #endif //!DATSETS_USE_RAW_MASKS
+            #endif //GEN_SEGMENTATION_ANNOT
                 false, //bool bEvalDisparities
                 false, //bool bFlipDisparities
                 false, //bool bLoadFrameSubset
@@ -134,7 +149,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         oDepthData["min_reliable_dist"] >> nMinDepthVal;
         oDepthData["max_reliable_dist"] >> nMaxDepthVal;
         lvAssert(nMinDepthVal>=0 && nMaxDepthVal>nMinDepthVal);
-        const std::string sGTName = (GEN_REGISTRATION_ANNOT?"gt_disp":"gt_masks");
+        const std::string sGTName = (GEN_REGISTRATION_ANNOT?"gt_disp":(DATSETS_USE_RAW_MASKS?"masks":"gt_masks"));
         const std::string sRGBGTDir = oBatch.getDataPath()+"rgb_"+sGTName+"/";
         const std::string sLWIRGTDir = oBatch.getDataPath()+"lwir_"+sGTName+"/";
         lv::createDirIfNotExist(sRGBGTDir);
@@ -427,25 +442,29 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             }
         #if GEN_SEGMENTATION_ANNOT
             {
-                cv::Mat oBodyIdxFrame_raw = lv::read(oBatch.getDataPath()+"/bodyidx/"+sPacketName+".bin",bTooOldForLZ4?lv::MatArchive_BINARY:lv::MatArchive_BINARY_LZ4);
-                lvAssert(!oBodyIdxFrame_raw.empty() && oBodyIdxFrame_raw.size()==cv::Size(512,424) && oBodyIdxFrame_raw.type()==CV_8UC1);
-                const cv::Mat oCoordMapFrame_c2d = lv::read(sC2DMappingDir+sPacketName+".bin",lv::MatArchive_BINARY_LZ4);
-                if(!oCoordMapFrame_c2d.empty()) {
-                    lvAssert(oCoordMapFrame_c2d.size()==oRGBFrame.size() && oCoordMapFrame_c2d.type()==CV_32FC2);
-                    oBodyIdxFrame.create(oRGBFrame.size(),CV_8UC1);
-                    oBodyIdxFrame = 255u; // 'dont care'
-                    for(size_t nPxIter=0u; nPxIter<oRGBFrame.total(); ++nPxIter) {
-                        const cv::Vec2f vRealPt = ((cv::Vec2f*)oCoordMapFrame_c2d.data)[nPxIter];
-                        if(vRealPt[0]>=0 && vRealPt[0]<oBodyIdxFrame_raw.cols && vRealPt[1]>=0 && vRealPt[1]<oBodyIdxFrame_raw.rows) {
-                            ((uchar*)oBodyIdxFrame.data)[nPxIter] = oBodyIdxFrame_raw.at<uchar>((int)std::round(vRealPt[1]),(int)std::round(vRealPt[0]));
+                oBodyIdxFrame = cv::Mat();
+                const std::string sBodyIdxPacket = oBatch.getDataPath()+"/bodyidx/"+sPacketName+".bin";
+                if(lv::checkIfExists(sBodyIdxPacket)) {
+                    cv::Mat oBodyIdxFrame_raw = lv::read(sBodyIdxPacket,bTooOldForLZ4?lv::MatArchive_BINARY:lv::MatArchive_BINARY_LZ4);
+                    lvAssert(!oBodyIdxFrame_raw.empty() && oBodyIdxFrame_raw.size()==cv::Size(512,424) && oBodyIdxFrame_raw.type()==CV_8UC1);
+                    const cv::Mat oCoordMapFrame_c2d = lv::read(sC2DMappingDir+sPacketName+".bin",lv::MatArchive_BINARY_LZ4);
+                    if(!oCoordMapFrame_c2d.empty()) {
+                        lvAssert(oCoordMapFrame_c2d.size()==oRGBFrame.size() && oCoordMapFrame_c2d.type()==CV_32FC2);
+                        oBodyIdxFrame.create(oRGBFrame.size(),CV_8UC1);
+                        oBodyIdxFrame = 255u; // 'dont care'
+                        for(size_t nPxIter=0u; nPxIter<oRGBFrame.total(); ++nPxIter) {
+                            const cv::Vec2f vRealPt = ((cv::Vec2f*)oCoordMapFrame_c2d.data)[nPxIter];
+                            if(vRealPt[0]>=0 && vRealPt[0]<oBodyIdxFrame_raw.cols && vRealPt[1]>=0 && vRealPt[1]<oBodyIdxFrame_raw.rows) {
+                                ((uchar*)oBodyIdxFrame.data)[nPxIter] = oBodyIdxFrame_raw.at<uchar>((int)std::round(vRealPt[1]),(int)std::round(vRealPt[0]));
+                            }
                         }
+                        //cv::flip(oBodyIdxFrame,oBodyIdxFrame,1);
+                        //cv::Mat oBodyIdxFrameDisplay;
+                        //oBodyIdxFrameDisplay = (oBodyIdxFrame<(BODY_COUNT));
+                        //cv::resize(oBodyIdxFrameDisplay,oBodyIdxFrameDisplay,cv::Size(),0.5,0.5);
+                        //cv::imshow("oBodyIdxFrameDisplay",oBodyIdxFrameDisplay);
+                        //cv::waitKey(1);
                     }
-                    cv::flip(oBodyIdxFrame,oBodyIdxFrame,1);
-                    //cv::Mat oBodyIdxFrameDisplay;
-                    //oBodyIdxFrameDisplay = (oBodyIdxFrame<(BODY_COUNT));
-                    //cv::resize(oBodyIdxFrameDisplay,oBodyIdxFrameDisplay,cv::Size(),0.5,0.5);
-                    //cv::imshow("oBodyIdxFrameDisplay",oBodyIdxFrameDisplay);
-                    //cv::waitKey(1);
                 }
             }
             for(size_t a=0u; a<2u; ++a) {
@@ -458,6 +477,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     aSegmMasks[a].create(vOrigSizes[a],CV_8UC1);
                     aSegmMasks[a] = 0u;
                 }
+            #if DATASETS_FLIP_GT_MASKS
+                else
+                    cv::flip(aSegmMasks[a],aSegmMasks[a],1);
+            #endif //DATASETS_FLIP_GT_MASKS
                 lvAssert(lv::MatInfo(aSegmMasks[a])==lv::MatInfo(vOrigSizes[a],CV_8UC1));
                 aTempSegmMasks[a].create(vOrigSizes[a],CV_8UC1);
                 aTempSegmMasks[a] = 0u;
@@ -553,11 +576,19 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     nKeyPressed = 13;
                     break;
                 }*/
+            #if DATASETS_SCAN_ONLY
+                nKeyPressed = 13;
+                break;
+            #endif //DATASETS_SCAN_ONLY
             #endif //GEN_SEGMENTATION_ANNOT
             }
         #if GEN_SEGMENTATION_ANNOT
             const bool bCurrFrameValid = (cv::countNonZero(aSegmMasks[0])!=0 || cv::countNonZero(aSegmMasks[1])!=0);
             if(bCurrFrameValid) {
+            #if DATASETS_FLIP_GT_MASKS
+                cv::flip(aSegmMasks[0],aSegmMasks[0],1);
+                cv::flip(aSegmMasks[1],aSegmMasks[1],1);
+            #endif //DATASETS_FLIP_GT_MASKS
                 if(cv::countNonZero(aSegmMasks[0])!=0)
                     cv::imwrite(sRGBGTDir+lv::putf("%05d.png",(int)nCurrIdx),aSegmMasks[0]);
                 if(cv::countNonZero(aSegmMasks[1])!=0)
@@ -601,6 +632,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 --nCurrIdx;
             else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u))
                 ++nCurrIdx;
+        #if DATASETS_SCAN_ONLY
+            else if(nCurrIdx==(nTotPacketCount-1u))
+                break;
+        #endif //DATASETS_SCAN_ONLY
         #else //!(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
             ++nCurrIdx;
         #endif //!(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
