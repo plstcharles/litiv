@@ -39,6 +39,9 @@
 #ifndef DATASETS_LITIV2018_FLIP_RGB
 #define DATASETS_LITIV2018_FLIP_RGB 1
 #endif //ndef(DATASETS_LITIV2018_FLIP_RGB)
+#ifndef DATASETS_LITIV2018_REMAP_MASKS
+#define DATASETS_LITIV2018_REMAP_MASKS 0
+#endif //DATASETS_LITIV2018_REMAP_MASKS
 
 namespace lv {
 
@@ -876,7 +879,6 @@ namespace lv {
             const std::string& sC2DMapPath = this->m_vsC2DMapPaths[nPacketIdx];
             lvDbgAssert(!this->m_bLoadDepth || !sC2DMapPath.empty());
             const std::vector<lv::MatInfo>& vOrigInputInfos = this->m_vOrigInputInfos;
-            lvIgnore(vOrigInputInfos);
             lvDbgAssert(!vOrigInputInfos.empty() && vOrigInputInfos.size()==getInputStreamCount());
             const std::vector<lv::MatInfo>& vInputInfos = this->m_vInputInfos;
             lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
@@ -900,13 +902,14 @@ namespace lv {
             vInputs[nInputRGBStreamIdx] = oRGBPacket;
             if(bUseInterlacedMasks) {
                 cv::Mat oRGBMaskPacket = cv::imread(vsInputPaths[nInputRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
-                lvAssert(!oRGBMaskPacket.empty() && oRGBMaskPacket.type()==CV_8UC1 && oRGBMaskPacket.size()==oRGBSize);
-                lvDbgAssert(oRGBMaskPacket.size()==vOrigInputInfos[nInputRGBStreamIdx].size());
+                lvAssert(!oRGBMaskPacket.empty() && oRGBMaskPacket.type()==CV_8UC1 && oRGBMaskPacket.size()==vOrigInputInfos[nInputRGBStreamIdx].size());
+            #if DATASETS_LITIV2018_REMAP_MASKS
                 if(this->m_bUndistort || this->m_bHorizRectify) {
                     if(this->m_bHorizRectify && oRGBMaskPacket.size()!=oRectifSize)
                         cv::resize(oRGBMaskPacket,oRGBMaskPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                     cv::remap(oRGBMaskPacket.clone(),oRGBMaskPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
                 }
+            #endif //DATASETS_LITIV2018_REMAP_MASKS
                 if(oRGBMaskPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
                     cv::resize(oRGBMaskPacket,oRGBMaskPacket,vInputInfos[nInputRGBStreamIdx].size(),cv::INTER_LINEAR);
                 oRGBMaskPacket = oRGBMaskPacket>128;
@@ -930,8 +933,8 @@ namespace lv {
             vInputs[nInputLWIRStreamIdx] = oLWIRPacket;
             if(bUseInterlacedMasks) {
                 cv::Mat oLWIRMaskPacket = cv::imread(vsInputPaths[nInputLWIRMaskStreamIdx],cv::IMREAD_GRAYSCALE);
-                lvAssert(!oLWIRMaskPacket.empty() && oLWIRMaskPacket.type()==CV_8UC1 && oLWIRMaskPacket.size()==oLWIRSize);
-                lvDbgAssert(oLWIRMaskPacket.size()==vOrigInputInfos[nInputLWIRStreamIdx].size());
+                lvAssert(!oLWIRMaskPacket.empty() && oLWIRMaskPacket.type()==CV_8UC1 && oLWIRMaskPacket.size()==vOrigInputInfos[nInputLWIRStreamIdx].size());
+            #if DATASETS_LITIV2018_REMAP_MASKS
                 if(this->m_bUndistort || this->m_bHorizRectify) {
                     if(this->m_bHorizRectify && oLWIRMaskPacket.size()!=oRectifSize)
                         cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,oRectifSize,0,0,cv::INTER_LINEAR);
@@ -939,6 +942,7 @@ namespace lv {
                     if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                         lv::shift(oLWIRMaskPacket.clone(),oLWIRMaskPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
                 }
+            #endif //DATASETS_LITIV2018_REMAP_MASKS
                 if(oLWIRMaskPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
                     cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,vInputInfos[nInputLWIRStreamIdx].size(),cv::INTER_LINEAR);
                 oLWIRMaskPacket = oLWIRMaskPacket>128;
@@ -980,8 +984,8 @@ namespace lv {
                 vInputs[nInputDepthStreamIdx] = oDepthPacket;
                 if(bUseInterlacedMasks) {
                     cv::Mat oDepthMaskPacket,oDepthMaskPacket_raw = cv::imread(vsInputPaths[nInputDepthMaskStreamIdx],cv::IMREAD_GRAYSCALE);
-                    lvAssert(!oDepthMaskPacket_raw.empty() && oDepthMaskPacket_raw.type()==CV_8UC1 && oDepthMaskPacket_raw.size()==oDepthSize);
-                    lvDbgAssert(oDepthMaskPacket_raw.size()==vOrigInputInfos[nInputDepthStreamIdx].size());
+                    lvAssert(!oDepthMaskPacket_raw.empty() && oDepthMaskPacket_raw.type()==CV_8UC1 && oDepthMaskPacket_raw.size()==vOrigInputInfos[nInputDepthStreamIdx].size());
+                #if DATASETS_LITIV2018_REMAP_MASKS
                     oDepthMaskPacket.create(oRGBSize,CV_8UC1);
                     oDepthMaskPacket = 0u; // 'background' default value
                     for(size_t nPxIter=0u; nPxIter<(size_t)oRGBSize.area(); ++nPxIter) {
@@ -996,6 +1000,9 @@ namespace lv {
                             cv::resize(oDepthMaskPacket,oDepthMaskPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                         cv::remap(oDepthMaskPacket.clone(),oDepthMaskPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
                     }
+                #else //!DATASETS_LITIV2018_REMAP_MASKS
+                    oDepthMaskPacket = oDepthMaskPacket_raw;
+                #endif //!DATASETS_LITIV2018_REMAP_MASKS
                     if(oDepthMaskPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
                         cv::resize(oDepthMaskPacket,oDepthMaskPacket,vInputInfos[nInputDepthStreamIdx].size(),cv::INTER_LINEAR);
                     oDepthMaskPacket = oDepthMaskPacket>128;
