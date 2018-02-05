@@ -33,7 +33,7 @@ namespace impl {
                                             const cudaTextureObject_t pDescLUMask_tex, int nMaskSize,
                                             cv::cuda::PtrStepSzf oDescs, bool bGenDescMap,
                                             bool bNonZeroInitBins, bool bNormalizeBins) {
-        assert(oContourPts.cols==1);
+        assert((oContourPts.cols==0 && oContourPts.rows==0) || oContourPts.cols==1);
         assert((nMaskSize%2)==1);
         assert((blockDim.x%warpSize)==0 && blockDim.y==1 && blockDim.z==1);
         const int nDescSize = oDescs.cols;
