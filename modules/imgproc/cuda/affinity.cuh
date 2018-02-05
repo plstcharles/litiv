@@ -19,7 +19,7 @@
 
 #include "litiv/utils/cuda.hpp"
 
-#define AFF_MAP_DISP_RANGE_MAX 128
+#define AFF_MAP_DISP_RANGE_MAX UCHAR_MAX-1 // 8-bit masks w 0xFF reserved for 'dont care'
 
 namespace device {
 
