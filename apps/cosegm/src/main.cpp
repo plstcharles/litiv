@@ -98,7 +98,7 @@
     bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
     false,                                        /* bool bLoadDepth=true */\
     PROCESS_PREPROC?false:true,                   /* bool bUndistort=true */\
-    PROCESS_PREPROC?false:true,                   /* bool bHorizRectify=false */\
+    PROCESS_PREPROC?false:true,                   /* bool bHorizRectify=true */\
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=false */\
     false,                                        /* bool bFlipDisparities=false*/\
     PROCESS_PREPROC_BGSEGM?false:DATASET_EVAL_INPUT_SUBSET,/* bool bLoadFrameSubset=false */\

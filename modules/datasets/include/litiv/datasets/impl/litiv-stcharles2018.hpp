@@ -96,7 +96,7 @@ namespace lv {
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
                 bool bLoadDepth=true, ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
                 bool bUndistort=true, ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
-                bool bHorizRectify=false, ///< defines whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
+                bool bHorizRectify=true, ///< defines whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
                 bool bEvalDisparities=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparities
                 bool bFlipDisparities=false, ///< defines whether frames should be flipped to use inverted disparities (from rgb to thermal) or not
                 bool bLoadFrameSubset=false, ///< defines whether only a subset of the dataset's frames will be loaded or not
@@ -419,7 +419,7 @@ namespace lv {
                 lvAssert(!this->m_bLoadDepth || vsDepthMaskPaths.empty() || extractPathIndex(vsDepthMaskPaths.back())<nTotInputPackets);
                 lvAssert(!this->m_bLoadDepth || vsDepthGTPaths.empty() || extractPathIndex(vsDepthGTPaths.back())<nTotInputPackets);
                 if(bLoadFrameSubset || bEvalOnlyFrameSubset) {
-                    const std::string sSubsetFilePath = this->getDataPath()+"subset.txt";
+                    const std::string sSubsetFilePath = this->getDataPath()+lv::putf("subset-v%02d.txt",(int)DATASETS_LITIV2018_DATA_VERSION);
                     std::ifstream oSubsetFile(sSubsetFilePath);
                     lvAssert__(oSubsetFile.is_open(),"could not open frame subset file at '%s'",sSubsetFilePath.c_str());
                     std::string sLineBuffer;
@@ -464,6 +464,7 @@ namespace lv {
             }
             const size_t nInputPackets = this->m_mSubset.size();
             const auto lSubsetCleaner = [&](std::vector<std::string>& vsPaths, const std::set<size_t>& mSubset, bool bMustIncludeAll=true) {
+                lvDbgExceptionWatch;
                 lvAssert(!mSubset.empty());
                 std::vector<std::string> vsKeptPaths;
                 if(bMustIncludeAll) {
@@ -476,12 +477,14 @@ namespace lv {
                 }
                 else {
                     for(size_t nIdx : mSubset) {
+                        std::string sFoundPath;
                         for(const auto& sPath : vsPaths) {
                             if(sPath.find(lv::putf("%05d",(int)nIdx))!=std::string::npos) {
-                                lvAssert(extractPathIndex(vsPaths[nIdx])==nIdx);
-                                vsKeptPaths.push_back(vsPaths[nIdx]);
+                                sFoundPath = sPath;
+                                break;
                             }
                         }
+                        vsKeptPaths.push_back(sFoundPath);
                     }
                 }
                 vsPaths = vsKeptPaths;
@@ -719,6 +722,7 @@ namespace lv {
                     lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected depth mask packet size",this->getName().c_str());
             }
             if(bLoadFrameSubset) {
+                lvDbgExceptionWatch;
                 lSubsetCleaner(vsRGBFramePaths,this->m_mSubset);
                 lSubsetCleaner(vsLWIRFramePaths,this->m_mSubset);
                 if(this->m_bLoadDepth) {
@@ -726,6 +730,7 @@ namespace lv {
                     lSubsetCleaner(vsC2DMapPaths,this->m_mSubset);
                 }
                 if(bUseInterlacedMasks) {
+                    lvDbgExceptionWatch;
                     lSubsetCleaner(vsRGBMaskPaths,this->m_mSubset);
                     lSubsetCleaner(vsLWIRMaskPaths,this->m_mSubset);
                     if(this->m_bLoadDepth)
@@ -764,6 +769,7 @@ namespace lv {
                 }
             }
             if(bLoadFrameSubset || bEvalOnlyFrameSubset) {
+                lvDbgExceptionWatch;
                 lSubsetCleaner(vsRGBGTPaths,this->m_mRealSubset,false);
                 lSubsetCleaner(vsLWIRGTPaths,this->m_mRealSubset,false);
                 if(this->m_bLoadDepth)
@@ -902,7 +908,8 @@ namespace lv {
             vInputs[nInputRGBStreamIdx] = oRGBPacket;
             if(bUseInterlacedMasks) {
                 cv::Mat oRGBMaskPacket = cv::imread(vsInputPaths[nInputRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
-                lvAssert(!oRGBMaskPacket.empty() && oRGBMaskPacket.type()==CV_8UC1 && oRGBMaskPacket.size()==vOrigInputInfos[nInputRGBStreamIdx].size());
+                lvAssert(!oRGBMaskPacket.empty() && oRGBMaskPacket.type()==CV_8UC1 && oRGBMaskPacket.size()==vOrigInputInfos[nInputRGBMaskStreamIdx].size());
+                cv::flip(oRGBMaskPacket,oRGBMaskPacket,1);
             #if DATASETS_LITIV2018_REMAP_MASKS
                 if(this->m_bUndistort || this->m_bHorizRectify) {
                     if(this->m_bHorizRectify && oRGBMaskPacket.size()!=oRectifSize)
@@ -910,8 +917,8 @@ namespace lv {
                     cv::remap(oRGBMaskPacket.clone(),oRGBMaskPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
                 }
             #endif //DATASETS_LITIV2018_REMAP_MASKS
-                if(oRGBMaskPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
-                    cv::resize(oRGBMaskPacket,oRGBMaskPacket,vInputInfos[nInputRGBStreamIdx].size(),cv::INTER_LINEAR);
+                if(oRGBMaskPacket.size()!=vInputInfos[nInputRGBMaskStreamIdx].size())
+                    cv::resize(oRGBMaskPacket,oRGBMaskPacket,vInputInfos[nInputRGBMaskStreamIdx].size(),cv::INTER_LINEAR);
                 oRGBMaskPacket = oRGBMaskPacket>128;
                 vInputs[nInputRGBMaskStreamIdx] = oRGBMaskPacket;
             }
@@ -933,7 +940,8 @@ namespace lv {
             vInputs[nInputLWIRStreamIdx] = oLWIRPacket;
             if(bUseInterlacedMasks) {
                 cv::Mat oLWIRMaskPacket = cv::imread(vsInputPaths[nInputLWIRMaskStreamIdx],cv::IMREAD_GRAYSCALE);
-                lvAssert(!oLWIRMaskPacket.empty() && oLWIRMaskPacket.type()==CV_8UC1 && oLWIRMaskPacket.size()==vOrigInputInfos[nInputLWIRStreamIdx].size());
+                lvAssert(!oLWIRMaskPacket.empty() && oLWIRMaskPacket.type()==CV_8UC1 && oLWIRMaskPacket.size()==vOrigInputInfos[nInputLWIRMaskStreamIdx].size());
+                cv::flip(oLWIRMaskPacket,oLWIRMaskPacket,1);
             #if DATASETS_LITIV2018_REMAP_MASKS
                 if(this->m_bUndistort || this->m_bHorizRectify) {
                     if(this->m_bHorizRectify && oLWIRMaskPacket.size()!=oRectifSize)
@@ -943,8 +951,8 @@ namespace lv {
                         lv::shift(oLWIRMaskPacket.clone(),oLWIRMaskPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
                 }
             #endif //DATASETS_LITIV2018_REMAP_MASKS
-                if(oLWIRMaskPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
-                    cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,vInputInfos[nInputLWIRStreamIdx].size(),cv::INTER_LINEAR);
+                if(oLWIRMaskPacket.size()!=vInputInfos[nInputLWIRMaskStreamIdx].size())
+                    cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,vInputInfos[nInputLWIRMaskStreamIdx].size(),cv::INTER_LINEAR);
                 oLWIRMaskPacket = oLWIRMaskPacket>128;
                 vInputs[nInputLWIRMaskStreamIdx] = oLWIRMaskPacket;
             }
@@ -984,7 +992,8 @@ namespace lv {
                 vInputs[nInputDepthStreamIdx] = oDepthPacket;
                 if(bUseInterlacedMasks) {
                     cv::Mat oDepthMaskPacket,oDepthMaskPacket_raw = cv::imread(vsInputPaths[nInputDepthMaskStreamIdx],cv::IMREAD_GRAYSCALE);
-                    lvAssert(!oDepthMaskPacket_raw.empty() && oDepthMaskPacket_raw.type()==CV_8UC1 && oDepthMaskPacket_raw.size()==vOrigInputInfos[nInputDepthStreamIdx].size());
+                    lvAssert(!oDepthMaskPacket_raw.empty() && oDepthMaskPacket_raw.type()==CV_8UC1 && oDepthMaskPacket_raw.size()==vOrigInputInfos[nInputDepthMaskStreamIdx].size());
+                    cv::flip(oDepthMaskPacket_raw,oDepthMaskPacket_raw,1);
                 #if DATASETS_LITIV2018_REMAP_MASKS
                     oDepthMaskPacket.create(oRGBSize,CV_8UC1);
                     oDepthMaskPacket = 0u; // 'background' default value
@@ -1003,8 +1012,8 @@ namespace lv {
                 #else //!DATASETS_LITIV2018_REMAP_MASKS
                     oDepthMaskPacket = oDepthMaskPacket_raw;
                 #endif //!DATASETS_LITIV2018_REMAP_MASKS
-                    if(oDepthMaskPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
-                        cv::resize(oDepthMaskPacket,oDepthMaskPacket,vInputInfos[nInputDepthStreamIdx].size(),cv::INTER_LINEAR);
+                    if(oDepthMaskPacket.size()!=vInputInfos[nInputDepthMaskStreamIdx].size())
+                        cv::resize(oDepthMaskPacket,oDepthMaskPacket,vInputInfos[nInputDepthMaskStreamIdx].size(),cv::INTER_LINEAR);
                     oDepthMaskPacket = oDepthMaskPacket>128;
                     vInputs[nInputDepthMaskStreamIdx] = oDepthMaskPacket;
                 }
