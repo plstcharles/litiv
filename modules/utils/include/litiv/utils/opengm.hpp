@@ -108,7 +108,7 @@ namespace lv {
             }
         }
 
-        /// explicit function wrapper to bypass marray allocations and use views instead (interface similar to opengm::ExplicitFunction's)
+        /// explicit view function wrapper to bypass marray allocations and use views instead (interface similar to opengm::ExplicitFunction's)
         template<typename TValue, typename TIndex=size_t, typename TLabel=size_t>
         struct ExplicitViewFunction :
                 public marray::View<TValue>,
@@ -131,6 +131,41 @@ namespace lv {
             void assign(TShapeIterator begin, TShapeIterator end, TValue* data) {
                 this->marray::View<TValue>::assign(begin,end,data);
             }
+        };
+
+        /// explicit scaled view function wrapper (same as above, but scales all costs by user-defined factor)
+        template<typename TValue, typename TIndex=size_t, typename TLabel=size_t, typename TScale=float>
+        struct ExplicitScaledViewFunction : ExplicitViewFunction<TValue,TIndex,TLabel> {
+            /// default constructor (null view data)
+            explicit ExplicitScaledViewFunction(TScale fScale=TScale(1)) : ExplicitViewFunction<TValue,TIndex,TLabel>(),m_fScale(fScale) {}
+            /// copy constructor (this will point to other's view data)
+            ExplicitScaledViewFunction(const ExplicitScaledViewFunction& other, TScale fScale=TScale(1)) : ExplicitViewFunction<TValue,TIndex,TLabel>(other),m_fScale(fScale) {}
+            /// assignment operation (this will point to other's view data)
+            ExplicitScaledViewFunction& operator=(const ExplicitScaledViewFunction& other) {
+                marray::View<TValue>::operator=(other);
+                this->m_fScale = other.m_fScale;
+                return *this;
+            }
+            /// internal scale factor getter
+            TScale getScale() const {return m_fScale;}
+            /// internal scale factor setter
+            void setScale(TScale fScale) {m_fScale = fScale;}
+            /// element access function (applies scale)
+            template<class U>
+            TValue operator()(U u) const {
+                return TValue(m_fScale*this->ExplicitViewFunction<TValue,TIndex,TLabel>::operator()(u));
+            }
+            /// element access function (applies scale)
+            TValue operator()(const size_t value) const {
+                return TValue(m_fScale*this->ExplicitViewFunction<TValue,TIndex,TLabel>::operator()(value));
+            }
+            /// element access function (applies scale)
+            template<typename... TArgs>
+            TValue operator()(const size_t value, const TArgs... args) const {
+                return TValue(m_fScale*this->ExplicitViewFunction<TValue,TIndex,TLabel>::operator()(value,args...));
+            }
+        private:
+            TScale m_fScale;
         };
 
         /// clique interface used used for faster factor/energy/nodes access through graph model
