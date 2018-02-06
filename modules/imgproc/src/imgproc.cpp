@@ -150,6 +150,40 @@ void lv::thinning(const cv::Mat& oInput, cv::Mat& oOutput, ThinningMode eMode) {
     while(!bEq);
 }
 
+std::vector<int> lv::calcHistCounts(const cv::Mat& oInput) {
+    lvAssert_(!oInput.empty() && oInput.isContinuous(),"bad input matrix alloc");
+    lvAssert_(oInput.type()==CV_8UC1 || oInput.type()==CV_16UC1,"bad input matrix type");
+    lvAssert_(oInput.total()<(size_t)std::numeric_limits<int>::max(),"input mat too large");
+    if(oInput.type()==CV_8UC1) {
+        std::vector<int> vCounts(UCHAR_MAX+1u,0);
+        for(size_t nElemIdx=0u; nElemIdx<oInput.total(); ++nElemIdx)
+            ++vCounts[((uchar*)oInput.data)[nElemIdx]];
+        return vCounts;
+    }
+    else {
+        std::vector<int> vCounts(USHRT_MAX+1u,0);
+        for(size_t nElemIdx=0u; nElemIdx<oInput.total(); ++nElemIdx)
+            ++vCounts[((ushort*)oInput.data)[nElemIdx]];
+        return vCounts;
+    }
+}
+
+int lv::calcMedianValue(const cv::Mat& oInput, std::vector<int>* pHistCounts) {
+    lvAssert_(!oInput.empty() && oInput.isContinuous(),"bad input matrix alloc");
+    lvAssert_(oInput.type()==CV_8UC1 || oInput.type()==CV_16UC1,"bad input matrix type");
+    const std::vector<int> vCounts = lv::calcHistCounts(oInput);
+    lvDbgAssert(!vCounts.empty());
+    if(pHistCounts)
+        *pHistCounts = vCounts;
+    int nBinVal=0,nCurrElemCount=vCounts[0],nHalfCount=(int)oInput.total()/2;
+    while(nCurrElemCount<=nHalfCount) {
+        nCurrElemCount += vCounts[++nBinVal];
+        lvDbgAssert((size_t)nBinVal<vCounts.size());
+        lvDbgAssert(nCurrElemCount<=(int)oInput.total());
+    }
+    return nBinVal;
+}
+
 void lv::computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, int nPatchSize,
                               cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
                               const cv::Mat_<uchar>& oROI1, const cv::Mat_<uchar>& oROI2) {

@@ -2,6 +2,29 @@
 #include "litiv/imgproc.hpp"
 #include "litiv/test.hpp"
 
+TEST(calcMedianValue,regression) {
+    std::vector<uchar> vTestVals0 = {0,1,2,3,4,5,6,7,8,9};
+    cv::Mat_<uchar> vTestMat0(1,(int)vTestVals0.size(),vTestVals0.data());
+    ASSERT_EQ(lv::calcMedianValue(vTestMat0),5);
+    std::vector<uchar> vTestVals1 = {0,1,2,3,4,5,6,7,8,9,10};
+    cv::Mat_<uchar> vTestMat1(1,(int)vTestVals1.size(),vTestVals1.data());
+    ASSERT_EQ(lv::calcMedianValue(vTestMat1),5);
+    std::vector<uchar> vTestVals2 = {0,0,0,0,0,0,1,1,1};
+    cv::Mat_<uchar> vTestMat2(1,(int)vTestVals2.size(),vTestVals2.data());
+    ASSERT_EQ(lv::calcMedianValue(vTestMat2),0);
+    std::vector<uchar> vTestVals3 = {0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1};
+    cv::Mat_<uchar> vTestMat3(1,(int)vTestVals3.size(),vTestVals3.data());
+    ASSERT_EQ(lv::calcMedianValue(vTestMat3),1);
+    for(size_t i=0u; i<50u; ++i) {
+        cv::Mat_<uchar> vTestMat4((rand()%10)+1,(rand()%10)+1);
+        cv::randu(vTestMat4,0,256);
+        const int nMedian = lv::calcMedianValue(vTestMat4);
+        std::nth_element(vTestMat4.begin(),vTestMat4.begin()+(vTestMat4.total())/2,vTestMat4.end());
+        const int nMedianGT = (int)*(vTestMat4.begin()+(vTestMat4.total())/2);
+        ASSERT_EQ(nMedian,nMedianGT);
+    }
+}
+
 TEST(gmm_init,regression_opencv) {
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
     ASSERT_TRUE(!oInput.empty() && oInput.size()==cv::Size(481,321) && oInput.channels()==3);
