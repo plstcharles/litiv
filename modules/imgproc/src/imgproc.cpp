@@ -150,32 +150,65 @@ void lv::thinning(const cv::Mat& oInput, cv::Mat& oOutput, ThinningMode eMode) {
     while(!bEq);
 }
 
-std::vector<int> lv::calcHistCounts(const cv::Mat& oInput) {
+std::vector<int> lv::calcHistCounts(const cv::Mat& oInput, const cv::Mat_<uchar>& oMask, int* pnTotCount) {
     lvAssert_(!oInput.empty() && oInput.isContinuous(),"bad input matrix alloc");
     lvAssert_(oInput.type()==CV_8UC1 || oInput.type()==CV_16UC1,"bad input matrix type");
     lvAssert_(oInput.total()<(size_t)std::numeric_limits<int>::max(),"input mat too large");
+    lvAssert_(oMask.empty() || (oMask.isContinuous() && oMask.size==oInput.size),"bad roi");
     if(oInput.type()==CV_8UC1) {
         std::vector<int> vCounts(UCHAR_MAX+1u,0);
-        for(size_t nElemIdx=0u; nElemIdx<oInput.total(); ++nElemIdx)
-            ++vCounts[((uchar*)oInput.data)[nElemIdx]];
+        if(oMask.empty()) {
+            for(size_t nElemIdx=0u; nElemIdx<oInput.total(); ++nElemIdx)
+                ++vCounts[((uchar*)oInput.data)[nElemIdx]];
+            if(pnTotCount)
+                *pnTotCount = (int)oInput.total();
+        }
+        else {
+            int nTotCount = 0;
+            for(size_t nElemIdx=0u; nElemIdx<oInput.total(); ++nElemIdx) {
+                if(oMask.data[nElemIdx]) {
+                    ++nTotCount;
+                    ++vCounts[((uchar*)oInput.data)[nElemIdx]];
+                }
+            }
+            if(pnTotCount)
+                *pnTotCount = nTotCount;
+        }
         return vCounts;
     }
     else {
         std::vector<int> vCounts(USHRT_MAX+1u,0);
-        for(size_t nElemIdx=0u; nElemIdx<oInput.total(); ++nElemIdx)
-            ++vCounts[((ushort*)oInput.data)[nElemIdx]];
+        if(oMask.empty()) {
+            for(size_t nElemIdx=0u; nElemIdx<oInput.total(); ++nElemIdx)
+                ++vCounts[((ushort*)oInput.data)[nElemIdx]];
+            if(pnTotCount)
+                *pnTotCount = (int)oInput.total();
+        }
+        else {
+            int nTotCount = 0;
+            for(size_t nElemIdx=0u; nElemIdx<oInput.total(); ++nElemIdx) {
+                if(oMask.data[nElemIdx]) {
+                    ++nTotCount;
+                    ++vCounts[((ushort*)oInput.data)[nElemIdx]];
+                }
+            }
+            if(pnTotCount)
+                *pnTotCount = nTotCount;
+
+        }
         return vCounts;
     }
 }
 
-int lv::calcMedianValue(const cv::Mat& oInput, std::vector<int>* pHistCounts) {
+int lv::calcMedianValue(const cv::Mat& oInput, const cv::Mat_<uchar>& oMask, std::vector<int>* pHistCounts) {
     lvAssert_(!oInput.empty() && oInput.isContinuous(),"bad input matrix alloc");
     lvAssert_(oInput.type()==CV_8UC1 || oInput.type()==CV_16UC1,"bad input matrix type");
-    const std::vector<int> vCounts = lv::calcHistCounts(oInput);
+    int nTotCount;
+    const std::vector<int> vCounts = lv::calcHistCounts(oInput,oMask,&nTotCount);
     lvDbgAssert(!vCounts.empty());
     if(pHistCounts)
         *pHistCounts = vCounts;
-    int nBinVal=0,nCurrElemCount=vCounts[0],nHalfCount=(int)oInput.total()/2;
+    int nBinVal=0,nCurrElemCount=vCounts[0],nHalfCount=nTotCount/2;
     while(nCurrElemCount<=nHalfCount) {
         nCurrElemCount += vCounts[++nBinVal];
         lvDbgAssert((size_t)nBinVal<vCounts.size());

@@ -23,6 +23,12 @@ TEST(calcMedianValue,regression) {
         const int nMedianGT = (int)*(vTestMat4.begin()+(vTestMat4.total())/2);
         ASSERT_EQ(nMedian,nMedianGT);
     }
+    std::vector<uchar> vTestVals5 = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+    cv::Mat_<uchar> vTestMat5(1,(int)vTestVals5.size(),vTestVals5.data());
+    ASSERT_EQ(lv::calcMedianValue(vTestMat5),1);
+    std::vector<uchar> vTestVals6 = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    cv::Mat_<uchar> vTestMat6(1,(int)vTestVals6.size(),vTestVals6.data());
+    ASSERT_EQ(lv::calcMedianValue(vTestMat6),0);
 }
 
 TEST(gmm_init,regression_opencv) {

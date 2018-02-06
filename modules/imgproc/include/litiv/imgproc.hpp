@@ -46,9 +46,9 @@ namespace lv {
     void thinning(const cv::Mat& oInput, cv::Mat& oOutput, ThinningMode eMode=ThinningMode_LamLeeSuen);
 
     /// returns a vector of pixel occurrence counts for a small-type, single-channel matrix (8U or 16U only)
-    std::vector<int> calcHistCounts(const cv::Mat& oInput);
+    std::vector<int> calcHistCounts(const cv::Mat& oInput, const cv::Mat_<uchar>& oMask=cv::Mat(), int* pnTotCount=nullptr);
     /// returns the median value of pixel occurrences for a small-type, single-channel matrix (8U or 16U only)
-    int calcMedianValue(const cv::Mat& oInput, std::vector<int>* pHistCounts=nullptr);
+    int calcMedianValue(const cv::Mat& oInput, const cv::Mat_<uchar>& oMask=cv::Mat(), std::vector<int>* pHistCounts=nullptr);
 
     /// performs non-maximum suppression on the input image, with a (nWinSize)x(nWinSize) window
     template<int nWinSize>
