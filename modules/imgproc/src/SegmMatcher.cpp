@@ -3457,9 +3457,15 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
             m_oSuperStackedResegmLabeling.copyTo(oPreStereoUpdateLabeling);
         }
     }
-    for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx)
+    // post-proc; update offset stereo labeling to latest proj result, and magic blur all the things (better smoothing than 4-cc!)
+    for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
         if(nCamIdx!=m_nPrimaryCamIdx)
-            resetStereoLabelingByProjection(nCamIdx);
+            resetStereoLabelingByProjection(nCamIdx); // already smoothed internally
+        else
+            cv::medianBlur(m_aaStereoLabelings[0][nCamIdx],m_aaStereoLabelings[0][nCamIdx],5);
+        for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx)
+            cv::medianBlur(m_aaResegmLabelings[nLayerIdx][nCamIdx],m_aaResegmLabelings[nLayerIdx][nCamIdx],5);
+    }
     lvLog_(2,"Inference for primary camera idx=%d completed in %f second(s).",(int)m_nPrimaryCamIdx,oLocalTimer.tock());
     if(lv::getVerbosity()>=4)
         cv::waitKey(0);
