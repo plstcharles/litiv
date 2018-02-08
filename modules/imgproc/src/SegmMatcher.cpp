@@ -41,7 +41,7 @@
 #define SEGMMATCH_CONFIG_USE_OCCLUDED_LABELS   0
 #define SEGMMATCH_CONFIG_USE_FULL_DISP_RESETS  0
 #define SEGMMATCH_CONFIG_USE_CONT_RESEGM_UPDT  1
-#define SEGMMATCH_CONFIG_USE_TEMPORAL_U_CST    1
+#define SEGMMATCH_CONFIG_USE_TEMPORAL_U_CST    0
 #define SEGMMATCH_CONFIG_USE_SQR_LBL_DIFF_DIST 1
 #define SEGMMATCH_CONFIG_USE_LAST_STEREO_INIT  1
 
@@ -69,7 +69,6 @@
 #define SEGMMATCH_DEFAULT_GMM_1CH_COMPONENTS   (3)
 
 // unary costs params
-#define SEGMMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
 #define SEGMMATCH_UNARY_COST_TEMPORAL_CST      (ValueType(200))
 #define SEGMMATCH_IMGSIM_COST_COLOR_SCALE      (30)
 #define SEGMMATCH_IMGSIM_COST_DESC_SCALE       (1000)
@@ -81,7 +80,7 @@
 // pairwise costs params
 #define SEGMMATCH_LBLSIM_RESEGM_SCALE_CST      (200)
 #define SEGMMATCH_LBLSIM_STEREO_SCALE_CST      (1.f)
-#define SEGMMATCH_LBLSIM_STEREO_MAXDIFF_CST    (10)
+#define SEGMMATCH_LBLSIM_STEREO_MAXDIFF_CST    (std::max(10,(int)m_nMaxDispOffset/8))
 #define SEGMMATCH_LBLSIM_MEDIAN_DIST_SCALE_CST (20)
 #define SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE    (30)
 #define SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST    (30)
@@ -1325,8 +1324,14 @@ void SegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
         lvDbgAssert__(oShpSaliency(nRowIdx,nColIdx)>=-1e-6f && oShpSaliency(nRowIdx,nColIdx)<=1.0f+1e-6f,"fShpSaliency = %1.10f @ [%d,%d]",oShpSaliency(nRowIdx,nColIdx),nRowIdx,nColIdx);
         const float fImgSaliency = std::max(oImgSaliency(nRowIdx,nColIdx),0.0f);
         const float fShpSaliency = std::max(oShpSaliency(nRowIdx,nColIdx),0.0f);
+        ValueType tTotUnaryCost = cost_cast(0);
+        int nValidUnaryCosts = 0;
         for(InternalLabelType nLabelIdx=0; nLabelIdx<m_nRealStereoLabels; ++nLabelIdx) {
             vUnaryStereoLUT(nLabelIdx) = cost_cast(0);
+        #if SEGMMATCH_CONFIG_USE_MEDIAN_DIST_COST
+            if(nShapeIdx!=0 && nMedianShapeLabel<m_nRealStereoLabels)
+                vUnaryStereoLUT(nLabelIdx) += cost_cast(std::abs((int)nMedianShapeLabel-(int)nLabelIdx)*SEGMMATCH_LBLSIM_MEDIAN_DIST_SCALE_CST);
+        #endif //SEGMMATCH_CONFIG_USE_MEDIAN_DIST_COST
             const int nOffsetColIdx = getOffsetColIdx(m_nPrimaryCamIdx,nColIdx,nLabelIdx);
             if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[m_nPrimaryCamIdx^1](nRowIdx,nOffsetColIdx)) {
                 const float fImgAffinity = oImgAffinity(nRowIdx,nColIdx,nLabelIdx);
@@ -1335,17 +1340,15 @@ void SegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
                 lvDbgAssert__(fShpAffinity>=0.0f,"fShpAffinity = %1.10f @ [%d,%d]",fShpAffinity,nRowIdx,nColIdx);
                 vUnaryStereoLUT(nLabelIdx) += cost_cast(fImgAffinity*fImgSaliency*SEGMMATCH_IMGSIM_COST_DESC_SCALE);
                 vUnaryStereoLUT(nLabelIdx) += cost_cast(fShpAffinity*fShpSaliency*SEGMMATCH_SHPSIM_COST_DESC_SCALE);
+            #if SEGMMATCH_CONFIG_USE_DISP_BG_HRST
+                if(((InternalLabelType*)(m_aaResegmLabelings[oNode.nLayerIdx][m_nPrimaryCamIdx]).data)[oNode.nMapIdx]==s_nBackgroundLabelIdx)
+                vUnaryStereoLUT(nLabelIdx) += cost_cast((float(nLabelIdx)/m_nRealStereoLabels)*100);
+            #endif //SEGMMATCH_CONFIG_USE_DISP_BG_HRST
+                tTotUnaryCost += vUnaryStereoLUT(nLabelIdx);
+                ++nValidUnaryCosts;
             }
             else
-                vUnaryStereoLUT(nLabelIdx) = SEGMMATCH_UNARY_COST_OOB_CST;
-        #if SEGMMATCH_CONFIG_USE_DISP_BG_HRST
-            if(((InternalLabelType*)(m_aaResegmLabelings[oNode.nLayerIdx][m_nPrimaryCamIdx]).data)[oNode.nMapIdx]==s_nBackgroundLabelIdx)
-                vUnaryStereoLUT(nLabelIdx) += cost_cast((float(nLabelIdx)/m_nRealStereoLabels)*100);
-        #endif //SEGMMATCH_CONFIG_USE_DISP_BG_HRST
-        #if SEGMMATCH_CONFIG_USE_MEDIAN_DIST_COST
-            if(nShapeIdx!=0 && nMedianShapeLabel<m_nRealStereoLabels)
-                vUnaryStereoLUT(nLabelIdx) += cost_cast(std::abs((int)nMedianShapeLabel-(int)nLabelIdx)*SEGMMATCH_LBLSIM_MEDIAN_DIST_SCALE_CST);
-        #endif //SEGMMATCH_CONFIG_USE_MEDIAN_DIST_COST
+                vUnaryStereoLUT(nLabelIdx) = cost_cast(tTotUnaryCost/(nValidUnaryCosts+1));
         }
         vUnaryStereoLUT(m_nDontCareLabelIdx) = cost_cast(10000);
     #if SEGMMATCH_CONFIG_USE_OCCLUDED_LABELS
@@ -2010,7 +2013,7 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
             }
         }
         else {
-            vUnaryResegmLUT(s_nForegroundLabelIdx) = SEGMMATCH_UNARY_COST_OOB_CST;
+            vUnaryResegmLUT(s_nForegroundLabelIdx) = cost_cast(100); // oob foreground neighb-copy cost
             vUnaryResegmLUT(s_nBackgroundLabelIdx) = cost_cast(0);
             for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
                 PairwClique& oPairwClique = oNode.aPairwCliques[nOrientIdx];
