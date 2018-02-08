@@ -44,6 +44,7 @@
 #define DATASET_EVAL_INPUT_SUBSET          1
 #define DATASET_EVAL_GT_SUBSET             0
 #define DATASET_EVAL_FINAL_UPDATE          1
+#define DATASET_SHRINK_OFFSET_MASK         1
 #define DATASET_BATCH_START_INDEX          0
 #define DATASET_BATCH_STOP_MAX_INDEX       9999
 
@@ -619,6 +620,9 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             oModifMask = 0;
             vCurrInput[nModifMaskIdx] = oModifMask;
         #endif //DATASET_EVAL_BAD_INIT_MASKS
+        #if DATASET_LITIV2018 && DATASET_SHRINK_OFFSET_MASK
+            cv::erode(vCurrInput[SegmMatcher::InputPack_RightMask],vCurrInput[SegmMatcher::InputPack_RightMask],cv::Mat(),cv::Point(-1,-1),3);
+        #endif //DATASET_LITIV2018 && DATASET_SHRINK_OFFSET_MASK
         #if !DATASET_FORCE_RECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
             if(!oNextFeatsPacket.empty())
