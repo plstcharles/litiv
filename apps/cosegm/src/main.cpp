@@ -24,7 +24,7 @@
 #define PROCESS_PREPROC_GRABCUT 0
 #define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
-#define GLOBAL_VERBOSITY        2
+#define GLOBAL_VERBOSITY        3
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       0
 #define DATASET_LITIV2014       0
@@ -40,35 +40,38 @@
 #define DATASET_EVAL_DISPARITY_MASKS       0
 #define DATASET_EVAL_BAD_INIT_MASKS        0
 #define DATASET_EVAL_APPROX_MASKS_ONLY     0
-#define DATASET_EVAL_OUTPUT_MASKS_ONLY     0
+#define DATASET_EVAL_OUTPUT_ONLY           0
 #define DATASET_EVAL_INPUT_SUBSET          1
 #define DATASET_EVAL_GT_SUBSET             0
 #define DATASET_EVAL_FINAL_UPDATE          1
 #define DATASET_SHRINK_OFFSET_MASK         1
-#define DATASET_BATCH_START_INDEX          0
+#define DATASET_BATCH_START_INDEX          25
 #define DATASET_BATCH_STOP_MAX_INDEX       9999
 
 #if (DATASET_VAPTRIMOD+DATASET_LITIV2014+DATASET_LITIV2018+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
 #endif //(DATASET_+.../*+...*/)!=1
-#if (DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_MASKS_ONLY)>1
+#if (DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_ONLY)>1
 #error "Must pick single output source to evaluate."
-#endif //(DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_MASKS_ONLY)>1
+#endif //(DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_ONLY)>1
 #if (DATASET_EVAL_APPROX_MASKS_ONLY && DATASET_EVAL_DISPARITY_MASKS)
 #error "Cannot eval approx input masks w/ disp evaluation."
 #endif //(DATASET_EVAL_APPROX_MASKS_ONLY && DATASET_EVAL_DISPARITY_MASKS)
-#if (((DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_MASKS_ONLY)>0) && WRITE_IMG_OUTPUT)
+#if (((DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_ONLY)>0) && WRITE_IMG_OUTPUT)
 #error "Should not overwrite output if only reevaluating results."
-#endif //(((DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_MASKS_ONLY)>0) && WRITE_IMG_OUTPUT)
-#if ((DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY) && DATASET_EVAL_FINAL_UPDATE)
+#endif //(((DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_ONLY)>0) && WRITE_IMG_OUTPUT)
+#if ((DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_ONLY) && DATASET_EVAL_FINAL_UPDATE)
 #error "Deferred eval useless here."
-#endif //((DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY) && DATASET_EVAL_FINAL_UPDATE)
+#endif //((DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_ONLY) && DATASET_EVAL_FINAL_UPDATE)
 #define PROCESS_PREPROC (PROCESS_PREPROC_BGSEGM || PROCESS_PREPROC_GRABCUT)
+#if (PROCESS_PREPROC && (DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_ONLY)>0)
+#error "Missing impl for eval-only mode with preprocess algos"
+#endif //(PROCESS_PREPROC && (DATASET_EVAL_APPROX_MASKS_ONLY+DATASET_EVAL_OUTPUT_ONLY)>0)
 #if DATASET_VAPTRIMOD
 #define DATASET_ID Dataset_VAP_trimod2016
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
-    bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
+    bool(PROCESS_PREPROC),                        /* bool bSaveOutput=false */\
     bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
     false,                                        /* bool bLoadDepth=true */\
     PROCESS_PREPROC?false:true,                   /* bool bUndistort=true */\
@@ -83,7 +86,7 @@
 #define DATASET_ID Dataset_LITIV_bilodeau2014
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
-    bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
+    bool(PROCESS_PREPROC),                        /* bool bSaveOutput=false */\
     bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=true */\
     true,                                         /* bool bFlipDisparities=false */\
@@ -95,7 +98,7 @@
 #define DATASET_ID Dataset_LITIV_stcharles2018
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
-    bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
+    bool(PROCESS_PREPROC),                        /* bool bSaveOutput=false */\
     bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
     false,                                        /* bool bLoadDepth=true */\
     PROCESS_PREPROC?false:true,                   /* bool bUndistort=true */\
@@ -112,7 +115,7 @@
 #define DATASET_ID Dataset_CosegmTests
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
-    bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
+    bool(PROCESS_PREPROC),                        /* bool bSaveOutput=false */\
     bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=false */\
     false,                                        /* bool bLoadFrameSubset=false */\
@@ -429,12 +432,16 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 vvDisplayPairs[nDisplayRowIdx] = vRow;
             }
         }
-    #if (!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY)
+    #if !DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_ONLY
         std::shared_ptr<SegmMatcher> pAlgo = std::make_shared<SegmMatcher>(nMinDisp,nMaxDisp);
         pAlgo->m_pDisplayHelper = pDisplayHelper;
         pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
-    #endif //(!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY)
+    #if WRITE_IMG_OUTPUT
+        lv::createDirIfNotExist(oBatch.getOutputPath()+"disp");
+        lv::createDirIfNotExist(oBatch.getOutputPath()+"segm");
+    #endif //WRITE_IMG_OUTPUT
+    #endif //!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_ONLY
     #endif //!PROCESS_PREPROC_...
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
@@ -580,30 +587,49 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             }
         #endif //PROCESS_PREPROC_GRABCUT<=1
         #else //!PROCESS_PREPROC_...
-        #if (DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY)
-        #if DATASET_EVAL_OUTPUT_MASKS_ONLY
-            const std::vector<cv::Mat> vArchivedOutput = oBatch.loadOutputArray(nCurrIdx);
-        #endif //DATASET_EVAL_OUTPUT_MASKS_ONLY
-            for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
-                const size_t nOutputMaskIdx = nCamIdx*SegmMatcher::OutputPackOffset+SegmMatcher::OutputPackOffset_Mask;
-                const size_t nOutputDispIdx = nCamIdx*SegmMatcher::OutputPackOffset+SegmMatcher::OutputPackOffset_Disp;
+        #if (DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_ONLY)
+        #if DATASET_EVAL_OUTPUT_ONLY
+            //const std::vector<cv::Mat> vArchivedOutput = oBatch.loadOutputArray(nCurrIdx);
+            lvAssert(oBatch.getOutputStreamCount()==SegmMatcher::OutputPackOffset);
+            std::vector<cv::Mat> vArchivedOutput(SegmMatcher::OutputPackSize);
+            const std::string sPacketName = oBatch.getInputName(nCurrIdx);
+            for(size_t nStreamIdx=0u; nStreamIdx<oBatch.getOutputStreamCount(); ++nStreamIdx) {
+                const std::string sOutputDispFilePath = oBatch.getOutputPath()+"disp/"+sPacketName+"_"+std::to_string(nStreamIdx)+".png";
+                const std::string sOutputSegmFilePath = oBatch.getOutputPath()+"segm/"+sPacketName+"_"+std::to_string(nStreamIdx)+".png";
+                const size_t nOutputDispIdx = nStreamIdx*SegmMatcher::OutputPackOffset+SegmMatcher::OutputPackOffset_Disp;
+                const size_t nOutputSegmIdx = nStreamIdx*SegmMatcher::OutputPackOffset+SegmMatcher::OutputPackOffset_Mask;
+                vArchivedOutput[nOutputDispIdx] = cv::imread(sOutputDispFilePath,cv::IMREAD_GRAYSCALE|cv::IMREAD_ANYDEPTH);
+                vArchivedOutput[nOutputSegmIdx] = cv::imread(sOutputSegmFilePath,cv::IMREAD_GRAYSCALE|cv::IMREAD_ANYDEPTH);
+            }
+        #endif //DATASET_EVAL_OUTPUT_ONLY
+            for(size_t nStreamIdx=0; nStreamIdx<nCameraCount; ++nStreamIdx) {
+                const size_t nOutputDispIdx = nStreamIdx*SegmMatcher::OutputPackOffset+SegmMatcher::OutputPackOffset_Disp;
+                const size_t nOutputSegmIdx = nStreamIdx*SegmMatcher::OutputPackOffset+SegmMatcher::OutputPackOffset_Mask;
         #if DATASET_EVAL_APPROX_MASKS_ONLY
-                const size_t nInputMaskIdx = nCamIdx*SegmMatcher::InputPackOffset+SegmMatcher::InputPackOffset_Mask;
+                const size_t nInputMaskIdx = nStreamIdx*SegmMatcher::InputPackOffset+SegmMatcher::InputPackOffset_Mask;
                 vCurrInput[nInputMaskIdx].convertTo(vCurrOutput[nOutputDispIdx],CV_32S); // only to fool output checks
-                vCurrInput[nInputMaskIdx].convertTo(vCurrOutput[nOutputMaskIdx],CV_32S,1.0/255);
+                vCurrInput[nInputMaskIdx].convertTo(vCurrOutput[nOutputSegmIdx],CV_32S,1.0/255);
         #endif //DATASET_EVAL_APPROX_MASKS_ONLY
-        #if DATASET_EVAL_OUTPUT_MASKS_ONLY
+        #if DATASET_EVAL_OUTPUT_ONLY
                 if(oBatch.isEvaluatingDisparities()) {
-                    vArchivedOutput[nCamIdx].convertTo(vCurrOutput[nOutputDispIdx],CV_32S);
-                    cv::Mat_<OutputType>(oInfoArray[nCamIdx].size(),OutputType(0)).copyTo(vCurrOutput[nOutputMaskIdx]); // only to fool output checks
+                    lvAssert(!vArchivedOutput[nOutputDispIdx].empty());
+                    vArchivedOutput[nOutputDispIdx].convertTo(vCurrOutput[nOutputDispIdx],CV_32S);
+                    if(vArchivedOutput[nOutputSegmIdx].empty())
+                        cv::Mat_<OutputType>(oInfoArray[nStreamIdx].size(),OutputType(0)).copyTo(vCurrOutput[nOutputSegmIdx]); // only to fool output checks
+                    else
+                        vArchivedOutput[nOutputSegmIdx].convertTo(vCurrOutput[nOutputSegmIdx],CV_32S);
                 }
                 else {
-                    cv::Mat_<OutputType>(oInfoArray[nCamIdx].size(),OutputType(0)).copyTo(vCurrOutput[nOutputDispIdx]); // only to fool output checks
-                    vArchivedOutput[nCamIdx].convertTo(vCurrOutput[nOutputMaskIdx],CV_32S);
+                    lvAssert(!vArchivedOutput[nOutputSegmIdx].empty());
+                    vArchivedOutput[nOutputSegmIdx].convertTo(vCurrOutput[nOutputSegmIdx],CV_32S);
+                    if(vArchivedOutput[nOutputDispIdx].empty())
+                        cv::Mat_<OutputType>(oInfoArray[nStreamIdx].size(),OutputType(0)).copyTo(vCurrOutput[nOutputDispIdx]); // only to fool output checks
+                    else
+                        vArchivedOutput[nOutputDispIdx].convertTo(vCurrOutput[nOutputDispIdx],CV_32S);
                 }
-        #endif //DATASET_EVAL_OUTPUT_MASKS_ONLY
+        #endif //DATASET_EVAL_OUTPUT_ONLY
             }
-        #else //!(DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY)
+        #else //!(DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_ONLY)
             if(oBatch.isTemporalWindowBreak(nCurrIdx)) {
                 // only useful for subset processing; should never be triggered in other conditions
                 lvDbgAssert(DATASET_EVAL_INPUT_SUBSET || DATASET_EVAL_GT_SUBSET);
@@ -636,7 +662,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 pAlgo->setNextFeatures(oNewFeatsPacket);
             }
             pAlgo->apply(vCurrInput,vCurrOutput/*,dDefaultThreshold*/);
-        #endif //!(DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY)
+        #endif //!(DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_ONLY)
             lvDbgAssert(vCurrOutput.size()==nExpectedAlgoOutputCount);
             using OutputLabelType = SegmMatcher::LabelType;
             for(size_t nOutputArrayIdx=0; nOutputArrayIdx<vCurrOutput.size(); ++nOutputArrayIdx) {
@@ -660,10 +686,10 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 for(size_t nDisplayRowIdx=0; nDisplayRowIdx<nCameraCount; ++nDisplayRowIdx) {
                     vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
                     vCurrInput[nDisplayRowIdx*2+1].copyTo(vvDisplayPairs[nDisplayRowIdx][1].first);
-                #if !DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY
+                #if !DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_ONLY
                     pAlgo->getStereoDispMapDisplay(0,nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][2].first);
                     pAlgo->getResegmMapDisplay(0,nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][3].first);
-                #endif //!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY
+                #endif //!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_ONLY
                     vCurrEvalRes[nDisplayRowIdx].copyTo(vvDisplayPairs[nDisplayRowIdx][4].first);
                 }
                 lvAssert(pDisplayHelper);
@@ -701,6 +727,16 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                         oBatch.push(vCurrStereoMaps,nEvalIdx);
                     else
                         oBatch.push(vCurrFGMasks,nEvalIdx);
+                #if WRITE_IMG_OUTPUT
+                    const std::string sPacketName = oBatch.getInputName(nEvalIdx);
+                    for(size_t nStreamIdx=0u; nStreamIdx<oBatch.getOutputStreamCount(); ++nStreamIdx) {
+                        const std::string sOutputDispFilePath = oBatch.getOutputPath()+"disp/"+sPacketName+"_"+std::to_string(nStreamIdx)+".png";
+                        const std::string sOutputSegmFilePath = oBatch.getOutputPath()+"segm/"+sPacketName+"_"+std::to_string(nStreamIdx)+".png";
+                        const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+                        cv::imwrite(sOutputDispFilePath,vCurrStereoMaps[nStreamIdx],vnComprParams);
+                        cv::imwrite(sOutputSegmFilePath,vCurrFGMasks[nStreamIdx],vnComprParams);
+                    }
+                #endif //WRITE_IMG_OUTPUT
                 }
             }
             else if((nCurrIdx-nLastTemporalBreakIdx)>=SegmMatcher::getTemporalDepth()) {
@@ -727,6 +763,16 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                     oBatch.push(vCurrStereoMaps,nEvalIdx);
                 else
                     oBatch.push(vCurrFGMasks,nEvalIdx);
+            #if WRITE_IMG_OUTPUT
+                const std::string sPacketName = oBatch.getInputName(nEvalIdx);
+                for(size_t nStreamIdx=0u; nStreamIdx<oBatch.getOutputStreamCount(); ++nStreamIdx) {
+                    const std::string sOutputDispFilePath = oBatch.getOutputPath()+"disp/"+sPacketName+"_"+std::to_string(nStreamIdx)+".png";
+                    const std::string sOutputSegmFilePath = oBatch.getOutputPath()+"segm/"+sPacketName+"_"+std::to_string(nStreamIdx)+".png";
+                    const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+                    cv::imwrite(sOutputDispFilePath,vCurrStereoMaps[nStreamIdx],vnComprParams);
+                    cv::imwrite(sOutputSegmFilePath,vCurrFGMasks[nStreamIdx],vnComprParams);
+                }
+            #endif //WRITE_IMG_OUTPUT
             }
             ++nCurrIdx;
         #else //!DATASET_EVAL_FINAL_UPDATE
@@ -734,6 +780,16 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
+        #if WRITE_IMG_OUTPUT
+            const std::string sPacketName = oBatch.getInputName(nEvalIdx);
+            for(size_t nStreamIdx=0u; nStreamIdx<oBatch.getOutputStreamCount(); ++nStreamIdx) {
+                const std::string sOutputDispFilePath = oBatch.getOutputPath()+"disp/"+sPacketName+"_"+std::to_string(nStreamIdx)+".png";
+                const std::string sOutputSegmFilePath = oBatch.getOutputPath()+"segm/"+sPacketName+"_"+std::to_string(nStreamIdx)+".png";
+                const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+                cv::imwrite(sOutputDispFilePath,vCurrStereoMaps[nStreamIdx],vnComprParams);
+                cv::imwrite(sOutputSegmFilePath,vCurrFGMasks[nStreamIdx],vnComprParams);
+            }
+        #endif //WRITE_IMG_OUTPUT
         #endif //!DATASET_EVAL_FINAL_UPDATE
         #endif //!PROCESS_PREPROC_...
         }
