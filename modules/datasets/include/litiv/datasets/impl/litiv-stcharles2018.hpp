@@ -419,7 +419,7 @@ namespace lv {
                 lvAssert(!this->m_bLoadDepth || vsDepthMaskPaths.empty() || extractPathIndex(vsDepthMaskPaths.back())<nTotInputPackets);
                 lvAssert(!this->m_bLoadDepth || vsDepthGTPaths.empty() || extractPathIndex(vsDepthGTPaths.back())<nTotInputPackets);
                 if(bLoadFrameSubset || bEvalOnlyFrameSubset) {
-                    const std::string sSubsetFilePath = this->getDataPath()+lv::putf("subset-v%02d.txt",(int)DATASETS_LITIV2018_DATA_VERSION);
+                    const std::string sSubsetFilePath = this->getDataPath()+this->getName()+lv::putf("-subset-v%02d.txt",(int)DATASETS_LITIV2018_DATA_VERSION);
                     std::ifstream oSubsetFile(sSubsetFilePath);
                     lvAssert__(oSubsetFile.is_open(),"could not open frame subset file at '%s'",sSubsetFilePath.c_str());
                     std::string sLineBuffer;
