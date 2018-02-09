@@ -570,16 +570,13 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     else
                         aSegmMasks[0u] = 0u;
                 }
-                /*if(cv::countNonZero(aSegmMasks[0])==0 && cv::countNonZero(aSegmMasks[1])==0) {
-                    nKeyPressed = 13;
-                    break;
-                }*/
-            #if DATASETS_SCAN_ONLY
+            #if DATASETS_SCAN_ONLY>1
                 nKeyPressed = 13;
                 break;
-            #endif //DATASETS_SCAN_ONLY
+            #endif //DATASETS_SCAN_ONLY>1
             #endif //GEN_SEGMENTATION_ANNOT
             }
+        #if !DATASETS_SCAN_ONLY
         #if GEN_SEGMENTATION_ANNOT
             const bool bCurrFrameValid = (cv::countNonZero(aSegmMasks[0])!=0 || cv::countNonZero(aSegmMasks[1])!=0);
             if(bCurrFrameValid) {
@@ -624,21 +621,24 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             else if(!bCurrFrameValid && mnSubsetIdxs.find(nRealIdx)!=mnSubsetIdxs.end()) {
                 mnSubsetIdxs.erase(nRealIdx);
             }
+        #endif //!DATASETS_SCAN_ONLY
             if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
                 break;
             else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u)
                 --nCurrIdx;
             else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u))
                 ++nCurrIdx;
-        #if DATASETS_SCAN_ONLY
+        #if DATASETS_SCAN_ONLY>1
             else if(nCurrIdx==(nTotPacketCount-1u))
                 break;
-        #endif //DATASETS_SCAN_ONLY
+        #endif //DATASETS_SCAN_ONLY>1
         #else //!(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
             ++nCurrIdx;
         #endif //!(GEN_SEGMENTATION_ANNOT || GEN_REGISTRATION_ANNOT)
         }
+    #if !DATASETS_SCAN_ONLY
         {
+
             cv::FileStorage oGTMetadataFS(oBatch.getDataPath()+sGTName+"_metadata.yml",cv::FileStorage::WRITE);
             lvAssert(oGTMetadataFS.isOpened());
             oGTMetadataFS << "htag" << lv::getVersionStamp();
@@ -658,6 +658,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             oGTMetadataFS << "}";
         #endif //GEN_REGISTRATION_ANNOT
         }
+    #endif //!DATASETS_SCAN_ONLY
         lvLog(1,"... batch done.\n");
     }
     catch(const lv::Exception&) {std::cout << "\nAnalyze caught lv::Exception (check stderr)\n" << std::endl;}
