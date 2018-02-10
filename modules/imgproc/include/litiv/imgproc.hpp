@@ -218,8 +218,8 @@ void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, 
     cv::Mat oClusterLabels;
     std::array<double,nD> aSample;
     oBGModel.initLearning();
-    if(nBGSamples>0) {
-        cv::Mat oBGSamples(int(nBGSamples),(int)nD,CV_32FC1,s_aBGSamples.data());
+    if(nBGSamples>nD) {
+        cv::Mat oBGSamples((int)nBGSamples,(int)nD,CV_32FC1,s_aBGSamples.data());
         cv::kmeans(oBGSamples,int(nC1),oClusterLabels,cv::TermCriteria(CV_TERMCRIT_ITER,(int)nKMeansIters,0.0),0,cv::KMEANS_PP_CENTERS);
         for(size_t nSampleIdx=0; nSampleIdx<nBGSamples; ++nSampleIdx) {
             lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(s_aBGSamples[nSampleIdx*nD+nDimIdx]);});
@@ -228,8 +228,8 @@ void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, 
     }
     oBGModel.endLearning();
     oFGModel.initLearning();
-    if(nFGSamples>0) {
-        cv::Mat oFGSamples(int(nFGSamples),(int)nD,CV_32FC1,s_aFGSamples.data());
+    if(nFGSamples>nD) {
+        cv::Mat oFGSamples((int)nFGSamples,(int)nD,CV_32FC1,s_aFGSamples.data());
         cv::kmeans(oFGSamples,int(nC2),oClusterLabels,cv::TermCriteria(CV_TERMCRIT_ITER,(int)nKMeansIters,0.0),0,cv::KMEANS_PP_CENTERS);
         for(size_t nSampleIdx=0; nSampleIdx<nFGSamples; ++nSampleIdx) {
             lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(s_aFGSamples[nSampleIdx*nD+nDimIdx]);});
