@@ -827,33 +827,36 @@ namespace lv {
                 }
             }
             //////////////////////////////////////////////////////////////////////////////////////////////////
-            this->m_vvsGTPaths = std::vector<std::vector<std::string>>(nInputPackets);
+            this->m_vvsGTPaths = std::vector<std::vector<std::string>>();
             this->m_mGTIndexLUT.clear();
-            for(size_t nGTPacketIdx=0; nGTPacketIdx<nInputPackets; ++nGTPacketIdx) {
-                this->m_vvsGTPaths[nGTPacketIdx].resize(nGTStreamCount);
+            for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx) {
+                const size_t nOrigPacketIdx = *std::next(this->m_mSubset.begin(),nInputPacketIdx);
+                std::vector<std::string> vsGTPaths(nGTStreamCount);
                 const auto lIndexMatcher = [&](const std::string& sFilePath) {
-                    return sFilePath.find(lv::putf("%05d",(int)nGTPacketIdx))!=std::string::npos;
+                    return sFilePath.find(lv::putf("%05d",(int)nOrigPacketIdx))!=std::string::npos;
                 };
                 bool bGotPacket = false;
                 auto pRGBGTPath = std::find_if(vsRGBGTPaths.begin(),vsRGBGTPaths.end(),lIndexMatcher);
                 if(pRGBGTPath!=vsRGBGTPaths.end()) {
-                    this->m_vvsGTPaths[nGTPacketIdx][nGTRGBStreamIdx] = *pRGBGTPath;
+                    vsGTPaths[nGTRGBStreamIdx] = *pRGBGTPath;
                     bGotPacket = true;
                 }
                 auto pLWIRGTPath = std::find_if(vsLWIRGTPaths.begin(),vsLWIRGTPaths.end(),lIndexMatcher);
                 if(pLWIRGTPath!=vsLWIRGTPaths.end()) {
-                    this->m_vvsGTPaths[nGTPacketIdx][nGTLWIRStreamIdx] = *pLWIRGTPath;
+                    vsGTPaths[nGTLWIRStreamIdx] = *pLWIRGTPath;
                     bGotPacket = true;
                 }
                 if(this->m_bLoadDepth) {
                     auto pDepthGTPath = std::find_if(vsDepthGTPaths.begin(),vsDepthGTPaths.end(),lIndexMatcher);
                     if(pDepthGTPath!=vsDepthGTPaths.end()) {
-                        this->m_vvsGTPaths[nGTPacketIdx][nGTDepthStreamIdx] = *pDepthGTPath;
+                        vsGTPaths[nGTDepthStreamIdx] = *pDepthGTPath;
                         bGotPacket = true;
                     }
                 }
-                if(bGotPacket)
-                    this->m_mGTIndexLUT[nGTPacketIdx] = nGTPacketIdx; // direct gt path index to frame index mapping
+                if(bGotPacket) {
+                    this->m_vvsGTPaths.push_back(vsGTPaths);
+                    this->m_mGTIndexLUT[nInputPacketIdx] = this->m_vvsGTPaths.size()-1u;
+                }
             }
             //////////////////////////////////////////////////////////////////////////////////////////////////
             if(bFlipDisparities ^ this->m_bFlipDisparitiesInternal) {
