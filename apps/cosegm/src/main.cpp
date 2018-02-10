@@ -79,7 +79,7 @@
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=false */\
     PROCESS_PREPROC_BGSEGM?false:DATASET_EVAL_INPUT_SUBSET,/* bool bLoadFrameSubset=false */\
     DATASET_EVAL_GT_SUBSET,                       /* bool bEvalOnlyFrameSubset=false */\
-    PROCESS_PREPROC?0:(int)SegmMatcher::getTemporalDepth(),/* int nEvalTemporalWindowSize=0*/\
+    (PROCESS_PREPROC||DATASET_EVAL_OUTPUT_ONLY)?0:(int)SegmMatcher::getTemporalDepth(),/* int nEvalTemporalWindowSize=0*/\
     PROCESS_PREPROC?0:1,                          /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_LITIV2014
@@ -107,7 +107,7 @@
     false,                                        /* bool bFlipDisparities=false*/\
     PROCESS_PREPROC_BGSEGM?false:DATASET_EVAL_INPUT_SUBSET,/* bool bLoadFrameSubset=false */\
     DATASET_EVAL_GT_SUBSET,                       /* bool bEvalOnlyFrameSubset=false */\
-    PROCESS_PREPROC?0:(int)SegmMatcher::getTemporalDepth(),/* int nEvalTemporalWindowSize=0*/\
+    (PROCESS_PREPROC||DATASET_EVAL_OUTPUT_ONLY)?0:(int)SegmMatcher::getTemporalDepth(),/* int nEvalTemporalWindowSize=0*/\
     PROCESS_PREPROC?0:1,                          /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
