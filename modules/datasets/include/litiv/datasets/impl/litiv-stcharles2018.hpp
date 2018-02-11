@@ -753,9 +753,9 @@ namespace lv {
             }
             //////////////////////////////////////////////////////////////////////////////////////////////////
             if(bEvalDisparityMaps) {
-                if(!vsRGBGTPaths.empty() && cv::FileStorage(vsRGBGTPaths[0],cv::FileStorage::READ).isOpened())
+                if(!vsRGBGTPaths.empty() && !cv::FileStorage(vsRGBGTPaths[0],cv::FileStorage::READ).isOpened())
                     lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected RGB GT packet size/type",this->getName().c_str());
-                if(!vsLWIRGTPaths.empty() && cv::FileStorage(vsLWIRGTPaths[0],cv::FileStorage::READ).isOpened())
+                if(!vsLWIRGTPaths.empty() && !cv::FileStorage(vsLWIRGTPaths[0],cv::FileStorage::READ).isOpened())
                     lvError_("LITIV-stcharles2018 sequence '%s' did not possess expected LWIR GT packet size/type",this->getName().c_str());
             }
             else {
@@ -1078,14 +1078,15 @@ namespace lv {
                         lvAssert(oRGBCorresp.first+cv::Point2i(oRGBCorresp.second,0)==oLWIRCorresp.first);
                         lvAssert(oLWIRCorresp.first+cv::Point2i(oLWIRCorresp.second,0)==oRGBCorresp.first);
                         static constexpr int nMaxDisp = ILITIVStCharles2018Dataset::s_nDontCareDispLabel-1;
-                        const int nRGBDisp = (this->m_bFlipDisparitiesInternal?-oRGBCorresp.second:oRGBCorresp.second)-this->m_nLWIRDispOffset;
-                        const int nLWIRDisp = (this->m_bFlipDisparitiesInternal?-oLWIRCorresp.second:oLWIRCorresp.second)+this->m_nLWIRDispOffset;
-                        lvAssert_(nRGBDisp>0 && nRGBDisp<=nMaxDisp && nLWIRDisp>0 && nLWIRDisp<=nMaxDisp,"bad corresp disp offset");
-                        oRGBPacket.at<uchar>(oRGBCorresp.first) = (uchar)nRGBDisp;
-                        oLWIRPacket.at<uchar>(oLWIRCorresp.first) = (uchar)nLWIRDisp;
+                        const int nDispValue = (this->m_bFlipDisparitiesInternal?oRGBCorresp.second:-oRGBCorresp.second)+this->m_nLWIRDispOffset;
+                        //lvAssert_(nDispValue>=0 && nDispValue<=nMaxDisp,"bad corresp disp offset");
+                        if(nDispValue>=0 && nDispValue<=nMaxDisp) { // @@@ might need to readjust min/max disp ranges for vid07/08 later
+                            oRGBPacket.at<uchar>(oRGBCorresp.first) = (uchar)nDispValue;
+                            oLWIRPacket.at<uchar>(oLWIRCorresp.first) = (uchar)nDispValue;
+                        }
                     }
                     if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
-                        lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
+                        lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f),cv::BORDER_CONSTANT,cv::Scalar_<uchar>(255u));
                     if(oRGBPacket.size()!=vGTInfos[nGTRGBStreamIdx].size())
                         cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBStreamIdx].size(),0,0,cv::INTER_NEAREST);
                     if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
