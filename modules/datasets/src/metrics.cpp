@@ -175,7 +175,7 @@ cv::Mat lv::StereoDispErrors::getColoredMask(const cv::Mat& _oDispMap, const cv:
     lvAssert_((_oGT.empty() || _oDispMap.size()==_oGT.size()) && (oROI.empty() || _oDispMap.size()==oROI.size()),"all input mat sizes must match");
     lvAssert_(fMaxError>0.0f,"bad max disparity error value for color map scaling");
     if(_oGT.empty())
-        return cv::Mat(_oDispMap.size(),CV_8UC3,cv::Scalar::all(0));
+        return cv::Mat(_oDispMap.size(),CV_8UC3,cv::Scalar::all(92));
     cv::Mat_<float> oDispMap,oGT,oErrorMap;
     if(_oDispMap.type()==CV_32FC1)
         oDispMap = _oDispMap;
@@ -218,7 +218,10 @@ cv::Mat lv::StereoDispErrors::getColoredMask(const cv::Mat& _oDispMap, const cv:
     cv::Mat oOutput;
     cv::normalize(oErrorMap,oOutput,255,0,cv::NORM_MINMAX,CV_8U);
     oOutput.at<uchar>(0,0) = uchar((fOldErrorMapCornerVal/fMaxError)*255);
+    cv::dilate(oOutput,oOutput,cv::Mat(),cv::Point(-1,-1),2);
     cv::applyColorMap(oOutput,oOutput,cv::COLORMAP_HOT);
+    if(!oROI.empty())
+        cv::Mat(oOutput.size(),CV_8UC3,cv::Scalar_<uchar>::all(92)).copyTo(oOutput,oROI==0);
     return oOutput;
 }
 
