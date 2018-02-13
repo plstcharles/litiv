@@ -20,6 +20,7 @@ add_files(SOURCE_FILES
     "src/EdgeDetectorCanny.cpp"
     "src/EdgeDetectorLBSP.cpp"
     "src/imgproc.cpp"
+    "src/imwarp.cpp"
 )
 add_files(INCLUDE_FILES
     "include/litiv/imgproc/CosegmentationUtils.hpp"
@@ -27,6 +28,7 @@ add_files(INCLUDE_FILES
     "include/litiv/imgproc/EdgeDetectionUtils.hpp"
     "include/litiv/imgproc/EdgeDetectorCanny.hpp"
     "include/litiv/imgproc/EdgeDetectorLBSP.hpp"
+    "include/litiv/imgproc/imwarp.hpp"
     "include/litiv/imgproc.hpp"
 )
 
