@@ -23,6 +23,7 @@
 
 #include "litiv/datasets.hpp" // for parsers only, not truly required here
 #include <opencv2/calib3d.hpp>
+#include <litiv/imgproc/imwarp.hpp>
 
 #ifndef DATASETS_LITIV2018_LOAD_CALIB_DATA
 #define DATASETS_LITIV2018_LOAD_CALIB_DATA 0
@@ -42,6 +43,9 @@
 #ifndef DATASETS_LITIV2018_REMAP_MASKS
 #define DATASETS_LITIV2018_REMAP_MASKS 0
 #endif //DATASETS_LITIV2018_REMAP_MASKS
+#ifndef DATASETS_LITIV2018_REWARP_STRIDE
+#define DATASETS_LITIV2018_REWARP_STRIDE 20
+#endif //DATASETS_LITIV2018_REWARP_STRIDE
 
 namespace lv {
 
@@ -279,6 +283,7 @@ namespace lv {
         }
         /// returns whether the given packet index is at a break between two temporal windows (only useful when subset-processing, always false otherwise)
         bool isTemporalWindowBreak(size_t nPacketIdx) const {
+            lvDbgExceptionWatch;
             if(nPacketIdx==0u)
                 return true;
             const bool bLoadFrameSubset = this->isLoadingFrameSubset();
@@ -299,6 +304,7 @@ namespace lv {
         }
         /// returns the name (an index in string format) for a given packet index
         virtual std::string getInputName(size_t nPacketIdx) const override {
+            lvDbgExceptionWatch;
             if(nPacketIdx>=this->m_vvsInputPaths.size())
                 return "oob";
             const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
@@ -317,6 +323,108 @@ namespace lv {
                 lvDbgAssert(extractPathName(vsInputPaths[nInputRGBStreamIdx])==extractPathName(vsInputPaths[nInputLWIRStreamIdx]));
             }
             return extractPathName(vsInputPaths[nInputRGBStreamIdx]);
+        }
+        /// returns the result of inverse-remapping the given output packets (only useful when undistort/rectif is on)
+        inline std::vector<cv::Mat> inverseRemapOutput(const std::vector<cv::Mat>& vOutputs) const {
+            lvDbgExceptionWatch;
+            lvAssert_(this->m_bUndistort || this->m_bHorizRectify,"no map has been loaded");
+            lvAssert_(!vOutputs.empty() && vOutputs.size()==getGTStreamCount(),"bad output array size");
+            const cv::Size oRGBSize(1920,1080),oLWIRSize(320,240),oDepthSize(512,424);
+            const cv::Size oRectifSize(DATASETS_LITIV2018_RECTIFIED_SIZE);
+            const bool bFlipDisparities_true = (this->isFlippingDisparities()^this->m_bFlipDisparitiesInternal);
+            const size_t nOutputRGBStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_RGB);
+            const size_t nOutputLWIRStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_LWIR);
+            const size_t nOutputDepthStreamIdx = size_t(ILITIVStCharles2018Dataset::LITIV2018_Depth);
+            const std::vector<lv::MatInfo>& vGTInfos = this->m_vGTInfos;
+            lvDbgAssert(!vGTInfos.empty() && vGTInfos.size()==getGTStreamCount());
+            std::vector<cv::Mat> vRemapOutputs(getGTStreamCount());
+            ///////////////////////////////////////////////////////////////////////////////////
+            cv::Mat oRGBPacket = vOutputs[nOutputRGBStreamIdx].clone();
+            if(!oRGBPacket.empty()) {
+                lvAssert(oRGBPacket.size()==vGTInfos[nOutputRGBStreamIdx].size() && oRGBPacket.depth()==CV_8U);
+                if(!m_oRGBMapUnwarper.isInitialized()) {
+                    cv::Mat_<cv::Vec2f> oRGBMap(oRGBSize);
+                    for(int nRowIdx=0; nRowIdx<oRGBSize.height; ++nRowIdx)
+                        for(int nColIdx=0; nColIdx<oRGBSize.width; ++nColIdx)
+                            oRGBMap(nRowIdx,nColIdx) = cv::Vec2f((float)nColIdx,(float)nRowIdx);
+                    if(this->m_bHorizRectify)
+                        cv::resize(oRGBMap,oRGBMap,oRectifSize,0,0,cv::INTER_NEAREST);
+                    cv::remap(oRGBMap.clone(),oRGBMap,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST,cv::BORDER_CONSTANT,cv::Scalar::all(-1));
+                    cv::Mat oROI = this->m_vGTROIs[nOutputRGBStreamIdx].clone();
+                    if(bFlipDisparities_true)
+                        cv::flip(oROI,oROI,1);
+                    oRGBMap.setTo(cv::Scalar::all(-1),oROI==0);
+                    cv::resize(oRGBMap,oRGBMap,oRGBSize,0,0,cv::INTER_NEAREST);
+                    const int nStride = DATASETS_LITIV2018_REWARP_STRIDE;
+                    lvAssert_(nStride>0,"unwarp lut stride must be strictly positive");
+                    std::vector<cv::Point2d> vSourcePts,vDestPts;
+                    for(int nRowIdx=0; nRowIdx<oRGBSize.height; nRowIdx+=nStride) {
+                        for(int nColIdx=0; nColIdx<oRGBSize.width; nColIdx+=nStride) {
+                            const cv::Vec2f vPos = oRGBMap(nRowIdx,nColIdx);
+                            if(vPos[0]>=0.0f && vPos[1]>=0.0f) {
+                                vSourcePts.push_back(cv::Point2d(nColIdx,nRowIdx));
+                                vDestPts.push_back(cv::Point2d(vPos[0],vPos[1]));
+                            }
+                        }
+                    }
+                    m_oRGBMapUnwarper.initialize(vSourcePts,oRGBSize,vDestPts,oRGBSize);
+                }
+                if(bFlipDisparities_true)
+                    cv::flip(oRGBPacket,oRGBPacket,1);
+                if(oRGBPacket.size()!=oRGBSize)
+                    cv::resize(oRGBPacket,oRGBPacket,oRGBSize,0,0,cv::INTER_LINEAR);
+                m_oRGBMapUnwarper.warp(oRGBPacket,vRemapOutputs[nOutputRGBStreamIdx]);
+                lvAssert(lv::MatInfo(vRemapOutputs[nOutputRGBStreamIdx])==lv::MatInfo(oRGBPacket));
+                if(DATASETS_LITIV2018_FLIP_RGB)
+                    cv::flip(vRemapOutputs[nOutputRGBStreamIdx],vRemapOutputs[nOutputRGBStreamIdx],1);
+            }
+            cv::Mat oLWIRPacket = vOutputs[nOutputLWIRStreamIdx].clone();
+            if(!oLWIRPacket.empty()) {
+                lvAssert(oLWIRPacket.size()==vGTInfos[nOutputLWIRStreamIdx].size() && oLWIRPacket.depth()==CV_8U);
+                if(!m_oLWIRMapUnwarper.isInitialized()) {
+                    cv::Mat_<cv::Vec2f> oLWIRMap(oLWIRSize);
+                    for(int nRowIdx=0; nRowIdx<oLWIRSize.height; ++nRowIdx)
+                        for(int nColIdx=0; nColIdx<oLWIRSize.width; ++nColIdx)
+                            oLWIRMap(nRowIdx,nColIdx) = cv::Vec2f((float)nColIdx,(float)nRowIdx);
+                    if(this->m_bHorizRectify)
+                        cv::resize(oLWIRMap,oLWIRMap,oRectifSize,0,0,cv::INTER_NEAREST);
+                    cv::remap(oLWIRMap.clone(),oLWIRMap,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_NEAREST,cv::BORDER_CONSTANT,cv::Scalar::all(-1));
+                    cv::Mat oROI = this->m_vGTROIs[nOutputLWIRStreamIdx].clone();
+                    if(bFlipDisparities_true)
+                        cv::flip(oROI,oROI,1);
+                    oLWIRMap.setTo(cv::Scalar::all(-1),oROI==0);
+                    cv::resize(oLWIRMap,oLWIRMap,oLWIRSize,0,0,cv::INTER_NEAREST);
+                    const int nStride = DATASETS_LITIV2018_REWARP_STRIDE;
+                    lvAssert_(nStride>0,"unwarp lut stride must be strictly positive");
+                    std::vector<cv::Point2d> vSourcePts,vDestPts;
+                    for(int nRowIdx=0; nRowIdx<oLWIRSize.height; nRowIdx+=nStride) {
+                        for(int nColIdx=0; nColIdx<oLWIRSize.width; nColIdx+=nStride) {
+                            const cv::Vec2f vPos = oLWIRMap(nRowIdx,nColIdx);
+                            if(vPos[0]>=0.0f && vPos[1]>=0.0f) {
+                                vSourcePts.push_back(cv::Point2d(nColIdx,nRowIdx));
+                                vDestPts.push_back(cv::Point2d(vPos[0],vPos[1]));
+                            }
+                        }
+                    }
+                    m_oLWIRMapUnwarper.initialize(vSourcePts,oLWIRSize,vDestPts,oLWIRSize);
+                }
+                if(bFlipDisparities_true)
+                    cv::flip(oLWIRPacket,oLWIRPacket,1);
+                if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
+                    lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(-this->m_nLWIRDispOffset),0.0f));
+                if(oLWIRPacket.size()!=oLWIRSize)
+                    cv::resize(oLWIRPacket,oLWIRPacket,oLWIRSize,0,0,cv::INTER_LINEAR);
+                m_oLWIRMapUnwarper.warp(oLWIRPacket,vRemapOutputs[nOutputLWIRStreamIdx]);
+                lvAssert(lv::MatInfo(vRemapOutputs[nOutputLWIRStreamIdx])==lv::MatInfo(oLWIRPacket));
+            }
+            if(this->m_bLoadDepth) {
+                cv::Mat oDepthPacket = vOutputs[nOutputDepthStreamIdx].clone();
+                if(!oDepthPacket.empty()) {
+                    lvAssert(oDepthPacket.size()==vGTInfos[nOutputDepthStreamIdx].size() && oDepthPacket.depth()==CV_8U);
+                    lvAssert_(false,"missing impl");
+                }
+            }
+            return vRemapOutputs;
         }
 
     protected:
@@ -1172,6 +1280,7 @@ namespace lv {
             return vGTs;
         }
         inline std::string extractPathName(const std::string& sFilePath) const {
+            lvDbgExceptionWatch;
             const size_t nLastInputSlashPos = sFilePath.find_last_of("/\\");
             const std::string sInputFileNameExt = nLastInputSlashPos==std::string::npos?sFilePath:sFilePath.substr(nLastInputSlashPos+1);
             const size_t nLastInputDotPos = sInputFileNameExt.find_last_of('.');
@@ -1179,6 +1288,7 @@ namespace lv {
             return sInputFileName;
         }
         inline size_t extractPathIndex(const std::string& sFilePath) const {
+            lvDbgExceptionWatch;
             const std::string sFileName = extractPathName(sFilePath);
             lvDbgAssert(!sFileName.empty());
             return (size_t)std::stoi(sFileName);
@@ -1198,6 +1308,7 @@ namespace lv {
         cv::Mat m_oLWIRCalibMap1,m_oLWIRCalibMap2;
         std::vector<lv::MatInfo> m_vOrigInputInfos,m_vOrigGTInfos;
         std::vector<std::string> m_vsC2DMapPaths;
+        mutable ImageWarper m_oRGBMapUnwarper,m_oLWIRMapUnwarper;
     public:
     #if DATASETS_LITIV2018_LOAD_CALIB_DATA
         std::vector<bool> isCalibInputValid(size_t nPacketIdx) {

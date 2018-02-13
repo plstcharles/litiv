@@ -683,6 +683,9 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             if(lv::getVerbosity()>=3) {
                 lvAssert(oBatch.getGTStreamCount()==vCurrFGMasks.size() && oBatch.getGTStreamCount()==vCurrStereoMaps.size());
                 const std::vector<cv::Mat>& vCurrEvalRes = oBatch.getColoredMaskArray(oBatch.isEvaluatingDisparities()?vCurrStereoMaps:vCurrFGMasks,nCurrIdx);
+                //const std::vector<cv::Mat>& vCurrEvalResRemap = oBatch.inverseRemapOutput(vCurrEvalRes);
+                //lv::createDirIfNotExist(oBatch.getOutputPath()+"segm-dbg/");
+                //lv::createDirIfNotExist(oBatch.getOutputPath()+"segm-dbg2/");
                 for(size_t nDisplayRowIdx=0; nDisplayRowIdx<nCameraCount; ++nDisplayRowIdx) {
                     vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
                     vCurrInput[nDisplayRowIdx*2+1].copyTo(vvDisplayPairs[nDisplayRowIdx][1].first);
@@ -691,6 +694,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                     pAlgo->getResegmMapDisplay(0,nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][3].first);
                 #endif //!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_ONLY
                     vCurrEvalRes[nDisplayRowIdx].copyTo(vvDisplayPairs[nDisplayRowIdx][4].first);
+                    //cv::imwrite(oBatch.getOutputPath()+"segm-dbg/"+sPacketName+"_"+std::to_string(nDisplayRowIdx)+".png",vCurrEvalRes[nDisplayRowIdx]);
+                    //cv::imwrite(oBatch.getOutputPath()+"segm-dbg2/"+sPacketName+"_"+std::to_string(nDisplayRowIdx)+".png",vCurrEvalResRemap[nDisplayRowIdx]);
                 }
                 lvAssert(pDisplayHelper);
                 pDisplayHelper->display(vvDisplayPairs,cv::Size(320,240));
