@@ -1247,7 +1247,7 @@ void SegmMatcher::GraphModelData::buildStereoModel() {
         //    ... (check stride too)
         //    oBaseNode.vpCliques.push_back(&oBaseNode.oEpipolarClique);
         //    oBaseNode.vCliqueMemberLUT.push_back(std::make_pair(m_nStereoCliqueCount,size_t(0)));
-        //        oOffsetNode.vCliqueMemberLUT.push_back(std::make_pair(m_nStereoCliqueCount,size_t(@@)));
+        //        oOffsetNode.vCliqueMemberLUT.push_back(std::make_pair(m_nStereoCliqueCount,size_t(..)));
     #if SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN
         static_assert(false,"missing impl");
     #endif //SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN
@@ -2756,7 +2756,7 @@ void SegmMatcher::GraphModelData::calcStereoMoveCosts(InternalLabelType nNewLabe
     lvDbgExceptionWatch;
     lvDbgAssert(m_oGridSize.total()==m_vStereoNodeMap.size() && m_oGridSize.total()>1 && m_oGridSize==m_oStereoUnaryCosts.size);
     const InternalLabelType* pCurrLabeling = ((InternalLabelType*)m_aaStereoLabelings[0][m_nPrimaryCamIdx].data);
-    // @@@@@ openmp here?
+    // #### openmp here?
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidStereoGraphNodes; ++nGraphNodeIdx) {
         const size_t nLUTNodeIdx = m_vStereoGraphIdxToMapIdxLUT[nGraphNodeIdx];
         const StereoNodeInfo& oNode = m_vStereoNodeMap[nLUTNodeIdx];
@@ -2772,7 +2772,7 @@ void SegmMatcher::GraphModelData::calcStereoMoveCosts(InternalLabelType nNewLabe
 void SegmMatcher::GraphModelData::calcResegmMoveCosts(InternalLabelType nNewLabel) const {
     lvDbgExceptionWatch;
     lvDbgAssert(m_oResegmUnaryCosts.rows==int(m_oGridSize[0]*getTemporalLayerCount()*getCameraCount()) && m_oResegmUnaryCosts.cols==int(m_oGridSize[1]));
-    // @@@@@ openmp here?
+    // #### openmp here?
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidResegmGraphNodes; ++nGraphNodeIdx) {
         const size_t nLUTNodeIdx = m_vResegmGraphIdxToMapIdxLUT[nGraphNodeIdx];
         const ResegmNodeInfo& oNode = m_vResegmNodeMap[nLUTNodeIdx];
@@ -3160,7 +3160,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
     });
     lvDbgAssert(!m_vStereoLabelOrdering.empty() && m_vStereoLabelOrdering[0]==m_nDontCareLabelIdx);
     lvDbgAssert(lv::unique(m_vStereoLabelOrdering.begin(),m_vStereoLabelOrdering.end())==lv::make_range(InternalLabelType(0),InternalLabelType(m_nStereoLabels-1)));
-    // note: sospd might not follow this label order if using alpha heights strategy (reimpl to use same strat in every solver?) @@@
+    // note: sospd might not follow this label order if using alpha heights strategy (reimpl to use same strat in every solver?) ####
     lv::StopWatch oLocalTimer;
     ValueType tLastStereoEnergy=m_pStereoInf->value(),tLastResegmEnergy=std::numeric_limits<ValueType>::max();
     m_oSuperStackedResegmLabeling.copyTo(m_oInitSuperStackedResegmLabeling);

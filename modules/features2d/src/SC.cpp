@@ -171,7 +171,7 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::cuda::GpuMat& oDescMap_de
             for(int nColIdx=0; nColIdx<m_oCurrImageSize.width; ++nColIdx)
                 m_oKeyPts(nKeyPtIdx++) = cv::Point2f((float)nColIdx,(float)nRowIdx);
         m_bUsingFullKeyPtMap = true;
-        m_oKeyPts_dev.upload(m_oKeyPts); // blocking call @@@
+        m_oKeyPts_dev.upload(m_oKeyPts); // blocking call
     }
     if(!m_bUseRelativeSpace && !m_bRotationInvariant) {
         lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
@@ -230,7 +230,7 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
         m_bUsingFullKeyPtMap = true;
     #if HAVE_CUDA
         if(m_bUseCUDA)
-            m_oKeyPts_dev.upload(m_oKeyPts); // blocking call @@@
+            m_oKeyPts_dev.upload(m_oKeyPts); // blocking call
     #endif //HAVE_CUDA
     }
     if(!m_bUseRelativeSpace && !m_bRotationInvariant)
@@ -255,7 +255,7 @@ void ShapeContext::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& vo
     }
 #if HAVE_CUDA
     if(m_bUseCUDA)
-        m_oKeyPts_dev.upload(m_oKeyPts); // blocking call @@@
+        m_oKeyPts_dev.upload(m_oKeyPts); // blocking call
 #endif //HAVE_CUDA
     if(!m_bUseRelativeSpace && !m_bRotationInvariant)
         scdesc_fill_desc_direct(oDescMap,true);
@@ -298,7 +298,7 @@ void ShapeContext::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMas
         m_oKeyPts((int)nKeyPtIdx) = voKeypoints[nKeyPtIdx].pt;
 #if HAVE_CUDA
     if(m_bUseCUDA)
-        m_oKeyPts_dev.upload(m_oKeyPts); // blocking call @@@
+        m_oKeyPts_dev.upload(m_oKeyPts); // blocking call
 #endif //HAVE_CUDA
     _oDescriptors.create((int)voKeypoints.size(),m_nRadialBins*m_nAngularBins,CV_32FC1);
     cv::Mat_<float> oDescriptors = cv::Mat_<float>(_oDescriptors.getMat());
@@ -377,7 +377,7 @@ void ShapeContext::scdesc_generate_emdmask() {
                 m_oEMDCostMap(nBaseDescIdx,nOffsetDescIdx) = (float)cv::norm(cv::Mat(vOffsetCoord-vBaseCoord),cv::NORM_L2);
             }
         }
-        m_oEMDCostMap /= double(m_nOuterRadius)/2; // @@@@@ normalize costs based on half desc radius
+        m_oEMDCostMap /= double(m_nOuterRadius)/2; // normalize costs based on half desc radius
     }
     else {
         lvDbgAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
@@ -399,7 +399,7 @@ void ShapeContext::scdesc_generate_emdmask() {
                 }
             }
         }
-        m_oEMDCostMap /= m_vRadialLimits.back()/2; // @@@@@ normalize costs based on half desc radius
+        m_oEMDCostMap /= m_vRadialLimits.back()/2; // normalize costs based on half desc radius
     }
 }
 
@@ -427,7 +427,7 @@ void ShapeContext::scdesc_fill_contours(const cv::Mat& oImage) {
 #if HAVE_CUDA
     if(m_bUseCUDA) {
         m_oDistMask_dev.upload(m_oDistMask);
-        m_oContourPts_dev.upload(m_oContourPts); // blocking call @@@
+        m_oContourPts_dev.upload(m_oContourPts); // blocking call
     }
 #endif //HAVE_CUDA
 }
@@ -541,7 +541,7 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
         oParams.vGridSize = bGenDescMap?dim3((uint)m_oCurrImageSize.width,(uint)m_oCurrImageSize.height):dim3((uint)nDescCount);
         oParams.nSharedMemSize = size_t(std::ceil(float(m_nDescSize)/nWarpSize)*nWarpSize*2)*sizeof(float);
         device::scdesc_fill_desc_direct(oParams,m_oKeyPts_dev,m_oContourPts_dev,m_oDistMask_dev,m_pDescLUMap_tex,m_oAbsDescLUMap.rows,m_oDescriptors_dev,m_bNonZeroInitBins,bGenDescMap,m_bNormalizeBins);
-        m_oDescriptors_dev.download(oDescriptors); // blocking call @@@
+        m_oDescriptors_dev.download(oDescriptors); // blocking call
         if(bGenDescMap)
             oDescriptors = oDescriptors.reshape(0,3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
         return;

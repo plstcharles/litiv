@@ -21,7 +21,6 @@
 #include "litiv/video/BackgroundSubtractorSuBSENSE.hpp"
 #include "litiv/video/BackgroundSubtractorPAWCS.hpp"
 #if HAVE_OPENGM
-// @@@@@ add public vidsegm impls here
 #include "litiv/video/VideoCosegmentationUtils.hpp"
 #else //!HAVE_OPENGM
 #include "litiv/video/VideoCosegmentationUtils.hpp"

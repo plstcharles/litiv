@@ -74,7 +74,7 @@ namespace lv {
             LITIV2018_RGB=0,
             LITIV2018_LWIR=1,
             LITIV2018_Depth=2,
-            // @@@@ should add stream for body joints...
+            // #### should add stream for body joints...
             //LITIV2018_Joints,
         };
         /// value used for 'dont care' labeling in disparity maps
@@ -199,7 +199,7 @@ namespace lv {
             public IDataProducerWrapper_<eDatasetTask,DatasetSource_VideoArray,Dataset_LITIV_stcharles2018> {
         /// returns the number of parallel input streams (depends on whether loading depth or not)
         virtual size_t getInputStreamCount() const override final {
-            // @@@@ should add stream for body joints...
+            // #### should add stream for body joints...
             return size_t((m_bLoadDepth?3:2)*(m_nLoadInputMasks?2:1));
         }
         /// returns the number of parallel gt streams (depends on whether loading depth or not)
@@ -1188,7 +1188,7 @@ namespace lv {
                         static constexpr int nMaxDisp = ILITIVStCharles2018Dataset::s_nDontCareDispLabel-1;
                         const int nDispValue = (this->m_bFlipDisparitiesInternal?oRGBCorresp.second:-oRGBCorresp.second)+this->m_nLWIRDispOffset;
                         //lvAssert_(nDispValue>=0 && nDispValue<=nMaxDisp,"bad corresp disp offset");
-                        if(nDispValue>=0 && nDispValue<=nMaxDisp) { // @@@ might need to readjust min/max disp ranges for vid07/08 later
+                        if(nDispValue>=0 && nDispValue<=nMaxDisp) { // @@@ might need to readjust min/max disp ranges for vid07/08 in v06?
                             oRGBPacket.at<uchar>(oRGBCorresp.first) = (uchar)nDispValue;
                             oLWIRPacket.at<uchar>(oLWIRCorresp.first) = (uchar)nDispValue;
                         }

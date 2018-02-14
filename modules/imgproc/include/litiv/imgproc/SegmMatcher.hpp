@@ -30,7 +30,7 @@ struct SegmMatcher : ICosegmentor<int32_t,4> { // camera count could be template
     using OutputLabelType = int32_t; ///< type used in returned labelings (i.e. output of 'apply')
     using AssocCountType = uint16_t; ///< type used for stereo association counting in cv::Mat_'s
     using AssocIdxType = int16_t; ///< type used for stereo association idx listing in cv::Mat_'s
-    using ValueType =  int32_t; ///< type used for factor values (@@@@ could be integer? retest speed later?)
+    using ValueType =  int32_t; ///< type used for factor lut values and global cost estimations
     using IndexType = size_t; ///< type used for node indexing (note: pretty much hardcoded everywhere in impl below)
     using ICosegmentor<OutputLabelType,s_nInputArraySize,s_nOutputArraySize>::apply; ///< helps avoid 'no matching function' issues for apply overloads
     template<typename T> using CamArray = std::array<T,getInputStreamCount()/2>; ///< shortcut typename for variables and members that are assigned to each camera head

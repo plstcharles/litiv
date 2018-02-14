@@ -40,11 +40,11 @@
 #ifndef DATASET_ID
 #define DATASET_ID Dataset_Custom
 #define DATASET_PARAMS \
-    "@@@@",                                                      /* => const std::string& sDatasetName */ \
-    "@@@@",                                                      /* => const std::string& sDatasetDirPath */ \
+    "####",                                                      /* => const std::string& sDatasetName */ \
+    "####",                                                      /* => const std::string& sDatasetDirPath */ \
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirPath */ \
-    std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsWorkBatchDirs */ \
-    std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsSkippedDirTokens */ \
+    std::vector<std::string>{"###","###","###","..."},           /* => const std::vector<std::string>& vsWorkBatchDirs */ \
+    std::vector<std::string>{"###","###","###","..."},           /* => const std::vector<std::string>& vsSkippedDirTokens */ \
     bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
     bool(EVALUATE_OUTPUT),                                       /* => bool bUseEvaluator */ \
     false,                                                       /* => bool bForce4ByteDataAlign */ \

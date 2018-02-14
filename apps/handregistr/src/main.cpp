@@ -508,7 +508,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     lvAssert(!vvWorldPts.empty());
 
 #if USE_INTRINSIC_GUESS
-    @@@cleanup, retest (with target scale)
+    #### cleanup, retest (with target scale)
     aCamMats[0] = cv::initCameraMatrix2D(vvWorldPts,avvImagePts[0],oOrigImgSize,/*1.0*/1.27);
     //aCamMats[0] = (cv::Mat_<double>(3,3) << 531.15,0,320,  0,416.35,240,  0,0,1);
     aCamMats[1] = cv::initCameraMatrix2D(vvWorldPts,avvImagePts[1],oOrigImgSize,/*1.0*/1.27);

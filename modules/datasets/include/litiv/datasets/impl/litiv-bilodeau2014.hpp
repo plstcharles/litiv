@@ -289,7 +289,7 @@ namespace lv {
             std::ifstream oGTDispFile(sGTDispFilePath);
             lvAssert__(oGTDispFile.is_open(),"could not open gt disparity file at '%s'",sGTDispFilePath.c_str());
             if(this->m_bLoadFullVideos) {
-                lvAssert_(false,"missing impl"); // @@@@
+                lvAssert_(false,"missing impl");
                 // need to add video reader, override getInputCount, ...
             }
             else {
@@ -540,7 +540,7 @@ namespace lv {
             const std::vector<lv::MatInfo>& vInputInfos = this->m_vInputInfos;
             lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
             if(this->m_bLoadFullVideos) {
-                lvAssert(false); // missing impl @@@@
+                lvAssert(false); // missing impl
             }
             else {
                 const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
@@ -593,14 +593,14 @@ namespace lv {
                 const std::vector<lv::MatInfo>& vGTInfos = this->m_vGTInfos;
                 lvDbgAssert(!vGTInfos.empty() && vGTInfos.size()==getGTStreamCount());
                 if(this->m_bLoadFullVideos) {
-                    lvAssert(false); // missing impl @@@@
+                    lvAssert(false); // missing impl
                 }
                 else {
                     const std::vector<std::string>& vsGTMasksPaths = this->m_vvsGTPaths[nGTIdx];
                     lvDbgAssert(!vsGTMasksPaths.empty() && vsGTMasksPaths.size()==getGTStreamCount());
                     /*cv::Mat oRGBPacket = cv::imread(vsGTMasksPaths[nGTRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==oImageSize);*/
-                    // @@@@ no RGB packet in current dataset (gt is only for thermal)
+                    // ##### no RGB packet in current dataset (gt is only for thermal)
                     lvAssert(this->m_bEvalDisparities); // missing impl for 'dont care' rgb packet if eval foreground masks
                     cv::Mat oRGBPacket = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255)); // init with oob 'dont care' value for disparity
                     if(oRGBPacket.size()!=vGTInfos[nGTRGBMaskStreamIdx].size())

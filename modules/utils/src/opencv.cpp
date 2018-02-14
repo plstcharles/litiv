@@ -313,7 +313,7 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
         m_bFirstDisplay = false;
     }
     lvAssert(m_oLastDisplay.size()==oFinalDisplaySize);
-    cv::namedWindow(m_sDisplayName,m_nDisplayFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
+    cv::namedWindow(m_sDisplayName,m_nDisplayFlags); // #### if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
     cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
     cv::imshow(m_sDisplayName,m_oLastDisplay);
     m_oLastDisplaySize = m_oLastDisplay.size();
@@ -373,7 +373,7 @@ void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::M
         m_bMustDestroy = true;
     };
     size_t nCurrAlbumIdx = 0;
-    cv::namedWindow(m_sDisplayName,m_nDisplayFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
+    cv::namedWindow(m_sDisplayName,m_nDisplayFlags); // #### if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
     cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
     lDisplay(nCurrAlbumIdx);
     m_oLastTileSize = m_oLastDisplaySize = m_oLastDisplay.size();

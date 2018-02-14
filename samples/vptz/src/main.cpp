@@ -64,9 +64,9 @@ int main(int /*argc*/, char** /*argv*/) {
                 lvAssert(!oTargetImg.empty() && oTargetImg.type()==CV_8UC4);
                 cv::Rect oTargetBBox((oCurrImg.cols-oTargetImg.cols)/2,(oCurrImg.rows-oTargetImg.rows)/2,oTargetImg.cols,oTargetImg.rows); // assuming target starts centered in first frame
 
-                //////////////////////////////////////////////////////////////////////////////
-                // @@@@ TODO: initialize your own tracker here using oCurrImg and oTargetBBox
-                //////////////////////////////////////////////////////////////////////////////
+                ///////////////////////////////////////////////////////////////////
+                // initialize your own tracker here using oCurrImg and oTargetBBox
+                ///////////////////////////////////////////////////////////////////
 
                 oTestEval.BeginTesting();
                 while(!oCurrImg.empty()) {
@@ -77,9 +77,9 @@ int main(int /*argc*/, char** /*argv*/) {
                         break;
                     lvAssert(oCurrImg.type()==CV_8UC4);
 
-                    /////////////////////////////////////////////////////////////////////////////
-                    // @@@@ TODO: feed oCurrImg to your own tracker here, and update oTargetBBox
-                    /////////////////////////////////////////////////////////////////////////////
+                    //////////////////////////////////////////////////////////////////
+                    // feed oCurrImg to your own tracker here, and update oTargetBBox
+                    //////////////////////////////////////////////////////////////////
 
                     oTestEval.UpdateCurrentResult(oTargetBBox);
                     cv::Mat oCurrImg_display = oCurrImg.clone();
