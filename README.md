@@ -29,8 +29,8 @@ The primary goal here is to have the framework core only depend on OpenCV/CMake,
 * [GLEW](http://glew.sourceforge.net/) >= 1.9.0 (optional, for GLSL implementations)
 * [GLM](http://glm.g-truc.net/) (optional, for GLSL implementations)
 * [CUDA](https://developer.nvidia.com/cuda-toolkit) >= 7.0 with compute >=3.0 (optional, for some optimizations)
-* [Boost](http://www.boost.org/) >= 1.49 (optional, for some 3rdparty implementations)
-* [OpenGM](https://github.com/plstcharles/opengm) (optional, for graph-based implementations)
+* [Boost](http://www.boost.org/) >= 1.49 (optional, for some 3rdparty implementations, e.g. SoSPD)
+* [OpenGM](https://github.com/plstcharles/opengm) (optional, for mutual segmentation algorithms)
 
 A dockerfile which builds an Ubuntu image including all these dependencies is available [here](./Dockerfile). The images built by Travis are periodically uploaded to Docker Hub [here](https://hub.docker.com/r/plstcharles/litiv-base/) and [here](https://hub.docker.com/r/plstcharles/litiv/).
 
