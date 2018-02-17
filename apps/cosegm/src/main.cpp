@@ -79,7 +79,7 @@
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=false */\
     PROCESS_PREPROC_BGSEGM?false:DATASET_EVAL_INPUT_SUBSET,/* bool bLoadFrameSubset=false */\
     DATASET_EVAL_GT_SUBSET,                       /* bool bEvalOnlyFrameSubset=false */\
-    (PROCESS_PREPROC||DATASET_EVAL_OUTPUT_ONLY)?0:(int)SegmMatcher::getTemporalDepth(),/* int nEvalTemporalWindowSize=0*/\
+    PROCESS_PREPROC?0:(int)SegmMatcher::getTemporalDepth(),/* int nEvalTemporalWindowSize=0*/\
     PROCESS_PREPROC?0:1,                          /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_LITIV2014
@@ -612,7 +612,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         #endif //DATASET_EVAL_APPROX_MASKS_ONLY
         #if DATASET_EVAL_OUTPUT_ONLY
                 if(oBatch.isEvaluatingDisparities()) {
-                    lvAssert(!vArchivedOutput[nOutputDispIdx].empty());
+                    lvAssert__(!vArchivedOutput[nOutputDispIdx].empty(),"could not open packet '%s'",sPacketName.c_str());
                     vArchivedOutput[nOutputDispIdx].convertTo(vCurrOutput[nOutputDispIdx],CV_32S);
                     if(vArchivedOutput[nOutputSegmIdx].empty())
                         cv::Mat_<OutputType>(oInfoArray[nStreamIdx].size(),OutputType(0)).copyTo(vCurrOutput[nOutputSegmIdx]); // only to fool output checks
@@ -620,7 +620,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                         vArchivedOutput[nOutputSegmIdx].convertTo(vCurrOutput[nOutputSegmIdx],CV_32S);
                 }
                 else {
-                    lvAssert(!vArchivedOutput[nOutputSegmIdx].empty());
+                    lvAssert__(!vArchivedOutput[nOutputSegmIdx].empty(),"could not open packet '%s'",sPacketName.c_str());
                     vArchivedOutput[nOutputSegmIdx].convertTo(vCurrOutput[nOutputSegmIdx],CV_32S);
                     if(vArchivedOutput[nOutputDispIdx].empty())
                         cv::Mat_<OutputType>(oInfoArray[nStreamIdx].size(),OutputType(0)).copyTo(vCurrOutput[nOutputDispIdx]); // only to fool output checks
