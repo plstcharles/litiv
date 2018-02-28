@@ -22,12 +22,16 @@ Here is a non-exhaustive (and probably not fully up-to-date) list of features:
     - Mutex'd cerr and cout printers
     - Symbol export/import logic for WIN32 via LV_PUBLIC and LV_LOCAL macros
   - CUDA:
-    - helper functions for error handling, + basic test kernel
+    - Version/compute/architecture define flags taken from cmake
+    - Initialization function w/ test kernel execution for device warmup
+    - Helper functions for error handling and kernel param passing
   - OpenCV:
     - Type compatiblity lookup helpers (templated, constexpr)
     - Mat type/size helpers w/ support for printing in ostreams
     - Submatrix getters & squeezers for templated opencv matrices
+    - Bilinear interp value getters for 2D matrices
     - Generic matrix allocators/element getters for sparse/dense mats
+    - Matrix content copy function w/ double ROI validation
     - Vector-based opencv matrix concatenator
     - Random pixel lookup functions (based on 4-NN, 8-NN, Gaussian kernels, ...)
     - Matrix printer for 1D/2D templated array types
@@ -35,13 +39,18 @@ Here is a non-exhaustive (and probably not fully up-to-date) list of features:
     - BGR to HSL to BGR image color converters
     - BGR to packed YCbCr to BGR image color converters
     - Color map generator for 2d arrays with unique labels
+    - Color map generator for optical flow maps (2D vectors)
     - Display helper object with mouse feedback for debugging
-    - Generic cv::Mat archiver/loader (binary, text, or YML format)
+    - Generic cv::Mat archiver/loader (binary, text, YML, LZ4-compressed)
     - Matrix pixel circular shifting algorithm
     - Aligned memory allocator for opencv matrices
   - OpenGM:
     - Graph model info printer utility
-    - ExplicitViewFunction implementation to avoid in-graph reallocations
+    - Config define flags taken from CMake module parser
+    - ExplicitViewFunction implementation to avoid in-graph LUT reallocations
+    - ExplicitScaledViewFunction implementation; same as above w/ scale factor
+    - Clique interface and static implementations for fast node info lookup
+    - Higher order factor reduction utilities for QPBO interfaces (from FGBZ)
   - SIMD:
     - Wrappers for missing SSE calls (e.g. _mm_mullo_epi32, _mm_extract_epi32)
     - Horizontal SSE sums/min/max functions
