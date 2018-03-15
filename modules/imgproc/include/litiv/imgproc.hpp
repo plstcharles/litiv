@@ -50,6 +50,11 @@ namespace lv {
     /// returns the median value of pixel occurrences for a small-type, single-channel matrix (8U or 16U only)
     int calcMedianValue(const cv::Mat& oInput, const cv::Mat_<uchar>& oMask=cv::Mat(), std::vector<int>* pHistCounts=nullptr);
 
+    /// performs a median blur on the given matrix with a mask passed as argument (all mats 8U only, for now)
+    void medianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, uchar nDefaultVal=0u);
+    /// performs a median blur on the given binary matrix with a mask passed as argument (all mats 8U only, for now)
+    void binaryMedianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, uchar nDefaultVal=0u);
+
     /// performs non-maximum suppression on the input image, with a (nWinSize)x(nWinSize) window
     template<int nWinSize>
     void nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oMask=cv::Mat());

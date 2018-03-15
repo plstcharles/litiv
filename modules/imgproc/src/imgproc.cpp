@@ -217,6 +217,85 @@ int lv::calcMedianValue(const cv::Mat& oInput, const cv::Mat_<uchar>& oMask, std
     return nBinVal;
 }
 
+void lv::medianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, uchar nDefaultVal) {
+    lvAssert_(!oInput.empty() && oInput.type()==CV_8UC1 && oInput.isContinuous(),"bad input matrix");
+    lvAssert_(oOutput.empty() || (oOutput.type()==CV_8UC1 && oOutput.size()==oInput.size() && oOutput.isContinuous()),"bad output matrix");
+    lvAssert_(oMask.empty() || (oMask.type()==CV_8UC1 && oMask.size()==oInput.size() && oMask.isContinuous()),"bad mask matrix");
+    lvAssert_(nKernelSize>1 && (nKernelSize%2)==1,"bad kernel size");
+    if(oMask.empty()) {
+        cv::medianBlur(oInput,oOutput,nKernelSize);
+        return;
+    }
+    if(oOutput.empty())
+        oOutput.create(oInput.size(),CV_8UC1);
+    const int nOffset=nKernelSize/2, nRows=oInput.rows, nCols=oInput.cols;
+#if USING_OPENMP
+#pragma omp parallel for
+#endif //USING_OPENMP
+    for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+        static thread_local lv::AutoBuffer<uchar> aKernelBuffer;
+        aKernelBuffer.resize(size_t(nKernelSize*nKernelSize));
+        for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+            int nKernelHits = 0;
+            for(int nOffsetRowIdx=std::max(nRowIdx-nOffset,0); nOffsetRowIdx<=std::min(nRowIdx+nOffset,nRows-1); ++nOffsetRowIdx) {
+                for(int nOffsetColIdx=std::max(nColIdx-nOffset,0); nOffsetColIdx<=std::min(nColIdx+nOffset,nCols-1); ++nOffsetColIdx) {
+                    const size_t nOffsetPxIdx = size_t(nOffsetRowIdx*nCols+nOffsetColIdx);
+                    if(oMask.data[nOffsetPxIdx])
+                        aKernelBuffer[nKernelHits++] = oInput.data[nOffsetPxIdx];
+                }
+            }
+            const int nPxIdx = nRowIdx*nCols+nColIdx;
+            if(nKernelHits>0) {
+                std::nth_element(aKernelBuffer.begin(),aKernelBuffer.begin()+(nKernelHits-1)/2,aKernelBuffer.begin()+nKernelHits);
+                oOutput.data[nPxIdx] = *(aKernelBuffer.begin()+(nKernelHits-1)/2);
+            }
+            else
+                oOutput.data[nPxIdx] = nDefaultVal;
+        }
+    }
+}
+
+void lv::binaryMedianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, uchar nDefaultVal) {
+    lvAssert_(!oInput.empty() && oInput.type()==CV_8UC1 && oInput.isContinuous(),"bad input matrix");
+    lvAssert_(oOutput.empty() || (oOutput.type()==CV_8UC1 && oOutput.size()==oInput.size() && oOutput.isContinuous()),"bad output matrix");
+    lvAssert_(oMask.empty() || (oMask.type()==CV_8UC1 && oMask.size()==oInput.size() && oMask.isContinuous()),"bad mask matrix");
+    lvAssert_(nKernelSize>1 && (nKernelSize%2)==1,"bad kernel size");
+    if(oMask.empty()) {
+        cv::medianBlur(oInput,oOutput,nKernelSize); // might not actually be faster... (tbd)
+        return;
+    }
+    if(oOutput.empty())
+        oOutput.create(oInput.size(),CV_8UC1);
+    const int nOffset=nKernelSize/2, nRows=oInput.rows, nCols=oInput.cols;
+#if USING_OPENMP
+#ifdef _MSC_VER
+#pragma omp parallel for // msvc only supports openmp 2.0
+#else //ndef(_MSC_VER)
+#pragma omp parallel for collapse(2)
+#endif //ndef(_MSC_VER)
+#endif //USING_OPENMP
+    for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+        for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+            int nKernelHits = 0, nPositiveHits = 0;
+            for(int nOffsetRowIdx=std::max(nRowIdx-nOffset,0); nOffsetRowIdx<=std::min(nRowIdx+nOffset,nRows-1); ++nOffsetRowIdx) {
+                for(int nOffsetColIdx=std::max(nColIdx-nOffset,0); nOffsetColIdx<=std::min(nColIdx+nOffset,nCols-1); ++nOffsetColIdx) {
+                    const int nOffsetPxIdx = nOffsetRowIdx*nCols+nOffsetColIdx;
+                    if(oMask.data[nOffsetPxIdx]) {
+                        ++nKernelHits;
+                        if(oInput.data[nOffsetPxIdx])
+                            ++nPositiveHits;
+                    }
+                }
+            }
+            const int nPxIdx = nRowIdx*nCols+nColIdx;
+            if(nKernelHits>0)
+                oOutput.data[nPxIdx] = uchar((nPositiveHits>nKernelHits/2)?255u:0u);
+            else
+                oOutput.data[nPxIdx] = nDefaultVal;
+        }
+    }
+}
+
 void lv::computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, int nPatchSize,
                               cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
                               const cv::Mat_<uchar>& oROI1, const cv::Mat_<uchar>& oROI2) {

@@ -31,6 +31,54 @@ TEST(calcMedianValue,regression) {
     ASSERT_EQ(lv::calcMedianValue(vTestMat6),0);
 }
 
+TEST(medianBlur,regression) {
+    for(size_t n=0u; n<50u; ++n) {
+        cv::Mat_<uchar> vTestMat((rand()%100)+1,(rand()%100)+1),oMask(vTestMat.size());
+        cv::randu(vTestMat,0u,256u);
+        oMask = 255u;
+        cv::Mat_<uchar> oRegularOutput,oOCVOutput;
+        const int nKernelSize = (((rand()%7)+1)*2)+1;
+        lv::medianBlur(vTestMat,oRegularOutput,oMask,nKernelSize);
+        cv::medianBlur(vTestMat,oOCVOutput,nKernelSize);
+        for(int i=nKernelSize/2; i<vTestMat.rows-nKernelSize/2; ++i)
+            for(int j=nKernelSize/2; j<vTestMat.cols-nKernelSize/2; ++j)
+                ASSERT_EQ(oRegularOutput(i,j),oOCVOutput(i,j)) << "i=" << i << ", j=" << j;
+    }
+    // toy example, generalize later
+    cv::Mat_<uchar> vTestMat(10,10),oMask(10,10),oOutput(10,10);
+    for(int i=0; i<vTestMat.rows; ++i) {
+        for(int j=0; j<vTestMat.cols; ++j) {
+            vTestMat(i,j) = uchar(i*vTestMat.cols+j);
+            oMask(i,j) = uchar((((i%2)^(j%2))|int((i>=5)&&(i<9)))&int((j!=6)&&(j!=7)));
+        }
+    }
+    lv::medianBlur(vTestMat,oOutput,oMask,3);
+    ASSERT_EQ((int)oOutput(0,1),10);
+    ASSERT_EQ((int)oOutput(1,1),10);
+    ASSERT_EQ((int)oOutput(1,4),14);
+    ASSERT_EQ((int)oOutput(4,1),41);
+    ASSERT_EQ((int)oOutput(4,2),43);
+    ASSERT_EQ((int)oOutput(4,8),49);
+    ASSERT_EQ((int)oOutput(5,2),52);
+    ASSERT_EQ((int)oOutput(5,5),55);
+    ASSERT_EQ((int)oOutput(5,6),55);
+}
+
+TEST(binaryMedianBlur,regression) {
+    for(size_t i=0u; i<50u; ++i) {
+        cv::Mat_<uchar> vTestMat((rand()%100)+1,(rand()%100)+1),oMask(vTestMat.size());
+        cv::randu(vTestMat,0u,256u);
+        cv::randu(oMask,0u,256u);
+        vTestMat = vTestMat>128u;
+        oMask = oMask>128u;
+        cv::Mat oBinaryOutput,oRegularOutput;
+        const int nKernelSize = (((rand()%7)+1)*2)+1;
+        lv::binaryMedianBlur(vTestMat,oBinaryOutput,oMask,nKernelSize);
+        lv::medianBlur(vTestMat,oRegularOutput,oMask,nKernelSize);
+        ASSERT_TRUE(lv::isEqual<uchar>(oBinaryOutput,oRegularOutput));
+    }
+}
+
 TEST(gmm_init,regression_opencv) {
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
     ASSERT_TRUE(!oInput.empty() && oInput.size()==cv::Size(481,321) && oInput.channels()==3);
