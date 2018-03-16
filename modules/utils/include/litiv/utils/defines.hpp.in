@@ -198,6 +198,9 @@
     #ifndef USE_OPENCV_x264_TEST
         #define USE_OPENCV_x264_TEST        @USE_OPENCV_x264_TEST@
     #endif //ndef(USE_OPENCV_x264_TEST)
+    #ifndef USE_FULL_FLOAT_TEST
+        #define USE_FULL_FLOAT_TEST         @BUILD_TESTS_FULL_FLOAT@
+    #endif //USE_FULL_FLOAT_TEST
     #ifndef USE_SIGNEXT_SHIFT_TRICK
         #define USE_SIGNEXT_SHIFT_TRICK     @USE_SIGNEXT_SHIFT_TRICK@
     #endif //ndef(USE_SIGNEXT_SHIFT_TRICK)

@@ -467,6 +467,7 @@ TEST(descriptor_affinity,regression_L2_dasc) {
                 ASSERT_FLOAT_EQ(oAffMap(i,j,k),oAffMap_gpu(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
 #endif //HAVE_CUDA
     oAffMap = lv::getSubMat(oAffMap,0,cv::Range(45,70));
+#if USE_FULL_FLOAT_TEST
     const std::string sAffMapBinPath_p1 = TEST_CURR_INPUT_DATA_ROOT "/test_affmap_p1_r4_L2.bin";
     if(lv::checkIfExists(sAffMapBinPath_p1)) {
         cv::Mat_<float> oRefMap = lv::read(sAffMapBinPath_p1);
@@ -479,6 +480,7 @@ TEST(descriptor_affinity,regression_L2_dasc) {
     }
     else
         lv::write(sAffMapBinPath_p1,oAffMap);
+#endif //USE_FULL_FLOAT_TEST
     lv::computeDescriptorAffinity(oDescMap1,oDescMap2,7,oAffMap,vDispRange,lv::AffinityDist_L2,oROI1,oROI2,cv::Mat(),false);
     ASSERT_EQ(oAffMap.size[0],oInput.rows);
     ASSERT_EQ(oAffMap.size[1],oInput.cols);
