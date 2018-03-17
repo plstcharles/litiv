@@ -293,6 +293,16 @@ namespace lv {
                     m_pEvalAlgo->setDebugFetching(true);
             }
         }
+        /// overrides 'post_apply_gl' from IAsyncDataConsumer to compute colored mask for display helper
+        virtual void post_apply_gl(size_t nNextIdx, bool bRebindAll) override {
+            IAsyncDataConsumer_<DatasetEval_BinaryClassifier,lv::GLSL>::post_apply_gl(nNextIdx,bRebindAll);
+            if(isSavingOutput() || m_pAlgo->m_pDisplayHelper || m_lDataCallback) {
+                if(m_pAlgo->m_pDisplayHelper && m_pLoader->getGTPacketType()==ImagePacket && m_pLoader->getGTMappingType()==ElemMapping) {
+                    const cv::Mat oLastOutputDisplay = BinClassif::getColoredMask(m_oLastOutput,m_oLastGT,m_pLoader->getGTROI(m_nLastIdx));
+                    m_pAlgo->m_pDisplayHelper->display(m_oLastInput,m_oLastDebug,oLastOutputDisplay,m_nLastIdx);
+                }
+            }
+        }
         /// callback entrypoint for gpu-cpu evaluation validation
         void validationCallback(const cv::Mat& /*oInput*/, const cv::Mat& /*oDebug*/, const cv::Mat& oOutput, const cv::Mat& oGT, const cv::Mat& oGTROI, size_t /*nIdx*/) {
             lvAssert_(m_pMetricsBase,"algo needs to be initialized first");

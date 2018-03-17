@@ -881,6 +881,7 @@ namespace lv {
         /// pushes an output packet index for counting/speed analysis
         inline void push(size_t nPacketIdx) {
             lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing indices");
+            lvAssert_(!isSavingOutput(),"cannot save output internally without specifying eval type at compile time");
             countOutput(nPacketIdx);
         }
     };
@@ -947,44 +948,31 @@ namespace lv {
         virtual void processOutput(const std::vector<cv::Mat>& /*vOutput*/, size_t /*nPacketIdx*/) {}
     };
 
-    /// default (specializable) forward declaration of the async data consumer interface used for receiving processed packets (evaluation entrypoint)
+    /// default (specializable) forward declaration of the async data consumer interface
     template<DatasetEvalList eDatasetEval, lv::ParallelAlgoType eImpl>
     struct IAsyncDataConsumer_;
 
 #if HAVE_GLSL
 
     /// async data consumer specialization for non-array binary classification processing
-    template<>
-    struct IAsyncDataConsumer_<DatasetEval_BinaryClassifier,lv::GLSL> :
+    template<DatasetEvalList eDatasetEval>
+    struct IAsyncDataConsumer_<eDatasetEval,lv::GLSL> :
             public IDataArchiver_<NotArray>,
             public IDataCounter {
+        static_assert(eDatasetEval!=DatasetEval_None,"dataset eval type must always be specified at compile time for async consumer usage");
+        static_assert(OutputArrayPolicyHelper<eDatasetEval>::value!=Array,"current async consumer impl does not support array inputs/outputs");
         /// returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
         virtual cv::Size getIdealGLWindowSize() const;
         /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
-        virtual size_t getExpectedOutputCount() const override {
-            return getGTCount();
-        }
+        virtual size_t getExpectedOutputCount() const override;
         /// resets internal packet count metrics (no evaluation metrics for this interface)
-        virtual void resetMetrics() override {
-            resetOutputCount();
-        }
-        /// initializes internal params & calls 'initialize_gl' on algo with expanded args list
+        virtual void resetMetrics() override;
+        /// initializes internal params & calls 'initialize_gl' on algo with expanded args list, feeding in curr input, ROI, and rebind param
         template<typename Talgo, typename... Targs>
-        void initialize_gl(const std::shared_ptr<Talgo>& pAlgo, Targs&&... args) {
-            m_pAlgo = pAlgo;
-            pre_initialize_gl();
-            pAlgo->initialize_gl(m_oCurrInput,m_pLoader->getInputROI(m_nCurrIdx),std::forward<Targs>(args)...);
-            post_initialize_gl();
-        }
-        /// calls 'apply_gl' from 'Talgo' interface with expanded args list
+        void initialize_gl(const std::shared_ptr<Talgo>& pAlgo, Targs&&... args);
+        /// calls 'apply_gl' from 'Talgo' interface with expanded args list, feeding in next input and rebind param
         template<typename Talgo, typename... Targs>
-        void apply_gl(const std::shared_ptr<Talgo>& pAlgo, size_t nNextIdx, bool bRebindAll, Targs&&... args) {
-            m_pAlgo = pAlgo;
-            pre_apply_gl(nNextIdx,bRebindAll);
-            // @@@@@ allow apply with new roi for each packet? (like init?)
-            pAlgo->apply_gl(m_oNextInput,bRebindAll,std::forward<Targs>(args)...);
-            post_apply_gl(nNextIdx,bRebindAll);
-        }
+        void apply_gl(const std::shared_ptr<Talgo>& pAlgo, size_t nNextIdx, bool bRebindAll, Targs&&... args);
     protected:
         /// initializes internal async packet fetching indexes
         IAsyncDataConsumer_();
@@ -996,15 +984,14 @@ namespace lv {
         virtual void pre_apply_gl(size_t nNextIdx, bool bRebindAll);
         /// called just after the GL algorithm/evaluator process a new packet
         virtual void post_apply_gl(size_t nNextIdx, bool bRebindAll);
-        /// utility function for output/debug mask display (should be overloaded if also evaluating results)
-        virtual void getColoredMasks(cv::Mat& oOutput, cv::Mat& oDebug, const cv::Mat& oGT=cv::Mat(), const cv::Mat& oGTROI=cv::Mat());
-        std::shared_ptr<lv::IParallelAlgo_GLSL> m_pAlgo;
-        std::shared_ptr<GLImageProcEvaluatorAlgo> m_pEvalAlgo;
-        std::shared_ptr<IIDataLoader> m_pLoader;
+        std::shared_ptr<lv::IParallelAlgo_GLSL> m_pAlgo; ///< pointer to external algo being fed/evaluated (passed thru init)
+        std::shared_ptr<GLImageProcEvaluatorAlgo> m_pEvalAlgo; ///< pointer to external evaluation algo (optional)
+        std::shared_ptr<IIDataLoader> m_pLoader; ///< loader interface obtained through introspection
         cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
         cv::Mat m_oLastGT,m_oCurrGT,m_oNextGT;
+        cv::Mat m_oLastOutput,m_oLastDebug;
         size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
-        AsyncDataCallbackFunc m_lDataCallback;
+        AsyncDataCallbackFunc m_lDataCallback; ///< equivalent entrypoint to 'processOutput' in sync impl
     };
 
 #endif //HAVE_GLSL
@@ -1076,3 +1063,139 @@ namespace lv {
     };
 
 } // namespace lv
+
+#if HAVE_GLSL
+
+template<lv::DatasetEvalList eDatasetEval>
+cv::Size lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::getIdealGLWindowSize() const {
+    lvAssert_(getExpectedOutputCount()>1,"async data consumer requires work batch to expect more than one output packet");
+    auto pLoader = shared_from_this_cast<const IDataLoader_<NotArray>>(true);
+    lvAssert_(pLoader->isInputInfoConst(),"async data consumer requires input data to be constant size/type");
+    cv::Size oWindowSize = pLoader->getInputInfo(0).size;
+    lvAssert_(oWindowSize.area(),"input size must be non-null");
+    if(m_pEvalAlgo) {
+        lvAssert_(m_pEvalAlgo->getIsGLInitialized(),"evaluator algo must be initialized first");
+        oWindowSize.width *= int(m_pEvalAlgo->m_nSxSDisplayCount);
+    }
+    else if(m_pAlgo) {
+        lvAssert_(m_pAlgo->getIsGLInitialized(),"algo must be initialized first");
+        oWindowSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
+    }
+    return oWindowSize;
+}
+
+template<lv::DatasetEvalList eDatasetEval>
+size_t lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::getExpectedOutputCount() const {
+    return getGTCount();
+}
+
+template<lv::DatasetEvalList eDatasetEval>
+void lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::resetMetrics() {
+    resetOutputCount();
+}
+
+template<lv::DatasetEvalList eDatasetEval>
+template<typename Talgo, typename... Targs>
+void lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::initialize_gl(const std::shared_ptr<Talgo>& pAlgo, Targs&&... args) {
+    m_pAlgo = pAlgo;
+    pre_initialize_gl();
+    pAlgo->initialize_gl(m_oCurrInput,m_pLoader->getInputROI(m_nCurrIdx),std::forward<Targs>(args)...);
+    post_initialize_gl();
+}
+
+template<lv::DatasetEvalList eDatasetEval>
+template<typename Talgo, typename... Targs>
+void lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::apply_gl(const std::shared_ptr<Talgo>& pAlgo, size_t nNextIdx, bool bRebindAll, Targs&&... args) {
+    m_pAlgo = pAlgo;
+    pre_apply_gl(nNextIdx,bRebindAll);
+    // @@@@@ allow apply with new roi for each packet? (like init?) @@@ required for non-video stuff...
+    pAlgo->apply_gl(m_oNextInput,bRebindAll,std::forward<Targs>(args)...);
+    post_apply_gl(nNextIdx,bRebindAll);
+}
+
+template<lv::DatasetEvalList eDatasetEval>
+lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::IAsyncDataConsumer_() :
+        m_nLastIdx(0),
+        m_nCurrIdx(0),
+        m_nNextIdx(1) {}
+
+template<lv::DatasetEvalList eDatasetEval>
+void lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::pre_initialize_gl() {
+    lvAssert_(getExpectedOutputCount()>1,"async data consumer requires work batch to expect more than one output packet");
+    m_pLoader = shared_from_this_cast<IIDataLoader>(true);
+    lvAssert_(m_pLoader->getInputPacketType()==ImagePacket && m_pLoader->getOutputPacketType()==ImagePacket && m_pLoader->getIOMappingType()==ElemMapping,"async data consumer only defined to work with image packets under 1:1 mapping");
+    lvAssert_(m_pAlgo,"invalid algo given to async data consumer");
+    m_oCurrInput = m_pLoader->getInput(m_nCurrIdx).clone();
+    m_oNextInput = m_pLoader->getInput(m_nNextIdx).clone();
+    m_oLastInput = m_oCurrInput.clone();
+    lvAssert_(!m_oCurrInput.empty() && m_oCurrInput.isContinuous(),"invalid input fetched from loader");
+    lvAssert_(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4,"loaded data must be 1ch or 4ch to avoid alignment problems");
+    if(isSavingOutput() || m_pAlgo->m_pDisplayHelper)
+        m_pAlgo->setOutputFetching(true);
+    if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
+        m_pAlgo->setDebugFetching(true);
+    if(isEvaluating()) {
+        lvAssert_(m_pLoader->getGTPacketType()==ImagePacket && m_pLoader->getGTMappingType()==ElemMapping,"async data consumer only defined to work with gt image packets under 1:1 mapping");
+        m_oCurrGT = m_pLoader->getGT(m_nCurrIdx).clone();
+        m_oNextGT = m_pLoader->getGT(m_nNextIdx).clone();
+        m_oLastGT = m_oCurrGT.clone();
+        lvAssert_(!m_oCurrGT.empty() && m_oCurrGT.isContinuous(),"invalid gt fetched from loader");
+        lvAssert_(m_oCurrGT.channels()==1 || m_oCurrGT.channels()==4,"gt data must be 1ch or 4ch to avoid alignment problems");
+    }
+}
+
+template<lv::DatasetEvalList eDatasetEval>
+void lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::post_initialize_gl() {
+    lvDbgAssert(m_pAlgo);
+}
+
+template<lv::DatasetEvalList eDatasetEval>
+void lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::pre_apply_gl(size_t nNextIdx, bool bRebindAll) {
+    UNUSED(bRebindAll);
+    lvDbgAssert_(m_pLoader,"invalid data loader given to async data consumer");
+    lvDbgAssert_(m_pAlgo,"invalid algo given to async data consumer");
+    if(nNextIdx!=m_nNextIdx)
+        m_oNextInput = m_pLoader->getInput(nNextIdx);
+    if(isEvaluating() && nNextIdx!=m_nNextIdx)
+        m_oNextGT = m_pLoader->getGT(nNextIdx);
+}
+
+template<lv::DatasetEvalList eDatasetEval>
+void lv::IAsyncDataConsumer_<eDatasetEval,lv::GLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
+    lvDbgAssert(m_pLoader && m_pAlgo);
+    if(m_pEvalAlgo && isEvaluating())
+        m_pEvalAlgo->apply_gl(m_oNextGT,bRebindAll);
+    m_nLastIdx = m_nCurrIdx;
+    m_nCurrIdx = nNextIdx;
+    m_nNextIdx = nNextIdx+1;
+    if(m_pAlgo->m_pDisplayHelper || m_lDataCallback) {
+        m_oCurrInput.copyTo(m_oLastInput);
+        m_oNextInput.copyTo(m_oCurrInput);
+        if(isEvaluating()) {
+            m_oCurrGT.copyTo(m_oLastGT);
+            m_oNextGT.copyTo(m_oCurrGT);
+        }
+    }
+    if(m_nNextIdx<getInputCount()) {
+        m_oNextInput = m_pLoader->getInput(m_nNextIdx);
+        if(isEvaluating())
+            m_oNextGT = m_pLoader->getGT(m_nNextIdx);
+    }
+    if(m_pLoader->getIOMappingType()<=IndexMapping)
+        countOutput(m_nLastIdx);
+    if(isSavingOutput() || m_pAlgo->m_pDisplayHelper || m_lDataCallback) {
+        m_pAlgo->fetchLastOutput(m_oLastOutput);
+        if(m_pAlgo->m_pDisplayHelper && m_pEvalAlgo && m_pEvalAlgo->m_bUsingDebug)
+            m_pEvalAlgo->fetchLastDebug(m_oLastDebug);
+        else if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
+            m_pAlgo->fetchLastDebug(m_oLastDebug);
+        else
+            m_oLastOutput.copyTo(m_oLastDebug);
+        if(m_lDataCallback)
+            m_lDataCallback(m_oLastInput,m_oLastDebug,m_oLastOutput,m_oLastGT,m_pLoader->getGTROI(m_nLastIdx),m_nLastIdx);
+        if(isSavingOutput() && !m_oLastOutput.empty())
+            saveOutput(m_oLastOutput,m_nLastIdx);
+    }
+}
+
+#endif //HAVE_GLSL
