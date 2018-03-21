@@ -128,6 +128,7 @@ bool ImageWarper::computeTransform() {
     std::vector<double> vL2SqrDists(nPtCount);
     if(m_eWarpMode==RIGID) {
         const double dAlpha = DIST_EXP_ALPHA;
+        const bool bSkipAlpha = (dAlpha==1.0);
     #if USE_RIGID_PRESCALE
         const double dAreaRatio = sqrt(calcArea(m_vSourcePts)/calcArea(m_vDestPts));
         for(auto& vPt : m_vSourcePts)
@@ -158,7 +159,7 @@ bool ImageWarper::computeTransform() {
                     if((nColIdx==m_vDestPts[nPtIdx].x) && nRowIdx==m_vDestPts[nPtIdx].y)
                         break;
                     const double dL2SqrDist_raw = (nColIdx-m_vDestPts[nPtIdx].x)*(nColIdx-m_vDestPts[nPtIdx].x) + (nRowIdx-m_vDestPts[nPtIdx].y)*(nRowIdx-m_vDestPts[nPtIdx].y);
-                    if(dAlpha==1.0)
+                    if(bSkipAlpha)
                         vL2SqrDists[nPtIdx] = 1.0/dL2SqrDist_raw;
                     else
                         vL2SqrDists[nPtIdx] = std::pow(dL2SqrDist_raw,-dAlpha);
