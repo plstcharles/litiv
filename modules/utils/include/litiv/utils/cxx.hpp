@@ -793,7 +793,7 @@ namespace lv {
         void push_back(value_type&& o);
     protected:
         /// static buffer, which is not value-initialized by default
-        alignas(std::max(nByteAlign,alignof(value_type))) std::array<value_type,nStaticSize> m_aStaticBuffer;
+        alignas(std::max({nByteAlign,alignof(value_type)})) std::array<value_type,nStaticSize> m_aStaticBuffer;
         /// dynamic buffer, which may be null, and is not value-initialized by default
         std::unique_ptr<TVal[],std::function<void(TVal*)>> m_aDynamicBuffer;
         /// pointer to the currently used buffer
