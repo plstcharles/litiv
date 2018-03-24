@@ -18,39 +18,8 @@
 #pragma once
 
 #ifdef __CUDACC__
-#include <array>
-#include <cstdio>
-#include <sstream>
-#include <cassert>
-#include <opencv2/core/cuda/common.hpp>
-#include <opencv2/core/cuda/vec_traits.hpp>
-#include <opencv2/core/cuda/vec_math.hpp>
-#include <opencv2/core/cuda/limits.hpp>
-#include <opencv2/cudev.hpp>
-#ifdef CUDA_EXIT_ON_ERROR
-#define CUDA_ERROR_HANDLER(errn,msg) do { printf("%s",msg); std::exit(errn); } while(false)
-#else //ndef(CUDA_EXIT_ON_ERROR)
-#define CUDA_ERROR_HANDLER(errn,msg) do { (void)errn; throw std::runtime_error(msg); } while(false)
-#endif //ndef(CUDA_..._ON_ERROR)
-#define cudaKernelWrap(func,kparams,...) do { \
-        impl::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.pStream>>>(__VA_ARGS__); \
-        const cudaError_t __errn = cudaGetLastError(); \
-        if(__errn!=cudaSuccess) { \
-            std::array<char,1024> acBuffer; \
-            snprintf(acBuffer.data(),acBuffer.size(),"cuda kernel '" #func "' execution failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n\t... with kernel params = %s\n", \
-                     (int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__,kparams.str().c_str()); \
-            CUDA_ERROR_HANDLER((int)__errn,acBuffer.data()); \
-        } \
-    } while(false)
-#define cudaErrorCheck(test) do { \
-        const cudaError_t __errn = test; \
-        if(__errn!=cudaSuccess) { \
-            std::array<char,1024> acBuffer; \
-            snprintf(acBuffer.data(),acBuffer.size(),"cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n", \
-                     (int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
-            CUDA_ERROR_HANDLER((int)__errn,acBuffer.data()); \
-        } \
-    } while(false)
+#include "litiv/utils/cudev/common.hpp"
+#include "litiv/utils/cudev/vec_traits.hpp"
 #else //ndef(__CUDACC__)
 #include "litiv/utils/cxx.hpp"
 #if !HAVE_CUDA
@@ -85,10 +54,10 @@ namespace lv {
                     vGridSize(0),vBlockSize(0),nSharedMemSize(0),pStream(nullptr) {}
             KernelParams(dim3 vGridSize_, dim3 vBlockSize_, size_t nSharedMemSize_=0, cudaStream_t pStream_=nullptr) :
                     vGridSize(std::move(vGridSize_)),vBlockSize(std::move(vBlockSize_)),nSharedMemSize(nSharedMemSize_),pStream(pStream_) {} // NOLINT
-            dim3 vGridSize;
-            dim3 vBlockSize;
-            size_t nSharedMemSize;
-            cudaStream_t pStream;
+            dim3 vGridSize; ///< kernel grid size (i.e. number of block instantiations in x,y,z dimensions)
+            dim3 vBlockSize; ///< kernel block size (i.e. number of threads in x,y,z dimensions)
+            size_t nSharedMemSize; ///< size of the dynamic shared memory used by the kernel (in bytes)
+            cudaStream_t pStream; ///< kernel execution stream context (allows async processing if non-null)
             /// is-equal test operator for other KernelParams structs
             bool operator==(const KernelParams& o) const {
                 return
