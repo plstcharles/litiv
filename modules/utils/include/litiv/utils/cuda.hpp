@@ -41,6 +41,12 @@ namespace lv {
     //     int mask = __ballot(1);  // mask of active lanes
     //     int leader = __ffs(mask) - 1;  // -1 for 0-based indexing
 
+    template<typename Tint>
+    __forceinline__ __host__ __device__ Tint divUp(Tint nNumerator, Tint nDenominator) {
+        static_assert(std::is_integral<Tint>::value,"input type must be integral");
+        return (nNumerator+(nDenominator-1))/nDenominator;
+    }
+
     namespace cuda {
 
         /// container for cuda kernel execution configuration parameters
