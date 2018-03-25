@@ -119,23 +119,25 @@ void IIBackgroundSubtractor::initialize_common(const cv::Mat& oInitImg, const cv
     if(m_nImgChannels==1) {
         lvAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
+            m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+            m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
             if(m_oROI.data[nPxIter]) {
                 m_vnPxIdxLUT[nModelIter] = nPxIter;
-                m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
-                m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
                 m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
                 m_oLastColorFrame.data[nPxIter] = oInitImg.data[nPxIter];
                 ++nModelIter;
             }
+            else
+                m_voPxInfoLUT[nPxIter].nModelIdx = SIZE_MAX;
         }
     }
     else { //(m_nImgChannels==3 || m_nImgChannels==4)
         lvAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width*m_nImgChannels && m_oLastColorFrame.step.p[1]==m_nImgChannels);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
+            m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+            m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
             if(m_oROI.data[nPxIter]) {
                 m_vnPxIdxLUT[nModelIter] = nPxIter;
-                m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
-                m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
                 m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
                 const size_t nPxRGBIter = nPxIter*m_nImgChannels;
                 if(m_nImgChannels==3)
@@ -146,6 +148,8 @@ void IIBackgroundSubtractor::initialize_common(const cv::Mat& oInitImg, const cv
                         m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
                 ++nModelIter;
             }
+            else
+                m_voPxInfoLUT[nPxIter].nModelIdx = SIZE_MAX;
         }
     }
 }
