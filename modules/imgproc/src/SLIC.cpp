@@ -55,7 +55,7 @@ inline int iDivUp(int a, int b) {
 
 SLIC::SLIC() {
     lv::cuda::init(m_deviceId);
-    cudaErrorCheck(cudaGetDeviceProperties(&m_deviceProp, m_deviceId));
+    cudaErrorCheck_(cudaGetDeviceProperties(&m_deviceProp, m_deviceId));
     lvAssert_(m_deviceProp.major>=3,"compute capability for selected device too low (need >=30)");
 }
 
@@ -89,17 +89,17 @@ void SLIC::initialize(const cv::Size& size, const int diamSpxOrNbSpx , const Ini
 
     m_oLabels.create(m_FrameHeight,m_FrameWidth);
 
-    cudaErrorCheck(cudaGetLastError());
+    cudaErrorCheck;
 
     //allocate buffers on gpu
     const cudaChannelFormatDesc channelDescrBGRA = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
-    cudaErrorCheck(cudaMallocArray(&cuArrayFrameBGRA, &channelDescrBGRA, m_FrameWidth, m_FrameHeight));
+    cudaErrorCheck_(cudaMallocArray(&cuArrayFrameBGRA, &channelDescrBGRA, m_FrameWidth, m_FrameHeight));
 
     const cudaChannelFormatDesc channelDescrLab = cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
-    cudaErrorCheck(cudaMallocArray(&cuArrayFrameLab, &channelDescrLab, m_FrameWidth, m_FrameHeight, cudaArraySurfaceLoadStore));
+    cudaErrorCheck_(cudaMallocArray(&cuArrayFrameLab, &channelDescrLab, m_FrameWidth, m_FrameHeight, cudaArraySurfaceLoadStore));
 
     const cudaChannelFormatDesc channelDescrLabels = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
-    cudaErrorCheck(cudaMallocArray(&cuArrayLabels, &channelDescrLabels, m_FrameWidth, m_FrameHeight, cudaArraySurfaceLoadStore));
+    cudaErrorCheck_(cudaMallocArray(&cuArrayLabels, &channelDescrLabels, m_FrameWidth, m_FrameHeight, cudaArraySurfaceLoadStore));
 
     // Specify texture frameBGRA object parameters
     cudaResourceDesc resDesc;
@@ -113,27 +113,27 @@ void SLIC::initialize(const cv::Size& size, const int diamSpxOrNbSpx , const Ini
     texDesc.filterMode = cudaFilterModePoint;
     texDesc.readMode = cudaReadModeElementType;
     texDesc.normalizedCoords = false;
-    cudaErrorCheck(cudaCreateTextureObject(&oTexFrameBGRA, &resDesc, &texDesc, NULL));
+    cudaErrorCheck_(cudaCreateTextureObject(&oTexFrameBGRA, &resDesc, &texDesc, NULL));
 
     // surface frameLab
     cudaResourceDesc rescDescFrameLab;
     memset(&rescDescFrameLab, 0, sizeof(rescDescFrameLab));
     rescDescFrameLab.resType = cudaResourceTypeArray;
     rescDescFrameLab.res.array.array = cuArrayFrameLab;
-    cudaErrorCheck(cudaCreateSurfaceObject(&oSurfFrameLab, &rescDescFrameLab));
+    cudaErrorCheck_(cudaCreateSurfaceObject(&oSurfFrameLab, &rescDescFrameLab));
 
     // surface labels
     cudaResourceDesc resDescLabels;
     memset(&resDescLabels, 0, sizeof(resDescLabels));
     resDescLabels.resType = cudaResourceTypeArray;
     resDescLabels.res.array.array = cuArrayLabels;
-    cudaErrorCheck(cudaCreateSurfaceObject(&oSurfLabels, &resDescLabels));
+    cudaErrorCheck_(cudaCreateSurfaceObject(&oSurfLabels, &resDescLabels));
 
     // buffers clusters , accAtt
-    cudaErrorCheck(cudaMalloc((void**)&d_fClusters, m_nbSpx*sizeof(float) * 5)); // 5-D centroid
-    cudaErrorCheck(cudaMemset(d_fClusters, 0, m_nbSpx*sizeof(float) * 5));
-    cudaErrorCheck(cudaMalloc((void**)&d_fAccAtt, m_nbSpx*sizeof(float) * 6)); // 5-D centroid acc + 1 counter
-    cudaErrorCheck(cudaMemset(d_fAccAtt, 0, m_nbSpx*sizeof(float) * 6));
+    cudaErrorCheck_(cudaMalloc((void**)&d_fClusters, m_nbSpx*sizeof(float) * 5)); // 5-D centroid
+    cudaErrorCheck_(cudaMemset(d_fClusters, 0, m_nbSpx*sizeof(float) * 5));
+    cudaErrorCheck_(cudaMalloc((void**)&d_fAccAtt, m_nbSpx*sizeof(float) * 6)); // 5-D centroid acc + 1 counter
+    cudaErrorCheck_(cudaMemset(d_fAccAtt, 0, m_nbSpx*sizeof(float) * 6));
 }
 
 void SLIC::segment(const cv::Mat& frameBGR) {
@@ -141,7 +141,7 @@ void SLIC::segment(const cv::Mat& frameBGR) {
     cv::cvtColor(frameBGR, frameBGRA, CV_BGR2BGRA);
     CV_Assert(frameBGRA.type() == CV_8UC4);
     CV_Assert(frameBGRA.isContinuous());
-    cudaErrorCheck(cudaMemcpyToArray(cuArrayFrameBGRA, 0, 0, (uchar*)frameBGRA.data, m_nbPx* sizeof(uchar4), cudaMemcpyHostToDevice));
+    cudaErrorCheck_(cudaMemcpyToArray(cuArrayFrameBGRA, 0, 0, (uchar*)frameBGRA.data, m_nbPx* sizeof(uchar4), cudaMemcpyHostToDevice));
     {
         const int blockW = 16;
         const int blockH = blockW;
@@ -160,7 +160,7 @@ void SLIC::segment(const cv::Mat& frameBGR) {
         update();
         cudaDeviceSynchronize();
     }
-    cudaErrorCheck(cudaMemcpyFromArray(m_oLabels.data,cuArrayLabels,0,0,m_oLabels.total()*m_oLabels.elemSize(),cudaMemcpyDeviceToHost));
+    cudaErrorCheck_(cudaMemcpyFromArray(m_oLabels.data,cuArrayLabels,0,0,m_oLabels.total()*m_oLabels.elemSize(),cudaMemcpyDeviceToHost));
 }
 
 void SLIC::assignment() {

@@ -121,6 +121,16 @@
             if(__errn!=GL_NO_ERROR) \
                 lvError_("glErrorCheck failed [code=%d, msg=%s]",(int)__errn,gluErrorString(__errn)); \
         } while(false)
+        #define cudaErrorCheck do { \
+            const cudaError_t __errn = cudaGetLastError(); \
+            if(__errn!=cudaSuccess) \
+                lvError_("cudaErrorCheck failed [code=%d, msg=%s]",(int)__errn,cudaGetErrorString(__errn)); \
+        } while(false)
+        #define cudaErrorCheck_(test) do { \
+            const cudaError_t __errn = test; \
+            if(__errn!=cudaSuccess) \
+                lvError_("cudaErrorCheck failed [code=%d, msg=%s]",(int)__errn,cudaGetErrorString(__errn)); \
+        } while(false)
     #endif //def(__cplusplus)
     #ifdef _DEBUG
         #ifdef LITIV_BUILD

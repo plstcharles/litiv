@@ -20,6 +20,7 @@
 #ifdef __CUDACC__
 #include "litiv/utils/cudev/common.hpp"
 #include "litiv/utils/cudev/vec_traits.hpp"
+#include <curand_kernel.h>
 #else //ndef(__CUDACC__)
 #include "litiv/utils/cxx.hpp"
 #if !HAVE_CUDA
@@ -28,21 +29,15 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <npp.h>
+#include <curand.h>
+#include <opencv2/core/cuda_stream_accessor.hpp>
 #include "litiv/utils/opencv.hpp"
-#define cudaErrorCheck(test) do { \
-        const cudaError_t __errn = test; \
-        if(__errn!=cudaSuccess) { \
-            lvError_("cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n", \
-                     (int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
-        } \
-    } while(false)
 #endif //ndef(__CUDACC__)
 
 namespace lv {
 
-    // @@@@ TODO, ship common cuda utils here
-
-    // warp leader selection code for divergent code flow: (requires sm_20)
+    // notes:
+    //   warp leader selection code for divergent code flow: (requires sm_20)
     //     int mask = __ballot(1);  // mask of active lanes
     //     int leader = __ffs(mask) - 1;  // -1 for 0-based indexing
 

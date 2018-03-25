@@ -216,5 +216,5 @@ void device::compute_desc_affinity_patch(const lv::cuda::KernelParams& oKParams,
 }
 
 void device::setDisparityRange(const std::array<int,AFF_MAP_DISP_RANGE_MAX>& aDispRange) {
-    cudaErrorCheck(cudaMemcpyToSymbol(g_anDispRange,aDispRange.data(),sizeof(int)*aDispRange.size()));
+    cudaErrorCheck_(cudaMemcpyToSymbol(g_anDispRange,aDispRange.data(),sizeof(int)*aDispRange.size()));
 }

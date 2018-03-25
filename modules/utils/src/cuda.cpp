@@ -36,11 +36,11 @@ void lv::cuda::test_kernel(int nVerbosity) {
     cudaMalloc(&pTest_dev,nTestSize);
     cudaMemset(pTest_dev,1,nTestSize);
     std::vector<uchar> pTest_host(nTestSize);
-    cudaErrorCheck(cudaMemcpy(pTest_host.data(),pTest_dev,nTestSize,cudaMemcpyDeviceToHost));
+    cudaErrorCheck_(cudaMemcpy(pTest_host.data(),pTest_dev,nTestSize,cudaMemcpyDeviceToHost));
     pTest_host[13] = 0;
-    cudaErrorCheck(cudaMemcpy(pTest_dev,pTest_host.data(),nTestSize,cudaMemcpyHostToDevice));
+    cudaErrorCheck_(cudaMemcpy(pTest_dev,pTest_host.data(),nTestSize,cudaMemcpyHostToDevice));
     device::test_kernel(lv::cuda::KernelParams(dim3(1),dim3(1)),pTest_dev,nVerbosity);
-    cudaErrorCheck(cudaMemcpy(pTest_host.data(),pTest_dev,nTestSize,cudaMemcpyDeviceToHost));
+    cudaErrorCheck_(cudaMemcpy(pTest_host.data(),pTest_dev,nTestSize,cudaMemcpyDeviceToHost));
     assert(pTest_host[13]==1);
     cudaFree(pTest_dev);
 }
