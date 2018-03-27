@@ -42,9 +42,10 @@ namespace lv {
     }
 
 #if (!defined(_MSC_VER) || _MSC_VER>=1910) // extended constexpr only supported in visual studio 2017
-
+    constexpr
+#endif //(!defined(_MSC_VER) || _MSC_VER>=1910)
     /// returns the nearest (rounded up) power of two to the given 32-bit unsigned integer, but returns 0 if input is 0
-    constexpr inline uint32_t get_next_pow2(uint32_t nVal) {
+    inline uint32_t get_next_pow2(uint32_t nVal) {
         --nVal;
         nVal |= nVal>>1;
         nVal |= nVal>>2;
@@ -53,8 +54,6 @@ namespace lv {
         nVal |= nVal>>16;
         return ++nVal;
     }
-
-#endif //(!defined(_MSC_VER) || _MSC_VER>=1910)
 
     /// returns a (cheap) random number based on Intel's fastrand LCG algorithm (16-bit, like std::rand)
     inline int fastrand(int& nSeed) {

@@ -22,6 +22,27 @@ TEST(ispow2,regression) {
     EXPECT_EQ(lv::ispow2(std::numeric_limits<int>::max()),false);
 }
 
+TEST(get_next_pow2,regression) {
+    EXPECT_EQ(lv::get_next_pow2(0u),0u);
+    EXPECT_EQ(lv::get_next_pow2(1u),1u);
+    EXPECT_EQ(lv::get_next_pow2(2u),2u);
+    EXPECT_EQ(lv::get_next_pow2(3u),4u);
+    EXPECT_EQ(lv::get_next_pow2(4u),4u);
+    EXPECT_EQ(lv::get_next_pow2(5u),8u);
+    EXPECT_EQ(lv::get_next_pow2(31u),32u);
+    EXPECT_EQ(lv::get_next_pow2(32u),32u);
+    const auto lLameNextPow2 = [](uint nVal){
+        uint nPow = 1u;
+        while(nPow<nVal)
+            nPow*=2u;
+        return nPow;
+    };
+    for(size_t nIter=0; nIter<1000; ++nIter) {
+        const uint nVal = (uint)rand();
+        ASSERT_EQ(lv::get_next_pow2(nVal),lLameNextPow2(nVal));
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 TEST(abs_fast,regression) {
