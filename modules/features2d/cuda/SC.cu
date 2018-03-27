@@ -111,6 +111,7 @@ namespace impl {
                     aTmpLUT[threadIdx.x] += aTmpLUT[threadIdx.x +  1];
                 }
                 else {
+                    assert(lv::isPow2(blockDim.x));
                     if(nLUTSize>blockDim.x) {
                         assert(nLUTSize>=blockDim.x*2);
                         for(int nStep=nLUTSize-blockDim.x; nStep>=blockDim.x; nStep-=blockDim.x)
@@ -121,8 +122,8 @@ namespace impl {
                     else {
                         assert(nLUTSize==blockDim.x);
                         for(int nStep=blockDim.x/2; nStep>0; nStep>>=1) {
-                            if(threadIdx.x + nStep < nLUTSize)
-                                aTmpLUT[threadIdx.x] += aTmpLUT[threadIdx.x + nStep];
+                            if(threadIdx.x<nStep)
+                                aTmpLUT[threadIdx.x] += aTmpLUT[threadIdx.x+nStep];
                             __syncthreads();
                         }
                     }

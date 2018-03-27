@@ -43,6 +43,7 @@ namespace impl {
                 }
                 __syncthreads();
                 assert((nDescSize_LUT%nThreads)==0);
+                assert(lv::isPow2(nThreads));
                 if(nDescSize_LUT>nThreads) {
                     assert(nDescSize_LUT>=nThreads*2);
                     for(int nStep=nThreads; nStep<nDescSize_LUT; nStep+=nThreads)
@@ -59,7 +60,7 @@ namespace impl {
                 else {
                     assert(nDescSize_LUT==nThreads);
                     for(int nStep=nThreads/2; nStep>0; nStep>>=1) {
-                        if(nThreadIdx+nStep<nDescSize_LUT)
+                        if(nThreadIdx<nStep)
                             aDescCalcLUT[nThreadIdx] += aDescCalcLUT[nThreadIdx+nStep];
                         __syncthreads();
                     }
@@ -186,6 +187,7 @@ namespace impl {
             anCounts[nThreadIdx] = 0;
             afAffinities[nThreadIdx] = 0.0f;
         }
+        assert(lv::isPow2(nThreads));
         for(int nStep=nThreads/2; nStep>0; nStep>>=1) {
             const bool bInRange = (nThreadIdx+nStep)<nThreads;
             __syncthreads();
