@@ -41,10 +41,17 @@ namespace lv {
     //     int mask = __ballot(1);  // mask of active lanes
     //     int leader = __ffs(mask) - 1;  // -1 for 0-based indexing
 
+    template<typename Tint1, typename Tint2>
+    __forceinline__ __host__ __device__ Tint1 divUp(Tint1 nNumerator, Tint2 nDenominator) {
+        static_assert(std::is_integral<Tint1>::value,"input type must be integral");
+        static_assert(std::is_integral<Tint2>::value,"input type must be integral");
+        return Tint1((nNumerator+Tint1(nDenominator-1))/nDenominator);
+    }
+
     template<typename Tint>
-    __forceinline__ __host__ __device__ Tint divUp(Tint nNumerator, Tint nDenominator) {
+    __forceinline__ __host__ __device__ bool isPow2(Tint x) {
         static_assert(std::is_integral<Tint>::value,"input type must be integral");
-        return (nNumerator+(nDenominator-1))/nDenominator;
+        return (x!=0) && ((x&(x-1))==0);
     }
 
     namespace cuda {
