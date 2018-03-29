@@ -98,13 +98,13 @@ namespace lv {
         // Version 0.1
         // Author Kipp Owens, Rajiv Parikh
         ////////////////////////////////////////////////////////////////////////
-        __declspec(align(16)) static const unsigned int gadd[4] = {2531011, 10395331, 13737667, 1};
-        __declspec(align(16)) static const unsigned int mult[4] = {214013, 17405, 214013, 69069};
-        __declspec(align(16)) static const unsigned int mask[4] = {0xFFFFFFFF, 0, 0xFFFFFFFF, 0};
-        __declspec(align(16)) __m128i adder = _mm_load_si128((__m128i*)gadd);
-        __declspec(align(16)) __m128i multiplier = _mm_load_si128((__m128i*)mult);
-        __declspec(align(16)) __m128i mod_mask = _mm_load_si128((__m128i*)mask);
-        __declspec(align(16)) __m128i cur_seed_split = _mm_shuffle_epi32(anGenerator,_MM_SHUFFLE(2,3,0,1));
+        alignas(16) static constexpr unsigned int gadd[4] = {2531011,10395331,13737667,1};
+        alignas(16) static constexpr unsigned int mult[4] = {214013,17405,214013,69069};
+        alignas(16) static constexpr unsigned int mask[4] = {0xFFFFFFFF,0,0xFFFFFFFF,0};
+        alignas(16) __m128i adder = _mm_load_si128((__m128i*)gadd);
+        alignas(16) __m128i multiplier = _mm_load_si128((__m128i*)mult);
+        alignas(16) __m128i mod_mask = _mm_load_si128((__m128i*)mask);
+        alignas(16) __m128i cur_seed_split = _mm_shuffle_epi32(anGenerator,_MM_SHUFFLE(2,3,0,1));
         anGenerator = _mm_mul_epu32(anGenerator,multiplier);
         multiplier = _mm_shuffle_epi32(multiplier,_MM_SHUFFLE(2,3,0,1));
         cur_seed_split = _mm_mul_epu32(cur_seed_split,multiplier);
@@ -114,9 +114,9 @@ namespace lv {
         anGenerator = _mm_or_si128(anGenerator,cur_seed_split);
         anGenerator = _mm_add_epi32(anGenerator,adder);
         if(bStdCompat) {
-            __declspec(align(16)) static const unsigned int masklo[4] = {0x00007FFF, 0x00007FFF, 0x00007FFF, 0x00007FFF};
-            __declspec(align(16)) __m128i sra_mask = _mm_load_si128((__m128i*)masklo);
-            __declspec(align(16)) __m128i sseresult = _mm_srai_epi32(anGenerator,16);
+            alignas(16) static constexpr unsigned int masklo[4] = {0x00007FFF,0x00007FFF,0x00007FFF,0x00007FFF};
+            alignas(16) __m128i sra_mask = _mm_load_si128((__m128i*)masklo);
+            alignas(16) __m128i sseresult = _mm_srai_epi32(anGenerator,16);
             sseresult = _mm_and_si128(sseresult,sra_mask);
             _mm_storeu_si128((__m128i*)anResult,sseresult);
         }
