@@ -869,6 +869,8 @@ namespace lv {
             nSampleCoord_Y = oImageSize.height-nBorderSize-1;
     }
 
+    // @@@@ remove all rand stuff from here, put randidx in as param to all funcs
+
     /// returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check
     template<int nKernelHeight, int nKernelWidth>
     inline void getRandSamplePosition(const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
@@ -1322,13 +1324,15 @@ namespace lv {
         const float fAvgLight = 0.50f, fVarLight = 0.25f;
         const size_t nDivs = size_t(std::ceil(std::log2(nColors)));
         std::vector<cv::Vec3b> vColors(nColors);
+        std::random_device oRandDev;
+        std::default_random_engine oRandEng(oRandDev());
         size_t nColorIdx = 0;
         for(size_t nDivIdx=0; nDivIdx<nDivs && nColorIdx<nColors; ++nDivIdx) {
             const size_t nSampleCount = std::min(std::max(nColors/(size_t(1)<<(nDivIdx+1)),(360/nMaxAng)-1),nColors-nColorIdx);
             const float fCurrSat = 1.0f; //const float fCurrSat = fMaxSat-((fMaxSat-fMinSat)/nDivs)*nDivIdx;
             const float fCurrLight = fAvgLight + int(nDivIdx>0)*(((nDivIdx%2)?-fVarLight:fVarLight)/((std::max(nDivIdx,size_t(1))+1)/2));
             std::unordered_set<uint16_t> mDivAngSet;
-            uint16_t nCurrAng = uint16_t(rand())%nMaxAng;
+            uint16_t nCurrAng = uint16_t(oRandEng())%nMaxAng;
             for(size_t nSampleIdx=0; nSampleIdx<nSampleCount; ++nSampleIdx) {
                 lvDbgAssert(mDivAngSet.size()<360);
                 while(mDivAngSet.count(nCurrAng))
@@ -1338,8 +1342,6 @@ namespace lv {
                 nCurrAng = (nCurrAng+360/nSampleCount)%360;
             }
         }
-        std::random_device oRandDev;
-        std::default_random_engine oRandEng(oRandDev());
         std::shuffle(vColors.begin(),vColors.end(),oRandEng);
         std::map<T,cv::Vec3b> mColorMap;
         for(nColorIdx=0; nColorIdx<nColors; ++nColorIdx)
