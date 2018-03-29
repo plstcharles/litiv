@@ -65,16 +65,17 @@ namespace lv {
 
 #if HAVE_SSE2
     /// initializes the vectorized intel_fastrand LCG random number generator
-    inline void srand_vec(uint32_t nSeed, __m128i* anGenerator) {
-        lvDbgAssert_(anGenerator && ((uintptr_t)(anGenerator)&15)==0,"pointer must be 16-byte aligned");
-        *((__m128i*)anGenerator) = _mm_set_epi32(nSeed,nSeed+1,nSeed,nSeed+1);
+    inline void sfastrand_vec(uint32_t nSeed, __m128i& anGenerator) {
+        lvDbgAssert_(((uintptr_t)(&anGenerator)&15)==0,"pointer must be 16-byte aligned");
+        anGenerator = _mm_set_epi32(nSeed,nSeed+1,nSeed,nSeed+1);
     }
 
     /// returns 4x random values obtained via the vectorized intel_fastrand LCG random number generator
-    template<bool bStdCompat=false>
-    inline void rand_vec(uint32_t* anResult, __m128i* anGenerator) {
-        lvDbgAssert_(anResult && ((uintptr_t)(anResult)&15)==0,"pointer must be 16-byte aligned");
-        lvDbgAssert_(anGenerator && ((uintptr_t)(anGenerator)&15)==0,"pointer must be 16-byte aligned");
+    template<bool bOutputAligned16=false, bool bStdCompat=false>
+    inline void fastrand_vec(std::array<uint32_t,4>& anResult, __m128i& anGenerator) {
+        if(bOutputAligned16)
+            lvDbgAssert_(((uintptr_t)(anResult.data())&15)==0,"pointer must be 16-byte aligned");
+        lvDbgAssert_(((uintptr_t)(&anGenerator)&15)==0,"pointer must be 16-byte aligned");
         /////////////////////////////////////////////////////////////////////////////
         // The Software is provided "AS IS" and possibly with faults.
         // Intel disclaims any and all warranties and guarantees, express, implied or
@@ -118,10 +119,17 @@ namespace lv {
             alignas(16) __m128i sra_mask = _mm_load_si128((__m128i*)masklo);
             alignas(16) __m128i sseresult = _mm_srai_epi32(anGenerator,16);
             sseresult = _mm_and_si128(sseresult,sra_mask);
-            _mm_storeu_si128((__m128i*)anResult,sseresult);
+            if(bOutputAligned16)
+                _mm_store_si128((__m128i*)anResult.data(),sseresult);
+            else
+                _mm_storeu_si128((__m128i*)anResult.data(),sseresult);
         }
-        else
-            _mm_storeu_si128((__m128i*)anResult,anGenerator);
+        else {
+            if(bOutputAligned16)
+                _mm_store_si128((__m128i*)anResult.data(),anGenerator);
+            else
+                _mm_storeu_si128((__m128i*)anResult.data(),anGenerator);
+        }
     }
 #endif //HAVE_SSE2
 
