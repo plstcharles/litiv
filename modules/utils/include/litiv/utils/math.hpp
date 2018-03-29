@@ -56,6 +56,75 @@ namespace lv {
 
 #endif //(!defined(_MSC_VER) || _MSC_VER>=1910)
 
+    /// returns a (cheap) random number based on Intel's fastrand LCG algorithm (16-bit, like std::rand)
+    inline int fastrand(int& nSeed) {
+        // see https://software.intel.com/en-us/articles/fast-random-number-generator-on-the-intel-pentiumr-4-processor/
+        nSeed = (214013*nSeed+2531011);
+        return (nSeed>>16)&0x7FFF;
+    }
+
+#if HAVE_SSE2
+    /// initializes the vectorized intel_fastrand LCG random number generator
+    inline void srand_vec(uint32_t nSeed, __m128i* anGenerator) {
+        lvDbgAssert_(anGenerator && ((uintptr_t)(anGenerator)&15)==0,"pointer must be 16-byte aligned");
+        *((__m128i*)anGenerator) = _mm_set_epi32(nSeed,nSeed+1,nSeed,nSeed+1);
+    }
+
+    /// returns 4x random values obtained via the vectorized intel_fastrand LCG random number generator
+    template<bool bStdCompat=false>
+    inline void rand_vec(uint32_t* anResult, __m128i* anGenerator) {
+        lvDbgAssert_(anResult && ((uintptr_t)(anResult)&15)==0,"pointer must be 16-byte aligned");
+        lvDbgAssert_(anGenerator && ((uintptr_t)(anGenerator)&15)==0,"pointer must be 16-byte aligned");
+        /////////////////////////////////////////////////////////////////////////////
+        // The Software is provided "AS IS" and possibly with faults.
+        // Intel disclaims any and all warranties and guarantees, express, implied or
+        // otherwise, arising, with respect to the software delivered hereunder,
+        // including but not limited to the warranty of merchantability, the warranty
+        // of fitness for a particular purpose, and any warranty of non-infringement
+        // of the intellectual property rights of any third party.
+        // Intel neither assumes nor authorizes any person to assume for it any other
+        // liability. Customer will use the software at its own risk. Intel will not
+        // be liable to customer for any direct or indirect damages incurred in using
+        // the software. In no event will Intel be liable for loss of profits, loss of
+        // use, loss of data, business interruption, nor for punitive, incidental,
+        // consequential, or special damages of any kind, even if advised of
+        // the possibility of such damages.
+        //
+        // Copyright (c) 2003 Intel Corporation
+        //
+        ///////////////////////////////////////////////////////////////////////////
+        // Random Number Generation for SSE / SSE2
+        // see https://software.intel.com/en-us/articles/fast-random-number-generator-on-the-intel-pentiumr-4-processor/
+        // Version 0.1
+        // Author Kipp Owens, Rajiv Parikh
+        ////////////////////////////////////////////////////////////////////////
+        __declspec(align(16)) static const unsigned int gadd[4] = {2531011, 10395331, 13737667, 1};
+        __declspec(align(16)) static const unsigned int mult[4] = {214013, 17405, 214013, 69069};
+        __declspec(align(16)) static const unsigned int mask[4] = {0xFFFFFFFF, 0, 0xFFFFFFFF, 0};
+        __declspec(align(16)) __m128i adder = _mm_load_si128((__m128i*)gadd);
+        __declspec(align(16)) __m128i multiplier = _mm_load_si128((__m128i*)mult);
+        __declspec(align(16)) __m128i mod_mask = _mm_load_si128((__m128i*)mask);
+        __declspec(align(16)) __m128i cur_seed_split = _mm_shuffle_epi32(anGenerator,_MM_SHUFFLE(2,3,0,1));
+        anGenerator = _mm_mul_epu32(anGenerator,multiplier);
+        multiplier = _mm_shuffle_epi32(multiplier,_MM_SHUFFLE(2,3,0,1));
+        cur_seed_split = _mm_mul_epu32(cur_seed_split,multiplier);
+        anGenerator = _mm_and_si128(anGenerator,mod_mask);
+        cur_seed_split = _mm_and_si128(cur_seed_split,mod_mask);
+        cur_seed_split = _mm_shuffle_epi32(cur_seed_split,_MM_SHUFFLE(2,3,0,1));
+        anGenerator = _mm_or_si128(anGenerator,cur_seed_split);
+        anGenerator = _mm_add_epi32(anGenerator,adder);
+        if(bStdCompat) {
+            __declspec(align(16)) static const unsigned int masklo[4] = {0x00007FFF, 0x00007FFF, 0x00007FFF, 0x00007FFF};
+            __declspec(align(16)) __m128i sra_mask = _mm_load_si128((__m128i*)masklo);
+            __declspec(align(16)) __m128i sseresult = _mm_srai_epi32(anGenerator,16);
+            sseresult = _mm_and_si128(sseresult,sra_mask);
+            _mm_storeu_si128((__m128i*)anResult,sseresult);
+        }
+        else
+            _mm_storeu_si128((__m128i*)anResult,anGenerator);
+    }
+#endif //HAVE_SSE2
+
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wstrict-aliasing"
