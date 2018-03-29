@@ -869,16 +869,14 @@ namespace lv {
             nSampleCoord_Y = oImageSize.height-nBorderSize-1;
     }
 
-    // @@@@ remove all rand stuff from here, put randidx in as param to all funcs
-
-    /// returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check
+    /// returns the sampling location for the specified random index & original pixel location, given a predefined kernel; also guards against out-of-bounds values via image/border size check
     template<int nKernelHeight, int nKernelWidth>
-    inline void getRandSamplePosition(const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
-                                      const int nSamplesInitPatternTot, int& nSampleCoord_X, int& nSampleCoord_Y,
-                                      const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+    inline void getSamplePosition(const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
+                                  const int nSamplesInitPatternTot, const int nRandIdx, int& nSampleCoord_X, int& nSampleCoord_Y,
+                                  const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         static_assert(nKernelWidth>0 && nKernelHeight>0,"invalid init pattern array size");
         lvDbgAssert_(nSamplesInitPatternTot>0,"pattern max count must be positive");
-        int r = 1+rand()%nSamplesInitPatternTot;
+        int r = 1+(nRandIdx%nSamplesInitPatternTot);
         for(nSampleCoord_Y=0; nSampleCoord_Y<nKernelHeight; ++nSampleCoord_Y) {
             for(nSampleCoord_X=0; nSampleCoord_X<nKernelWidth; ++nSampleCoord_X) {
                 r -= anSamplesInitPattern[nSampleCoord_Y][nSampleCoord_X];
@@ -892,8 +890,10 @@ namespace lv {
         clampImageCoords(nSampleCoord_X,nSampleCoord_Y,nBorderSize,oImageSize);
     }
 
-    /// returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    inline void getRandSamplePosition_3x3_std1(int& nSampleCoord_X, int& nSampleCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+    /// returns the sampling location for the specified random index & original pixel location; also guards against out-of-bounds values via image/border size check
+    inline void getSamplePosition_3x3_std1(const int nRandIdx, int& nSampleCoord_X, int& nSampleCoord_Y,
+                                           const int nOrigCoord_X, const int nOrigCoord_Y,
+                                           const int nBorderSize, const cv::Size& oImageSize) {
         // based on 'floor(fspecial('gaussian',3,1)*256)'
         static_assert(sizeof(std::array<int,3>)==sizeof(int)*3,"bad std::array stl impl");
         static const int s_nSamplesInitPatternTot = 256;
@@ -902,11 +902,13 @@ namespace lv {
                 std::array<int,3>{32,52,32,},
                 std::array<int,3>{19,32,19,},
         };
-        getRandSamplePosition<3,3>(s_anSamplesInitPattern,s_nSamplesInitPatternTot,nSampleCoord_X,nSampleCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
+        getSamplePosition<3,3>(s_anSamplesInitPattern,s_nSamplesInitPatternTot,nRandIdx,nSampleCoord_X,nSampleCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    /// returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    inline void getRandSamplePosition_7x7_std2(int& nSampleCoord_X, int& nSampleCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+    /// returns the sampling location for the specified random index & original pixel location; also guards against out-of-bounds values via image/border size check
+    inline void getSamplePosition_7x7_std2(const int nRandIdx, int& nSampleCoord_X, int& nSampleCoord_Y,
+                                           const int nOrigCoord_X, const int nOrigCoord_Y,
+                                           const int nBorderSize, const cv::Size& oImageSize) {
         // based on 'floor(fspecial('gaussian',7,2)*512)'
         static_assert(sizeof(std::array<int,7>)==sizeof(int)*7,"bad std::array stl impl");
         static const int s_nSamplesInitPatternTot = 512;
@@ -919,35 +921,39 @@ namespace lv {
                 std::array<int,7>{ 4, 8,12,14,12, 8, 4,},
                 std::array<int,7>{ 2, 4, 6, 7, 6, 4, 2,},
         };
-        getRandSamplePosition<7,7>(s_anSamplesInitPattern,s_nSamplesInitPatternTot,nSampleCoord_X,nSampleCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
+        getSamplePosition<7,7>(s_anSamplesInitPattern,s_nSamplesInitPatternTot,nRandIdx,nSampleCoord_X,nSampleCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    /// returns a random neighbor position for the specified pixel position, given a predefined neighborhood; also guards against out-of-bounds values via image/border size check.
+    /// returns the neighbor location for the specified random index & original pixel location, given a predefined neighborhood; also guards against out-of-bounds values via image/border size check
     template<int nNeighborCount>
-    inline void getRandNeighborPosition(const std::array<std::array<int,2>,nNeighborCount>& anNeighborPattern,
-                                        int& nNeighborCoord_X, int& nNeighborCoord_Y,
-                                        const int nOrigCoord_X, const int nOrigCoord_Y,
-                                        const int nBorderSize, const cv::Size& oImageSize) {
+    inline void getNeighborPosition(const std::array<std::array<int,2>,nNeighborCount>& anNeighborPattern,
+                                    const int nRandIdx, int& nNeighborCoord_X, int& nNeighborCoord_Y,
+                                    const int nOrigCoord_X, const int nOrigCoord_Y,
+                                    const int nBorderSize, const cv::Size& oImageSize) {
         static_assert(nNeighborCount>0,"invalid input neighbor pattern array size");
-        int r = rand()%nNeighborCount;
+        const int r = nRandIdx%nNeighborCount;
         nNeighborCoord_X = nOrigCoord_X+anNeighborPattern[r][0];
         nNeighborCoord_Y = nOrigCoord_Y+anNeighborPattern[r][1];
         clampImageCoords(nNeighborCoord_X,nNeighborCoord_Y,nBorderSize,oImageSize);
     }
 
-    /// returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    inline void getRandNeighborPosition_3x3(int& nNeighborCoord_X, int& nNeighborCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+    /// returns the neighbor location for the specified random index & original pixel location; also guards against out-of-bounds values via image/border size check
+    inline void getNeighborPosition_3x3(const int nRandIdx, int& nNeighborCoord_X, int& nNeighborCoord_Y,
+                                        const int nOrigCoord_X, const int nOrigCoord_Y,
+                                        const int nBorderSize, const cv::Size& oImageSize) {
         typedef std::array<int,2> Nb;
         static const std::array<std::array<int,2>,8> s_anNeighborPattern ={
                 Nb{-1, 1},Nb{0, 1},Nb{1, 1},
                 Nb{-1, 0},         Nb{1, 0},
                 Nb{-1,-1},Nb{0,-1},Nb{1,-1},
         };
-        getRandNeighborPosition<8>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
+        getNeighborPosition<8>(s_anNeighborPattern,nRandIdx,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    /// returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    inline void getRandNeighborPosition_5x5(int& nNeighborCoord_X, int& nNeighborCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+    /// returns the neighbor location for the specified random index & original pixel location; also guards against out-of-bounds values via image/border size check
+    inline void getNeighborPosition_5x5(const int nRandIdx, int& nNeighborCoord_X, int& nNeighborCoord_Y,
+                                        const int nOrigCoord_X, const int nOrigCoord_Y,
+                                        const int nBorderSize, const cv::Size& oImageSize) {
         typedef std::array<int,2> Nb;
         static const std::array<std::array<int,2>,24> s_anNeighborPattern ={
                 Nb{-2, 2},Nb{-1, 2},Nb{0, 2},Nb{1, 2},Nb{2, 2},
@@ -956,7 +962,7 @@ namespace lv {
                 Nb{-2,-1},Nb{-1,-1},Nb{0,-1},Nb{1,-1},Nb{2,-1},
                 Nb{-2,-2},Nb{-1,-2},Nb{0,-2},Nb{1,-2},Nb{2,-2},
         };
-        getRandNeighborPosition<24>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
+        getNeighborPosition<24>(s_anNeighborPattern,nRandIdx,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
     /// computes & returns a logpolar lookup mask using the given output square matrix size & angular/radial bin counts

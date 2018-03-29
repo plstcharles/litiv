@@ -387,31 +387,32 @@ TEST(clampImageCoords,regression) {
     EXPECT_TRUE(nX==320 && nY==240);
 }
 
-TEST(getRandSamplePosition,regression) {
+TEST(getSamplePosition,regression) {
+    srand((uint)time(NULL));
     int nX,nY;
     const std::array<std::array<int,1>,1> anTestPattern1u = {{1}};
-    lv::getRandSamplePosition<1,1>(anTestPattern1u,1,nX,nY,0,0,0,cv::Size(640,480));
+    lv::getSamplePosition<1,1>(anTestPattern1u,1,rand(),nX,nY,0,0,0,cv::Size(640,480));
     EXPECT_TRUE(nX==0 && nY==0);
-    lv::getRandSamplePosition<1,1>(anTestPattern1u,1,nX,nY,320,240,0,cv::Size(640,480));
+    lv::getSamplePosition<1,1>(anTestPattern1u,1,rand(),nX,nY,320,240,0,cv::Size(640,480));
     EXPECT_TRUE(nX==320 && nY==240);
-    lv::getRandSamplePosition<1,1>(anTestPattern1u,1,nX,nY,640,480,0,cv::Size(640,480));
+    lv::getSamplePosition<1,1>(anTestPattern1u,1,rand(),nX,nY,640,480,0,cv::Size(640,480));
     EXPECT_TRUE(nX==639 && nY==479);
     const std::array<std::array<int,3>,3> anTestPattern3i = {std::array<int,3>{0,0,100},std::array<int,3>{0,0,0},std::array<int,3>{0,0,0}};
-    lv::getRandSamplePosition<3,3>(anTestPattern3i,5,nX,nY,0,0,0,cv::Size(640,480));
+    lv::getSamplePosition<3,3>(anTestPattern3i,5,rand(),nX,nY,0,0,0,cv::Size(640,480));
     EXPECT_TRUE(nX==1 && nY==0);
-    lv::getRandSamplePosition<3,3>(anTestPattern3i,5,nX,nY,320,240,0,cv::Size(640,480));
+    lv::getSamplePosition<3,3>(anTestPattern3i,5,rand(),nX,nY,320,240,0,cv::Size(640,480));
     EXPECT_TRUE(nX==321 && nY==239);
-    lv::getRandSamplePosition<3,3>(anTestPattern3i,5,nX,nY,640,480,0,cv::Size(640,480));
+    lv::getSamplePosition<3,3>(anTestPattern3i,5,rand(),nX,nY,640,480,0,cv::Size(640,480));
     EXPECT_TRUE(nX==639 && nY==479);
     const std::array<std::array<int,3>,3> anTestPattern3u = {std::array<int,3>{1,1,1},std::array<int,3>{1,1,1},std::array<int,3>{1,1,1}};
     for(size_t i=0; i<10000; ++i) {
-        lv::getRandSamplePosition<3,3>(anTestPattern3u,9,nX,nY,320,240,0,cv::Size(640,480));
+        lv::getSamplePosition<3,3>(anTestPattern3u,9,rand(),nX,nY,320,240,0,cv::Size(640,480));
         ASSERT_TRUE(nX>=319 && nX<=321);
         ASSERT_TRUE(nY>=239 && nY<=241);
     }
 }
 
-TEST(getRandNeighborPosition,regression) {
+TEST(getNeighborPosition,regression) {
     typedef std::array<int,2> Nb;
     const std::array<std::array<int,2>,8> anTestPattern8 ={
             Nb{-1, 1},Nb{0, 1},Nb{1, 1},
@@ -420,7 +421,7 @@ TEST(getRandNeighborPosition,regression) {
     };
     for(size_t i=0; i<10000; ++i) {
         int nX, nY;
-        lv::getRandNeighborPosition<8>(anTestPattern8,nX,nY,320,240,0,cv::Size(640,480));
+        lv::getNeighborPosition<8>(anTestPattern8,rand(),nX,nY,320,240,0,cv::Size(640,480));
         ASSERT_TRUE(nX>=319 && nX<=321);
         ASSERT_TRUE(nY>=239 && nY<=241);
         ASSERT_FALSE(nX==320 && nY==240);
