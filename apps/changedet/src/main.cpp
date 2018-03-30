@@ -120,6 +120,7 @@ using BackgroundSubtractorType = cv::cuda::BackgroundSubtractorMOG2;
 #error "Missing glsl impl for gmm."
 #endif //USE_GLSL_IMPL
 #if !USE_GPU_IMPL
+#include <opencv2/core/ocl.hpp>
 using BackgroundSubtractorType = cv::BackgroundSubtractorMOG2;
 #endif //!USE_GPU_IMPL
 #else //USE_...(algo)
@@ -361,6 +362,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         pAlgo->initialize(oCurrInput,oROI);
     #else //!USE_LITIV_IMPL
     #if USE_GMM
+        cv::ocl::setUseOpenCL(false);
+        cv::setNumThreads(1);
         cv::Ptr<BackgroundSubtractorType> pAlgo = cv::createBackgroundSubtractorMOG2();
         const double dDefaultLearningRate = -1.0;
     #endif //USE_...
