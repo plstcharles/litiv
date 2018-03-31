@@ -202,6 +202,9 @@
 #ifndef __LV_CONFIG_DEFS__
     #define __LV_CONFIG_DEFS__
     // config defs that may still change from CMake values have ifndef's
+    #ifndef USE_PROFILING
+        #define USE_PROFILING               @USE_PROFILING@
+    #endif //USE_PROFILING
     #ifndef USE_OPENCV_MAT_CONSTR_FIX
         #define USE_OPENCV_MAT_CONSTR_FIX   @USE_OPENCV_MAT_CONSTR_FIX@
     #endif //ndef(USE_OPENCV_MAT_CONSTR_FIX)

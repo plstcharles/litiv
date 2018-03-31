@@ -372,7 +372,20 @@ macro(litiv_app name sources)
             FOLDER "apps"
             DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
     )
-    target_link_libraries(${PROJECT_NAME} PUBLIC litiv_world)
+    if(USE_PROFILING)
+        target_include_directories(${PROJECT_NAME}
+            PRIVATE
+                ${Gperftools_INCLUDE_DIR}
+        )
+        target_link_libraries(${PROJECT_NAME}
+            PRIVATE
+                ${Gperftools_PROFILER}
+        )
+    endif()
+    target_link_libraries(${PROJECT_NAME}
+        PUBLIC
+            litiv_world
+    )
     install(
         TARGETS ${PROJECT_NAME}
         RUNTIME DESTINATION "bin"

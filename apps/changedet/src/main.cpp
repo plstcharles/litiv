@@ -21,6 +21,9 @@
 
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
+#if USE_PROFILING
+#include <gperftools/profiler.h>
+#endif //USE_PROFILING
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
@@ -130,6 +133,9 @@ using BackgroundSubtractorType = cv::BackgroundSubtractorMOG2;
 void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch);
 
 int main(int, char**) {
+#if USE_PROFILING
+    ProfilerStart("changedet.gprof");
+#endif //PROFILING
     try {
         DatasetType::Ptr pDataset = DatasetType::create(DATASET_PARAMS);
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false);
@@ -153,6 +159,9 @@ int main(int, char**) {
     catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
+#if USE_PROFILING
+    ProfilerStop();
+#endif //USE_PROFILING
     return 0;
 }
 
