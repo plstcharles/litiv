@@ -217,14 +217,15 @@ namespace lv {
     }
 
     /// explicit loop unroller helper function (specialization for null iter count)
-    template<size_t n, typename TFunc>
+    template<size_t n, bool bInvert=false, typename TFunc>
     std::enable_if_t<n==0> unroll(const TFunc&) {}
 
-    /// explicit loop unroller helper function (specialization for non-null iter count)
-    template<size_t n, typename TFunc>
+    /// explicit loop unroller helper function (specialization for non-null iter count; goes from index 0 to nIters-1 by default)
+    template<size_t n, bool bInvert=false, typename TFunc>
     std::enable_if_t<(n>0)> unroll(const TFunc& f) {
-        unroll<n-1>(f);
-        f(n-1);
+        bInvert?f(n-1):(void)0;
+        unroll<n-1,bInvert>(f);
+        bInvert?(void)0:f(n-1);
     }
 
     /// returns the number of decimal digits required to display the non-fractional part of a given number (counts sign as extra digit if negative)

@@ -15,6 +15,11 @@ TEST(unroll,regression) {
         EXPECT_EQ(nIdx,nIdx_ext++);
     });
     EXPECT_EQ(nIdx_ext,nIter);
+    nIdx_ext = 0;
+    lv::unroll<nIter,true>([&](size_t nIdx){
+        EXPECT_EQ(nIdx,nIter-++nIdx_ext);
+    });
+    EXPECT_EQ(nIdx_ext,nIter);
 }
 
 TEST(compare_lowercase,regression) {
