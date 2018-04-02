@@ -28,7 +28,9 @@
 #else //(!defined(_MSC_VER))
 #if defined(__i386__) || defined(__amd64__)
 #include <x86intrin.h>
-#endif //(defined() || defined())
+#elif defined(__ARM_NEON__) || defined(__arm__) || defined(__aarch64__)
+#include <arm_neon.h>
+#endif //(defined(arch...))
 #endif //(!defined(_MSC_VER))
 
 namespace lv {

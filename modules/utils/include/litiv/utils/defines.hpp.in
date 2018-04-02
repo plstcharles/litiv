@@ -356,6 +356,9 @@
 
     #define HAVE_KINECTSDK            @USE_KINECTSDK@
 
+    #ifndef HAVE_NEON
+        #define HAVE_NEON             @USE_NEON@
+    #endif //ndef(HAVE_NEON)
     #ifndef HAVE_MMX
         #define HAVE_MMX              @USE_MMX@
     #endif //ndef(HAVE_MMX)
