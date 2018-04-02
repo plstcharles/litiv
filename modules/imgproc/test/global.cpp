@@ -509,3 +509,14 @@ TEST(descriptor_affinity,regression_L2_dasc) {
 }
 
 #endif //ndef(_MSC_VER)
+
+TEST(computeIntegral,regression) {
+    for(size_t i=0u; i<20u; ++i) {
+        cv::Mat oTestMat((rand()%500)+1,(rand()%500)+1,CV_8UC((rand()%4)+1));
+        cv::randu(oTestMat,0,256);
+        cv::Mat oLocalOutput,oCVOutput;
+        lv::computeIntegral(oTestMat,oLocalOutput,CV_32S);
+        cv::integral(oTestMat,oCVOutput,CV_32S);
+        ASSERT_TRUE(lv::isEqual<int>(oLocalOutput,oCVOutput));
+    }
+}

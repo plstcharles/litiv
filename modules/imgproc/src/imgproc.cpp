@@ -17,6 +17,7 @@
 
 #include "litiv/imgproc.hpp"
 #include "litiv/features2d/MI.hpp"
+#include <opencv2/core/ocl.hpp>
 #if HAVE_CUDA
 #include "affinity.cuh"
 #endif //HAVE_CUDA
@@ -544,6 +545,69 @@ void lv::computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::
 }
 
 #endif //HAVE_CUDA
+
+void lv::computeIntegral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth) {
+    lvAssert_(!oInput.empty() && oInput.depth()==CV_8U && oInput.dims==2 && oInput.isContinuous(),"invalid input matrix");
+    lvAssert_(nOutDepth==CV_32S || nOutDepth==CV_32F,"invalid requested output matrix depth");
+    if(oInput.rows+1!=oIntegralImg.rows || oInput.cols+1!=oIntegralImg.cols || oInput.channels()!=oIntegralImg.channels() || oIntegralImg.depth()!=nOutDepth || !oIntegralImg.isContinuous())
+        oIntegralImg.create(oInput.rows+1,oInput.cols+1,CV_MAKE_TYPE(nOutDepth,oInput.channels()));
+#if HAVE_NEON
+    if(oInput.channels()==1 && nOutDepth==CV_32S && !cv::ocl::useOpenCL()) {
+        cv::Mat_<int> oOutput = oIntegralImg(cv::Rect(1,1,oInput.cols,oInput.rows));
+        std::fill(oIntegralImg.ptr<int>(0),oIntegralImg.ptr<int>(1),0);
+        static const uint16x8_t aZeroVec = vdupq_n_u16(0u);
+        // + omp? @@@@
+        for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
+            int nLatestPrefixSum = oIntegralImg.at<int>(nRowIdx+1,0) = 0;
+            int32x4_t aCarryVec = vdupq_n_s32(0);
+            int nColIdx = 0;
+            for(; nColIdx+16<oInput.cols; nColIdx+=16) {
+
+                // tmp test, to remove @@@@
+                const int nTestSum = std::accumulate(oInput.ptr<uchar>(nRowIdx,nColIdx),oInput.ptr<uchar>(nRowIdx,nColIdx)+16,nLatestPrefixSum);
+
+                const uint8x16_t aInputVec = vld1q_u8(oInput.ptr<uchar>(nRowIdx,nColIdx));
+                std::array<uint16x8_t,2> aInputSum{vmovl_u8(vget_low_u8(aInputVec)),vmovl_u8(vget_high_u8(aInputVec))};
+                lv::unroll<2u>([&](size_t nIdx) {
+                    aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(zeroVec,aInputSum[nIdx],7));
+                    aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(zeroVec,aInputSum[nIdx],6));
+                    aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(zeroVec,aInputSum[nIdx],4));
+                });
+                int* aCurrOutputVec = oOutput.ptr<int>(nRowIdx,nColIdx);
+                lv::unroll<2u,true>([&](size_t nIdx) {
+                    vst1q_s32(aCurrOutputVec+(nIdx*8),vaddq_s32(vmovl_s16(vget_low_s16(vreinterpretq_s16_u16(aInputSum[nIdx]))),aCarryVec));
+                    const int32x4_t aOutputSumHi = vaddq_s32(vmovl_s16(vget_high_s16(vreinterpretq_s16_u16(aInputSum[nIdx]))),aCarryVec);
+                    vst1q_s32(aCurrOutputVec+(nIdx*8+4),aOutputSumHi);
+                    aCarryVec = vdupq_n_s32(nLatestPrefixSum=vgetq_lane_s32(aOutputSumHi,3));
+                });
+
+                // to remove @@@@
+                lvAssert(nTestSum==nLatestPrefixSum);
+            }
+            for(; nColIdx<oInput.cols ; ++nColIdx) {
+                nLatestPrefixSum += (int)oInput.at<uchar>(nRowIdx,nColIdx);
+                oOutput(nRowIdx,nColIdx) = nLatestPrefixSum;
+            }
+        }
+        for(int nRowIdx=0; nRowIdx<oInput.rows-1; ++nRowIdx) {
+            int nColIdx = 0;
+            for(; nColIdx+16<oInput.cols; nColIdx+=16) {
+                lv::unroll<4u,true>([&](size_t nIdx) {
+                    const int32x4_t aRow1 = vld1q_s32(oOutput.ptr<int>(nRowIdx,nColIdx)+nIdx*4);
+                    const int32x4_t aRow1 = vld1q_s32(oOutput.ptr<int>(nRowIdx+1,nColIdx)+nIdx*4);
+                    vst1q_s32(oOutput.ptr<int>(nRowIdx+1,nColIdx),vqaddq_s32(aRow1,aRow1));
+                });
+            }
+            for(; nColIdx<oInput.cols; ++nColIdx)
+                oOutput(nRowIdx+1,nColIdx) += oOutput(nRowIdx,nColIdx);
+        }
+        return;
+    }
+#else //!HAVE_NEON
+    cv::integral(oInput,oIntegralImg,nOutDepth); // redirect to opencv's impl by default; accelerated via ocl & sse2
+#endif //!HAVE_NEON
+
+}
 
 void lv::computeTemporalAbsDiff(const cv::Mat& oImage1, const cv::Mat& oImage2, const cv::Mat& oFlow, cv::Mat& oOutput, int nSmoothKernelSize) {
     lvAssert_(!oImage1.empty() && !oImage2.empty() && !oFlow.empty() && nSmoothKernelSize>=0,"invalid parameter(s)");

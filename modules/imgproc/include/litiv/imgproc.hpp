@@ -77,6 +77,9 @@ namespace lv {
                                    const cv::cuda::GpuMat& oROI1=cv::cuda::GpuMat(), const cv::cuda::GpuMat& oROI2=cv::cuda::GpuMat());
 #endif //HAVE_CUDA
 
+    /// computes a 2d integral image; will redirect to opencv implementation unless NEON is available
+    void computeIntegral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth=-1);
+
     /// computes the 'temporal' absolute difference between two 8U images given their optical flow map (with optional smoothing); output is a 32F image
     void computeTemporalAbsDiff(const cv::Mat& oImage1, const cv::Mat& oImage2, const cv::Mat& oFlow, cv::Mat& oOutput, int nSmoothKernelSize=1);
     /// computes a map-transform of an image using relative xy pixel offsets; see cv::remap for more information
