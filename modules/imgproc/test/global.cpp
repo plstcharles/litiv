@@ -65,17 +65,63 @@ TEST(medianBlur,regression) {
 }
 
 TEST(binaryMedianBlur,regression) {
-    for(size_t i=0u; i<50u; ++i) {
-        cv::Mat_<uchar> vTestMat((rand()%100)+1,(rand()%100)+1),oMask(vTestMat.size());
-        cv::randu(vTestMat,0u,256u);
-        cv::randu(oMask,0u,256u);
-        vTestMat = vTestMat>128u;
-        oMask = oMask>128u;
-        cv::Mat oBinaryOutput,oRegularOutput;
+    for(size_t i=0u; i<200u; ++i) {
+        cv::Mat_<uchar> oMask,oInput((rand()%100)+1,(rand()%100)+1);
+        cv::randu(oInput,0u,256u);
+        oInput = oInput>128u;
+        if((rand()%4)!=0) {
+            oMask.create(oInput.size());
+            cv::randu(oMask,0u,256u);
+            oMask = oMask>128u;
+        }
+        cv::Mat_<uchar> oBinaryOutput_conv,oBinaryOutput_raw,oRegularOutput;
         const int nKernelSize = (((rand()%7)+1)*2)+1;
-        lv::binaryMedianBlur(vTestMat,oBinaryOutput,oMask,nKernelSize);
-        lv::medianBlur(vTestMat,oRegularOutput,oMask,nKernelSize);
-        ASSERT_TRUE(lv::isEqual<uchar>(oBinaryOutput,oRegularOutput));
+        lv::medianBlur(oInput,oRegularOutput,oMask,nKernelSize);
+        lv::binaryMedianBlur(oInput,oBinaryOutput_conv,oMask,nKernelSize,true);
+        oInput.setTo(1u,oInput!=0);
+        lv::binaryMedianBlur(oInput,oBinaryOutput_raw,oMask,nKernelSize,false);
+        const int nOffset = nKernelSize/2;
+        const cv::Rect oROI(nOffset,nOffset,oInput.cols-nOffset*2,oInput.rows-nOffset*2);
+        if(oROI.width>0 && oROI.height>0) {
+            ASSERT_TRUE(lv::isEqual<uchar>(oBinaryOutput_conv(oROI),oRegularOutput(oROI)));
+            ASSERT_TRUE(lv::isEqual<uchar>(oBinaryOutput_raw(oROI),oRegularOutput(oROI)));
+        }
+    }
+}
+
+TEST(binaryConsensus,regression) {
+    for(size_t i=0u; i<200u; ++i) {
+        cv::Mat_<uchar> oInput((rand()%100)+1,(rand()%100)+1);
+        cv::randu(oInput,0u,3u);
+        cv::Mat_<uchar> oMask(oInput.size());
+        cv::randu(oMask,0u,2u);
+        cv::Mat_<int> oThreshMap(oInput.size());
+        const int nKernelSize = (((rand()%7)+1)*2)+1;
+        const int nOffset=nKernelSize/2, nRows=oInput.rows, nCols=oInput.cols;
+        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+            for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+                int nHits = 0;
+                for(int nOffsetRowIdx=std::max(nRowIdx-nOffset,0); nOffsetRowIdx<=std::min(nRowIdx+nOffset,nRows-1); ++nOffsetRowIdx) {
+                    for(int nOffsetColIdx=std::max(nColIdx-nOffset,0); nOffsetColIdx<=std::min(nColIdx+nOffset,nCols-1); ++nOffsetColIdx) {
+                        nHits += (oMask(nOffsetRowIdx,nOffsetColIdx)?1:0);
+                    }
+                }
+                oThreshMap(nRowIdx,nColIdx) = nHits/2+1;
+            }
+        }
+        cv::Mat_<uchar> oOutput_conv,oOutput_raw,oOutput_old;
+        lv::binaryMedianBlur(oInput,oOutput_old,oMask,nKernelSize,false);
+        cv::Mat_<uchar> oInput_masked;
+        oInput.copyTo(oInput_masked);
+        oInput_masked.setTo(0u,oMask==0);
+        lv::binaryConsensus(oInput_masked,oOutput_conv,oThreshMap,nKernelSize,true);
+        oInput_masked.setTo(1u,oInput_masked!=0);
+        lv::binaryConsensus(oInput_masked,oOutput_raw,oThreshMap,nKernelSize,false);
+        const cv::Rect oROI(nOffset,nOffset,oInput.cols-nOffset*2,oInput.rows-nOffset*2);
+        if(oROI.width>0 && oROI.height>0) {
+            ASSERT_TRUE(lv::isEqual<uchar>(oOutput_conv(oROI),oOutput_raw(oROI)));
+            ASSERT_TRUE(lv::isEqual<uchar>(oOutput_conv(oROI),oOutput_old(oROI)));
+        }
     }
 }
 
@@ -515,8 +561,87 @@ TEST(computeIntegral,regression) {
         cv::Mat oTestMat((rand()%500)+1,(rand()%500)+1,CV_8UC((rand()%4)+1));
         cv::randu(oTestMat,0,256);
         cv::Mat oLocalOutput,oCVOutput;
-        lv::computeIntegral(oTestMat,oLocalOutput,CV_32S);
+        lv::integral(oTestMat,oLocalOutput,CV_32S);
         cv::integral(oTestMat,oCVOutput,CV_32S);
         ASSERT_TRUE(lv::isEqual<int>(oLocalOutput,oCVOutput));
     }
 }
+
+namespace {
+
+    void medianBlur_perftest(benchmark::State& st) {
+        const volatile int nMatSize = st.range(0);
+        const volatile int nKernelSize = st.range(1);
+        std::unique_ptr<uint8_t[]> aVals = lv::test::genarray<uint8_t>((size_t)nMatSize*nMatSize,0u,255u);
+        cv::Mat_<uchar> oOutput(nMatSize,nMatSize);
+        while(st.KeepRunning()) {
+            benchmark::DoNotOptimize(aVals.get());
+            cv::Mat oInput(nMatSize,nMatSize,CV_8UC1,aVals.get());
+            cv::medianBlur(oInput,oOutput,nKernelSize);
+            benchmark::DoNotOptimize(oOutput.data);
+        }
+    }
+
+    void binaryMedianBlur_conv_perftest(benchmark::State& st) {
+        const volatile int nMatSize = st.range(0);
+        const volatile int nKernelSize = st.range(1);
+        std::unique_ptr<uint8_t[]> aVals = lv::test::genarray<uint8_t>((size_t)nMatSize*nMatSize,0u,255u);
+        cv::Mat_<uchar> oOutput(nMatSize,nMatSize);
+        while(st.KeepRunning()) {
+            benchmark::DoNotOptimize(aVals.get());
+            cv::Mat oInput(nMatSize,nMatSize,CV_8UC1,aVals.get());
+            lv::binaryMedianBlur(oInput,oOutput,cv::Mat(),nKernelSize,true);
+            benchmark::DoNotOptimize(oOutput.data);
+        }
+    }
+
+    void binaryMedianBlur_raw_perftest(benchmark::State& st) {
+        const volatile int nMatSize = st.range(0);
+        const volatile int nKernelSize = st.range(1);
+        std::unique_ptr<uint8_t[]> aVals = lv::test::genarray<uint8_t>((size_t)nMatSize*nMatSize,0u,1u);
+        cv::Mat_<uchar> oOutput(nMatSize,nMatSize);
+        while(st.KeepRunning()) {
+            benchmark::DoNotOptimize(aVals.get());
+            cv::Mat oInput(nMatSize,nMatSize,CV_8UC1,aVals.get());
+            lv::binaryMedianBlur(oInput,oOutput,cv::Mat(),nKernelSize,false);
+            benchmark::DoNotOptimize(oOutput.data);
+        }
+    }
+
+    void binaryConsensus_perftest(benchmark::State& st) {
+        const volatile int nMatSize = st.range(0);
+        const volatile int nKernelSize = st.range(1);
+        std::unique_ptr<uint8_t[]> aVals1 = lv::test::genarray<uint8_t>((size_t)nMatSize*nMatSize,0u,1u);
+        std::unique_ptr<int[]> aVals2 = lv::test::genarray<int>((size_t)nMatSize*nMatSize,0,nKernelSize*nKernelSize);
+        cv::Mat_<uchar> oOutput(nMatSize,nMatSize);
+        while(st.KeepRunning()) {
+            benchmark::DoNotOptimize(aVals1.get());
+            benchmark::DoNotOptimize(aVals2.get());
+            cv::Mat oInput(nMatSize,nMatSize,CV_8UC1,aVals1.get());
+            cv::Mat oThresh(nMatSize,nMatSize,CV_32SC1,aVals2.get());
+            lv::binaryConsensus(oInput,oOutput,oThresh,nKernelSize,false);
+            benchmark::DoNotOptimize(oOutput.data);
+        }
+    }
+
+}
+
+BENCHMARK(medianBlur_perftest)->Args({50,3})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryMedianBlur_conv_perftest)->Args({50,3})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryMedianBlur_raw_perftest)->Args({50,3})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryConsensus_perftest)->Args({50,3})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+
+BENCHMARK(medianBlur_perftest)->Args({200,5})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryMedianBlur_conv_perftest)->Args({200,5})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryMedianBlur_raw_perftest)->Args({200,5})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryConsensus_perftest)->Args({200,5})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+
+BENCHMARK(medianBlur_perftest)->Args({400,7})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryMedianBlur_conv_perftest)->Args({400,7})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryMedianBlur_raw_perftest)->Args({400,7})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryConsensus_perftest)->Args({400,7})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+
+BENCHMARK(medianBlur_perftest)->Args({800,11})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryMedianBlur_conv_perftest)->Args({800,11})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryMedianBlur_raw_perftest)->Args({800,11})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK(binaryConsensus_perftest)->Args({800,11})->Unit(benchmark::kMicrosecond)->Repetitions(10)->ReportAggregatesOnly(true);

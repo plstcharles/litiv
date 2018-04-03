@@ -219,7 +219,7 @@ int lv::calcMedianValue(const cv::Mat& oInput, const cv::Mat_<uchar>& oMask, std
 }
 
 void lv::medianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, uchar nDefaultVal) {
-    lvAssert_(!oInput.empty() && oInput.type()==CV_8UC1 && oInput.isContinuous(),"bad input matrix");
+    lvAssert_(!oInput.empty() && oInput.dims==2 && oInput.type()==CV_8UC1 && oInput.isContinuous(),"bad input matrix");
     lvAssert_(oOutput.empty() || (oOutput.type()==CV_8UC1 && oOutput.size()==oInput.size() && oOutput.isContinuous()),"bad output matrix");
     lvAssert_(oMask.empty() || (oMask.type()==CV_8UC1 && oMask.size()==oInput.size() && oMask.isContinuous()),"bad mask matrix");
     lvAssert_(nKernelSize>1 && (nKernelSize%2)==1,"bad kernel size");
@@ -256,18 +256,86 @@ void lv::medianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<ucha
     }
 }
 
-void lv::binaryMedianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, uchar nDefaultVal) {
-    lvAssert_(!oInput.empty() && oInput.type()==CV_8UC1 && oInput.isContinuous(),"bad input matrix");
+void lv::binaryMedianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, bool bForceConvertBinary, uchar nDefaultVal) {
+    lvAssert_(!oInput.empty() && oInput.dims==2 && oInput.type()==CV_8UC1 && oInput.isContinuous(),"bad input matrix");
     lvAssert_(oOutput.empty() || (oOutput.type()==CV_8UC1 && oOutput.size()==oInput.size() && oOutput.isContinuous()),"bad output matrix");
     lvAssert_(oMask.empty() || (oMask.type()==CV_8UC1 && oMask.size()==oInput.size() && oMask.isContinuous()),"bad mask matrix");
     lvAssert_(nKernelSize>1 && (nKernelSize%2)==1,"bad kernel size");
+    if(oOutput.empty())
+        oOutput.create(oInput.size(),CV_8UC1);
+    const int nOffset=nKernelSize/2, nRows=oInput.rows, nCols=oInput.cols;
     if(oMask.empty()) {
-        cv::medianBlur(oInput,oOutput,nKernelSize); // might not actually be faster... (tbd)
+        static thread_local cv::Mat_<int> oInputIntegral_entry;
+        lv::binaryIntegral(oInput,oInputIntegral_entry,cv::Mat(),CV_32S,bForceConvertBinary);
+        cv::Mat_<int> oInputIntegral = oInputIntegral_entry;
+    #if USING_OPENMP
+    #ifdef _MSC_VER
+    #pragma omp parallel for // msvc only supports openmp 2.0
+    #else //ndef(_MSC_VER)
+    #pragma omp parallel for collapse(2)
+    #endif //ndef(_MSC_VER)
+    #endif //USING_OPENMP
+        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+            for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+                const cv::Point2i oTL(std::max(nColIdx-nOffset,0),std::max(nRowIdx-nOffset,0));
+                const cv::Point2i oBR(std::min(nColIdx+nOffset,nCols-1)+1,std::min(nRowIdx+nOffset,nRows-1)+1);
+                const int nP0 = oInputIntegral(oTL.y,oTL.x);
+                const int nP1 = oInputIntegral(oTL.y,oBR.x);
+                const int nP2 = oInputIntegral(oBR.y,oTL.x);
+                const int nP3 = oInputIntegral(oBR.y,oBR.x);
+                const int nPositiveHits = nP3-nP2-nP1+nP0;
+                const int nKernelHits = (oBR.x-oTL.x)*(oBR.y-oTL.y);
+                const int nPxIdx = nRowIdx*nCols+nColIdx;
+                oOutput.data[nPxIdx] = uchar((nPositiveHits>nKernelHits/2)?255u:0u);
+            }
+        }
+    }
+    else {
+    #if USING_OPENMP
+    #ifdef _MSC_VER
+    #pragma omp parallel for // msvc only supports openmp 2.0
+    #else //ndef(_MSC_VER)
+    #pragma omp parallel for collapse(2)
+    #endif //ndef(_MSC_VER)
+    #endif //USING_OPENMP
+        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+            for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+                int nKernelHits = 0, nPositiveHits = 0;
+                for(int nOffsetRowIdx=std::max(nRowIdx-nOffset,0); nOffsetRowIdx<=std::min(nRowIdx+nOffset,nRows-1); ++nOffsetRowIdx) {
+                    for(int nOffsetColIdx=std::max(nColIdx-nOffset,0); nOffsetColIdx<=std::min(nColIdx+nOffset,nCols-1); ++nOffsetColIdx) {
+                        const int nOffsetPxIdx = nOffsetRowIdx*nCols+nOffsetColIdx;
+                        if(oMask.data[nOffsetPxIdx]) {
+                            ++nKernelHits;
+                            if(oInput.data[nOffsetPxIdx])
+                                ++nPositiveHits;
+                        }
+                    }
+                }
+                const int nPxIdx = nRowIdx*nCols+nColIdx;
+                if(nKernelHits>0)
+                    oOutput.data[nPxIdx] = uchar((nPositiveHits>nKernelHits/2)?255u:0u);
+                else
+                    oOutput.data[nPxIdx] = nDefaultVal;
+            }
+        }
+    }
+}
+
+void lv::binaryConsensus(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<int>& oMinCountMap, int nKernelSize, bool bForceConvertBinary) {
+    lvAssert_(!oInput.empty() && oInput.dims==2 && oInput.type()==CV_8UC1 && oInput.isContinuous(),"bad input matrix");
+    lvAssert_(oOutput.empty() || (oOutput.type()==CV_8UC1 && oOutput.size()==oInput.size() && oOutput.isContinuous()),"bad output matrix");
+    lvAssert_(oMinCountMap.empty() || (oMinCountMap.type()==CV_32SC1 && oMinCountMap.size()==oInput.size() && oMinCountMap.isContinuous()),"bad mask matrix");
+    lvAssert_(nKernelSize>1 && (nKernelSize%2)==1,"bad kernel size");
+    if(oMinCountMap.empty()) {
+        lv::binaryMedianBlur(oInput,oOutput,cv::Mat(),nKernelSize,bForceConvertBinary);
         return;
     }
     if(oOutput.empty())
         oOutput.create(oInput.size(),CV_8UC1);
     const int nOffset=nKernelSize/2, nRows=oInput.rows, nCols=oInput.cols;
+    static thread_local cv::Mat_<int> oInputIntegral_entry;
+    lv::binaryIntegral(oInput,oInputIntegral_entry,cv::Mat(),CV_32S,bForceConvertBinary);
+    cv::Mat_<int> oInputIntegral = oInputIntegral_entry;
 #if USING_OPENMP
 #ifdef _MSC_VER
 #pragma omp parallel for // msvc only supports openmp 2.0
@@ -277,22 +345,15 @@ void lv::binaryMedianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat
 #endif //USING_OPENMP
     for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
-            int nKernelHits = 0, nPositiveHits = 0;
-            for(int nOffsetRowIdx=std::max(nRowIdx-nOffset,0); nOffsetRowIdx<=std::min(nRowIdx+nOffset,nRows-1); ++nOffsetRowIdx) {
-                for(int nOffsetColIdx=std::max(nColIdx-nOffset,0); nOffsetColIdx<=std::min(nColIdx+nOffset,nCols-1); ++nOffsetColIdx) {
-                    const int nOffsetPxIdx = nOffsetRowIdx*nCols+nOffsetColIdx;
-                    if(oMask.data[nOffsetPxIdx]) {
-                        ++nKernelHits;
-                        if(oInput.data[nOffsetPxIdx])
-                            ++nPositiveHits;
-                    }
-                }
-            }
+            const cv::Point2i oTL(std::max(nColIdx-nOffset,0),std::max(nRowIdx-nOffset,0));
+            const cv::Point2i oBR(std::min(nColIdx+nOffset,nCols-1)+1,std::min(nRowIdx+nOffset,nRows-1)+1);
+            const int nP0 = oInputIntegral(oTL.y,oTL.x);
+            const int nP1 = oInputIntegral(oTL.y,oBR.x);
+            const int nP2 = oInputIntegral(oBR.y,oTL.x);
+            const int nP3 = oInputIntegral(oBR.y,oBR.x);
+            const int nPositiveHits = nP3-nP2-nP1+nP0;
             const int nPxIdx = nRowIdx*nCols+nColIdx;
-            if(nKernelHits>0)
-                oOutput.data[nPxIdx] = uchar((nPositiveHits>nKernelHits/2)?255u:0u);
-            else
-                oOutput.data[nPxIdx] = nDefaultVal;
+            oOutput.data[nPxIdx] = uchar((nPositiveHits>=oMinCountMap(nRowIdx,nColIdx))?255u:0u);
         }
     }
 }
@@ -546,7 +607,7 @@ void lv::computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::
 
 #endif //HAVE_CUDA
 
-void lv::computeIntegral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth) {
+void lv::integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth) {
     lvAssert_(!oInput.empty() && oInput.depth()==CV_8U && oInput.dims==2 && oInput.isContinuous(),"invalid input matrix");
     lvAssert_(nOutDepth==CV_32S || nOutDepth==CV_32F,"invalid requested output matrix depth");
     if(oInput.rows+1!=oIntegralImg.rows || oInput.cols+1!=oIntegralImg.cols || oInput.channels()!=oIntegralImg.channels() || oIntegralImg.depth()!=nOutDepth || !oIntegralImg.isContinuous())
@@ -606,7 +667,42 @@ void lv::computeIntegral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutD
 #else //!HAVE_NEON
     cv::integral(oInput,oIntegralImg,nOutDepth); // redirect to opencv's impl by default; accelerated via ocl & sse2
 #endif //!HAVE_NEON
+}
 
+void lv::integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, const cv::Mat_<uchar>& oMask, int nOutDepth) {
+    lvAssert_(!oInput.empty() && oInput.depth()==CV_8U && oInput.dims==2 && oInput.isContinuous(),"invalid input matrix");
+    lvAssert_(oMask.empty() || (oMask.dims==2 && oMask.size()==oInput.size() && oMask.isContinuous()),"invalid input mask");
+    if(oMask.empty())
+        lv::integral(oInput,oIntegralImg,nOutDepth);
+    else {
+        static thread_local cv::Mat oMaskedInput;
+        oInput.copyTo(oMaskedInput);
+        oMaskedInput.setTo(cv::Scalar_<uchar>::all(0),oMask==0);
+        lv::integral(oMaskedInput,oIntegralImg,nOutDepth);
+    }
+}
+
+void lv::binaryIntegral(const cv::Mat& oInput, cv::Mat& oIntegralImg, const cv::Mat_<uchar>& oMask, int nOutDepth, bool bForceConvertBinary) {
+    lvAssert_(!oInput.empty() && oInput.type()==CV_8UC1 && oInput.dims==2 && oInput.isContinuous(),"invalid input matrix");
+    lvAssert_(oMask.empty() || (oMask.dims==2 && oMask.size()==oInput.size() && oMask.isContinuous()),"invalid input mask");
+    // could optimize more... (lower level impl?)
+    if(bForceConvertBinary) {
+        static thread_local cv::Mat_<uchar> oBinaryInput;
+        oBinaryInput.create(oInput.size());
+        oBinaryInput = 0u;
+        oBinaryInput.setTo(1u,oInput!=0u);
+        if(!oMask.empty())
+            oBinaryInput.setTo(0u,oMask==0u);
+        lv::integral(oBinaryInput,oIntegralImg,nOutDepth);
+    }
+    else if(oMask.empty())
+        lv::integral(oInput,oIntegralImg,nOutDepth);
+    else {
+        static thread_local cv::Mat_<uchar> oBinaryInput;
+        oInput.copyTo(oBinaryInput);
+        oBinaryInput.setTo(0u,oMask==0u);
+        lv::integral(oBinaryInput,oIntegralImg,nOutDepth);
+    }
 }
 
 void lv::computeTemporalAbsDiff(const cv::Mat& oImage1, const cv::Mat& oImage2, const cv::Mat& oFlow, cv::Mat& oOutput, int nSmoothKernelSize) {

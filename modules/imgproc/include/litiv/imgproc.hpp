@@ -53,7 +53,10 @@ namespace lv {
     /// performs a median blur on the given matrix with a mask passed as argument (all mats 8U only, for now)
     void medianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, uchar nDefaultVal=0u);
     /// performs a median blur on the given binary matrix with a mask passed as argument (all mats 8U only, for now)
-    void binaryMedianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, uchar nDefaultVal=0u);
+    void binaryMedianBlur(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<uchar>& oMask, int nKernelSize, bool bForceConvertBinary=true, uchar nDefaultVal=0u);
+    /// computes a 2d binary consensus for a given matrix with an optional pixel-wise minimum count map (if empty, assume majority vote, equiv to binaryMedianBlur)
+    void binaryConsensus(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat_<int>& oMinCountMap, int nKernelSize, bool bForceConvertBinary=true);
+
 
     /// performs non-maximum suppression on the input image, with a (nWinSize)x(nWinSize) window
     template<int nWinSize>
@@ -78,7 +81,12 @@ namespace lv {
 #endif //HAVE_CUDA
 
     /// computes a 2d integral image; will redirect to opencv implementation unless NEON is available
-    void computeIntegral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth=-1);
+    void integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth=-1);
+    /// computes a 2d integral image with an optional mask argument (invalid pixels are considered zero-valued)
+    void integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, const cv::Mat_<uchar>& oMask, int nOutDepth=-1);
+    /// computes a 2d binary integral image with an optional mask argument (invalid pixels are considered zero-valued)
+    void binaryIntegral(const cv::Mat& oInput, cv::Mat& oIntegralImg, const cv::Mat_<uchar>& oMask, int nOutDepth=-1, bool bForceConvertBinary=true);
+
 
     /// computes the 'temporal' absolute difference between two 8U images given their optical flow map (with optional smoothing); output is a 32F image
     void computeTemporalAbsDiff(const cv::Mat& oImage1, const cv::Mat& oImage2, const cv::Mat& oFlow, cv::Mat& oOutput, int nSmoothKernelSize=1);
