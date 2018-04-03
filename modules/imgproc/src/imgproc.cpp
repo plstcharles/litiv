@@ -630,9 +630,9 @@ void lv::integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth) {
                 const uint8x16_t aInputVec = vld1q_u8(oInput.ptr<uchar>(nRowIdx,nColIdx));
                 std::array<uint16x8_t,2> aInputSum{vmovl_u8(vget_low_u8(aInputVec)),vmovl_u8(vget_high_u8(aInputVec))};
                 lv::unroll<2u>([&](size_t nIdx) {
-                    aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(zeroVec,aInputSum[nIdx],7));
-                    aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(zeroVec,aInputSum[nIdx],6));
-                    aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(zeroVec,aInputSum[nIdx],4));
+                    aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(aZeroVec,aInputSum[nIdx],7));
+                    aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(aZeroVec,aInputSum[nIdx],6));
+                    aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(aZeroVec,aInputSum[nIdx],4));
                 });
                 int* aCurrOutputVec = oOutput.ptr<int>(nRowIdx,nColIdx);
                 lv::unroll<2u,true>([&](size_t nIdx) {
@@ -655,8 +655,8 @@ void lv::integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth) {
             for(; nColIdx+16<oInput.cols; nColIdx+=16) {
                 lv::unroll<4u,true>([&](size_t nIdx) {
                     const int32x4_t aRow1 = vld1q_s32(oOutput.ptr<int>(nRowIdx,nColIdx)+nIdx*4);
-                    const int32x4_t aRow1 = vld1q_s32(oOutput.ptr<int>(nRowIdx+1,nColIdx)+nIdx*4);
-                    vst1q_s32(oOutput.ptr<int>(nRowIdx+1,nColIdx),vqaddq_s32(aRow1,aRow1));
+                    const int32x4_t aRow2 = vld1q_s32(oOutput.ptr<int>(nRowIdx+1,nColIdx)+nIdx*4);
+                    vst1q_s32(oOutput.ptr<int>(nRowIdx+1,nColIdx),vqaddq_s32(aRow1,aRow2));
                 });
             }
             for(; nColIdx<oInput.cols; ++nColIdx)
