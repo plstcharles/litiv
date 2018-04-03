@@ -623,10 +623,6 @@ void lv::integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth) {
             int32x4_t aCarryVec = vdupq_n_s32(0);
             int nColIdx = 0;
             for(; nColIdx+16<oInput.cols; nColIdx+=16) {
-
-                // tmp test, to remove @@@@
-                const int nTestSum = std::accumulate(oInput.ptr<uchar>(nRowIdx,nColIdx),oInput.ptr<uchar>(nRowIdx,nColIdx)+16,nLatestPrefixSum);
-
                 const uint8x16_t aInputVec = vld1q_u8(oInput.ptr<uchar>(nRowIdx,nColIdx));
                 std::array<uint16x8_t,2> aInputSum{vmovl_u8(vget_low_u8(aInputVec)),vmovl_u8(vget_high_u8(aInputVec))};
                 lv::unroll<2u>([&](size_t nIdx) {
@@ -635,15 +631,12 @@ void lv::integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth) {
                     aInputSum[nIdx] = vaddq_u16(aInputSum[nIdx],vextq_u16(aZeroVec,aInputSum[nIdx],4));
                 });
                 int* aCurrOutputVec = oOutput.ptr<int>(nRowIdx,nColIdx);
-                lv::unroll<2u,true>([&](size_t nIdx) {
+                lv::unroll<2u>([&](size_t nIdx) {
                     vst1q_s32(aCurrOutputVec+(nIdx*8),vaddq_s32(vmovl_s16(vget_low_s16(vreinterpretq_s16_u16(aInputSum[nIdx]))),aCarryVec));
                     const int32x4_t aOutputSumHi = vaddq_s32(vmovl_s16(vget_high_s16(vreinterpretq_s16_u16(aInputSum[nIdx]))),aCarryVec);
                     vst1q_s32(aCurrOutputVec+(nIdx*8+4),aOutputSumHi);
                     aCarryVec = vdupq_n_s32(nLatestPrefixSum=vgetq_lane_s32(aOutputSumHi,3));
                 });
-
-                // to remove @@@@
-                lvAssert(nTestSum==nLatestPrefixSum);
             }
             for(; nColIdx<oInput.cols ; ++nColIdx) {
                 nLatestPrefixSum += (int)oInput.at<uchar>(nRowIdx,nColIdx);
@@ -653,10 +646,10 @@ void lv::integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth) {
         for(int nRowIdx=0; nRowIdx<oInput.rows-1; ++nRowIdx) {
             int nColIdx = 0;
             for(; nColIdx+16<oInput.cols; nColIdx+=16) {
-                lv::unroll<4u,true>([&](size_t nIdx) {
+                lv::unroll<4u>([&](size_t nIdx) {
                     const int32x4_t aRow1 = vld1q_s32(oOutput.ptr<int>(nRowIdx,nColIdx)+nIdx*4);
                     const int32x4_t aRow2 = vld1q_s32(oOutput.ptr<int>(nRowIdx+1,nColIdx)+nIdx*4);
-                    vst1q_s32(oOutput.ptr<int>(nRowIdx+1,nColIdx),vqaddq_s32(aRow1,aRow2));
+                    vst1q_s32(oOutput.ptr<int>(nRowIdx+1,nColIdx)+nIdx*4,vqaddq_s32(aRow1,aRow2));
                 });
             }
             for(; nColIdx<oInput.cols; ++nColIdx)
@@ -664,9 +657,8 @@ void lv::integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, int nOutDepth) {
         }
         return;
     }
-#else //!HAVE_NEON
+#endif //HAVE_NEON
     cv::integral(oInput,oIntegralImg,nOutDepth); // redirect to opencv's impl by default; accelerated via ocl & sse2
-#endif //!HAVE_NEON
 }
 
 void lv::integral(const cv::Mat& oInput, cv::Mat& oIntegralImg, const cv::Mat_<uchar>& oMask, int nOutDepth) {

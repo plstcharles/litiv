@@ -556,8 +556,8 @@ TEST(descriptor_affinity,regression_L2_dasc) {
 
 #endif //ndef(_MSC_VER)
 
-TEST(computeIntegral,regression) {
-    for(size_t i=0u; i<20u; ++i) {
+TEST(integral,regression) {
+    for(size_t i=0u; i<200u; ++i) {
         cv::Mat oTestMat((rand()%500)+1,(rand()%500)+1,CV_8UC((rand()%4)+1));
         cv::randu(oTestMat,0,256);
         cv::Mat oLocalOutput,oCVOutput;
