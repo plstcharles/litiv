@@ -76,7 +76,11 @@
             #endif //MAY_ALIAS
         #else //ndef(_MSC_VER)
             #if __cplusplus<201402L
+            #if __cplusplus<=201103L
                 #error "This project requires full C++14 support (including constexpr and SFINAE)."
+            #else //maybe partly supported
+                #warning "Compiler might not support all required C++14 features, build might fail."
+            #endif //maybe partly supported
             #endif //__cplusplus<201402L
             #if (defined(__GNUC__) || defined(__clang__))
                 #ifndef MAY_ALIAS
