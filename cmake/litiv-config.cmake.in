@@ -29,7 +29,7 @@
 #  ...and set 'litiv_DIR' during configuration to the LITIV build output or installation directory. If one or more required external
 #  dependency cannot be found, the 'find_package(litiv ...)' call will fail, and print some information on the missing component.
 #
-#  This file will define the following variables (starred variables are marked as advanced):
+#  This file will define the following variables (where * = marked as advanced):
 #    * LITIV_RUNTIME_DIRS         : Directory(ies) where executables and DLLs are located; typically not needed by CMake projects
 #    * LITIV_INCLUDE_DIRS         : Directory(ies) where headers are located; typically not needed by CMake projects
 #    * LITIV_LIBRARY_DIRS         : Directory(ies) where libraries are located; typically not needed by CMake projects
@@ -93,9 +93,15 @@ if(@USE_GLSL@)
         list(APPEND LITIV_EXT_INCLUDE_DIRS "${FREEGLUT_INCLUDE_DIR}")
     endif()
 endif()
+if(@USE_BOOST@)
+    message(STATUS "LITIV Framework searching for Boost dependency...")
+    find_package(Boost REQUIRED COMPONENTS chrono date_time system filesystem program_options regex serialization) # not using find_dependency due to component here
+    list(APPEND LITIV_EXT_INCLUDE_DIRS "${Boost_INCLUDE_DIRS}")
+endif()
 if(@USE_OPENGM@)
     message(STATUS "LITIV Framework searching for OpenGM dependency with external lib...")
     find_package(OpenGM REQUIRED COMPONENTS ext) # not using find_dependency due to component here
+    list(APPEND LITIV_EXT_INCLUDE_DIRS "${OpenGM_INCLUDE_DIRS}")
 endif()
 if(WIN32)
     if(@USE_KINECTSDK@)
