@@ -75,6 +75,10 @@ namespace lv {
     std::wstring convertStrToWStr(const std::string& sStr);
     /// wstring to string converter wrapper used for msvc strings
     std::string convertWStrToStr(const std::wstring& sStr);
+    /// terminal i/o function which blocks and requests an input from the user via stdin
+    std::string query_user_input(const std::string& sMessage, bool bAllowEmpty=true, bool bQueryInline=false);
+    /// terminal i/o function which blocks and requests specific input from the user via stdin
+    std::string query_user_input(const std::string& sMessage, const std::vector<std::string>& vOptions, bool bDisplayList=true, bool bAllowEmpty=false, bool bQueryInline=false);
     /// returns the comparison of two strings, ignoring character case
     bool compare_lowercase(const std::string& i, const std::string& j);
     /// returns whether the input string contains any of the given tokens

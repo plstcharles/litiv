@@ -56,6 +56,41 @@ std::string lv::convertWStrToStr(const std::wstring& sStr) {
     return converter.to_bytes(sStr);
 }
 
+std::string lv::query_user_input(const std::string& sMessage, bool bAllowEmpty, bool bQueryInline) {
+    std::string sInput;
+    do {
+        if(bQueryInline)
+            lvCout_(0) << sMessage << " ";
+        else
+            lvCout_(0) << sMessage << "\n > ";
+        std::getline(std::cin,sInput);
+    } while(!bAllowEmpty && sInput.empty());
+    return sInput;
+}
+
+std::string lv::query_user_input(const std::string& sMessage, const std::vector<std::string>& vOptions, bool bDisplayList, bool bAllowEmpty, bool bQueryInline) {
+    lvAssert_(!vOptions.empty(),"option list must be non-empty");
+    std::string sInput;
+    do {
+        std::stringstream ssMessage;
+        ssMessage << sMessage;
+        if(bDisplayList) {
+            ssMessage << " [";
+            for(size_t nOptIdx=0; nOptIdx<vOptions.size(); ++nOptIdx)
+                ssMessage << vOptions[nOptIdx] << ((nOptIdx==vOptions.size()-1)?"]":"/");
+        }
+        if(bQueryInline) {
+            ssMessage << " ";
+            lvCout_(0) << ssMessage.str();
+        }
+        else {
+            lvCout_(0) << ssMessage.str() << "\n > ";
+        }
+        std::getline(std::cin,sInput);
+    } while((!bAllowEmpty && sInput.empty()) || std::find(vOptions.begin(),vOptions.end(),sInput)==vOptions.end());
+    return sInput;
+}
+
 bool lv::compare_lowercase(const std::string& i, const std::string& j) {
     std::string i_lower(i), j_lower(j);
     std::transform(i_lower.begin(),i_lower.end(),i_lower.begin(),[](auto c){return std::tolower(c);});
