@@ -145,8 +145,8 @@ namespace lv {
             const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
             const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
             lvAssert_(vClassif.size()==vGTArray.size() && (vGTROIArray.empty() || vClassif.size()==vGTROIArray.size()),"array size mistmatch");
-            for(size_t nSteamIdx=0; nSteamIdx<vClassif.size(); ++nSteamIdx)
-                vMasks.push_back(BinClassif::getColoredMask(vClassif[nSteamIdx],vGTArray[nSteamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]));
+            for(size_t nStreamIdx=0; nStreamIdx<vClassif.size(); ++nStreamIdx)
+                vMasks.push_back(BinClassif::getColoredMask(vClassif[nStreamIdx],vGTArray[nStreamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nStreamIdx]));
             return vMasks;
         }
         /// resets internal packet count + classification metrics
@@ -174,8 +174,8 @@ namespace lv {
                     m_pMetricsBase->m_vCounters.resize(vClassif.size());
                     m_pMetricsBase->m_vsStreamNames.resize(vClassif.size());
                 }
-                for(size_t nSteamIdx=0; nSteamIdx<vClassif.size(); ++nSteamIdx)
-                    m_pMetricsBase->m_vCounters[nSteamIdx].accumulate(vClassif[nSteamIdx],vGTArray[nSteamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]);
+                for(size_t nStreamIdx=0; nStreamIdx<vClassif.size(); ++nStreamIdx)
+                    m_pMetricsBase->m_vCounters[nStreamIdx].accumulate(vClassif[nStreamIdx],vGTArray[nStreamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nStreamIdx]);
             }
         }
         /// default constructor; automatically creates an instance of the base metrics accumulator object
@@ -198,8 +198,8 @@ namespace lv {
             const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
             const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
             lvAssert_(vDispMaps.size()==vGTArray.size() && (vGTROIArray.empty() || vDispMaps.size()==vGTROIArray.size()),"array size mistmatch");
-            for(size_t nSteamIdx=0; nSteamIdx<vDispMaps.size(); ++nSteamIdx)
-                vMasks.push_back(StereoDispErrors::getColoredMask(vDispMaps[nSteamIdx],vGTArray[nSteamIdx],fMaxDispError,vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]));
+            for(size_t nStreamIdx=0; nStreamIdx<vDispMaps.size(); ++nStreamIdx)
+                vMasks.push_back(StereoDispErrors::getColoredMask(vDispMaps[nStreamIdx],vGTArray[nStreamIdx],fMaxDispError,vGTROIArray.empty()?cv::Mat():vGTROIArray[nStreamIdx]));
             return vMasks;
         }
         /// resets internal packet count + classification metrics
@@ -227,8 +227,8 @@ namespace lv {
                     m_pMetricsBase->m_vErrorLists.resize(vDispMaps.size());
                     m_pMetricsBase->m_vsStreamNames.resize(vDispMaps.size());
                 }
-                for(size_t nSteamIdx=0; nSteamIdx<vDispMaps.size(); ++nSteamIdx)
-                    m_pMetricsBase->m_vErrorLists[nSteamIdx].accumulate(vDispMaps[nSteamIdx],vGTArray[nSteamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]);
+                for(size_t nStreamIdx=0; nStreamIdx<vDispMaps.size(); ++nStreamIdx)
+                    m_pMetricsBase->m_vErrorLists[nStreamIdx].accumulate(vDispMaps[nStreamIdx],vGTArray[nStreamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nStreamIdx]);
             }
         }
         /// default constructor; automatically creates an instance of the base metrics accumulator object
