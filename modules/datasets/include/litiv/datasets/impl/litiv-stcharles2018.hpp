@@ -607,28 +607,28 @@ namespace lv {
                 lvAssert(oRGBROI.type()==CV_8UC1 && oRGBROI.size()==oRGBSize);
                 if(DATASETS_LITIV2018_FLIP_RGB)
                     cv::flip(oRGBROI,oRGBROI,1); // must pre-flip rgb frames due to original camera flip
-                oRGBROI = oRGBROI>128;
+                oRGBROI = oRGBROI>UCHAR_MAX/2;
             }
             else
-                oRGBROI = cv::Mat(oRGBSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                oRGBROI = cv::Mat(oRGBSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_POSITIVE_VAL));
             if(!oLWIRROI.empty()) {
                 lvAssert(oLWIRROI.type()==CV_8UC1 && oLWIRROI.size()==oLWIRSize);
-                oLWIRROI = oLWIRROI>128;
+                oLWIRROI = oLWIRROI>UCHAR_MAX/2;
             }
             else
-                oLWIRROI = cv::Mat(oLWIRSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                oLWIRROI = cv::Mat(oLWIRSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_POSITIVE_VAL));
             if(!oDepthROI.empty()) {
                 lvAssert(oDepthROI.type()==CV_8UC1 && oDepthROI.size()==oDepthSize);
-                oDepthROI = oDepthROI>128;
+                oDepthROI = oDepthROI>UCHAR_MAX/2;
             }
             else
-                oDepthROI = cv::Mat(oDepthSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                oDepthROI = cv::Mat(oDepthSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_POSITIVE_VAL));
             if(!oDepthRemapROI.empty()) {
                 lvAssert(oDepthRemapROI.type()==CV_8UC1 && oDepthRemapROI.size()==oRGBSize);
-                oDepthRemapROI = oDepthRemapROI>128;
+                oDepthRemapROI = oDepthRemapROI>UCHAR_MAX/2;
             }
             else
-                oDepthRemapROI = cv::Mat(oRGBSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                oDepthRemapROI = cv::Mat(oRGBSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_POSITIVE_VAL));
             ////////////////////////////////
             this->m_nMinDisp = 0;
             this->m_nMaxDisp = 100;
@@ -715,9 +715,9 @@ namespace lv {
                 cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 cv::remap(oLWIRROI.clone(),oLWIRROI,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 cv::remap(oDepthRemapROI.clone(),oDepthRemapROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
-                oRGBROI = oRGBROI>128;
-                oLWIRROI = oLWIRROI>128;
-                oDepthRemapROI = oDepthRemapROI>128;
+                oRGBROI = oRGBROI>UCHAR_MAX/2;
+                oLWIRROI = oLWIRROI>UCHAR_MAX/2;
+                oDepthRemapROI = oDepthRemapROI>UCHAR_MAX/2;
                 if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                     lv::shift(oLWIRROI.clone(),oLWIRROI,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
                 cv::erode(oRGBROI,oRGBROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
@@ -728,22 +728,22 @@ namespace lv {
                 cv::Mat oDepthRemapROI_undist = cv::imread(this->getDataPath()+"depth_remap_undist_roi.png",cv::IMREAD_GRAYSCALE);
                 if(!oRGBROI_undist.empty()) {
                     lvAssert(oRGBROI_undist.type()==CV_8UC1 && oRGBROI_undist.size()==oUndistortRGBSize);
-                    oRGBROI_undist = oRGBROI_undist>128;
+                    oRGBROI_undist = oRGBROI_undist>UCHAR_MAX/2;
                 }
                 else
-                    oRGBROI_undist = cv::Mat(oUndistortRGBSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                    oRGBROI_undist = cv::Mat(oUndistortRGBSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_POSITIVE_VAL));
                 if(!oLWIRROI_undist.empty()) {
                     lvAssert(oLWIRROI_undist.type()==CV_8UC1 && oLWIRROI_undist.size()==oUndistortLWIRSize);
-                    oLWIRROI_undist = oLWIRROI_undist>128;
+                    oLWIRROI_undist = oLWIRROI_undist>UCHAR_MAX/2;
                 }
                 else
-                    oLWIRROI_undist = cv::Mat(oUndistortLWIRSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                    oLWIRROI_undist = cv::Mat(oUndistortLWIRSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_POSITIVE_VAL));
                 if(!oDepthRemapROI_undist.empty()) {
                     lvAssert(oDepthRemapROI_undist.type()==CV_8UC1 && oDepthRemapROI_undist.size()==oUndistortDepthSize);
-                    oDepthRemapROI_undist = oDepthRemapROI_undist>128;
+                    oDepthRemapROI_undist = oDepthRemapROI_undist>UCHAR_MAX/2;
                 }
                 else
-                    oDepthRemapROI_undist = cv::Mat(oUndistortDepthSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                    oDepthRemapROI_undist = cv::Mat(oUndistortDepthSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_POSITIVE_VAL));
                 oRGBROI &= oRGBROI_undist;
                 oLWIRROI &= oLWIRROI_undist;
                 oDepthRemapROI &= oDepthRemapROI_undist;
@@ -1030,7 +1030,7 @@ namespace lv {
             #endif //DATASETS_LITIV2018_REMAP_MASKS
                 if(oRGBMaskPacket.size()!=vInputInfos[nInputRGBMaskStreamIdx].size())
                     cv::resize(oRGBMaskPacket,oRGBMaskPacket,vInputInfos[nInputRGBMaskStreamIdx].size(),cv::INTER_LINEAR);
-                oRGBMaskPacket = oRGBMaskPacket>128;
+                oRGBMaskPacket = oRGBMaskPacket>UCHAR_MAX/2;
                 vInputs[nInputRGBMaskStreamIdx] = oRGBMaskPacket;
             }
             ///////////////////////////////////////////////////////////////////////////////////
@@ -1064,7 +1064,7 @@ namespace lv {
             #endif //DATASETS_LITIV2018_REMAP_MASKS
                 if(oLWIRMaskPacket.size()!=vInputInfos[nInputLWIRMaskStreamIdx].size())
                     cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,vInputInfos[nInputLWIRMaskStreamIdx].size(),cv::INTER_LINEAR);
-                oLWIRMaskPacket = oLWIRMaskPacket>128;
+                oLWIRMaskPacket = oLWIRMaskPacket>UCHAR_MAX/2;
                 vInputs[nInputLWIRMaskStreamIdx] = oLWIRMaskPacket;
             }
             ///////////////////////////////////////////////////////////////////////////////////
@@ -1125,7 +1125,7 @@ namespace lv {
                 #endif //!DATASETS_LITIV2018_REMAP_MASKS
                     if(oDepthMaskPacket.size()!=vInputInfos[nInputDepthMaskStreamIdx].size())
                         cv::resize(oDepthMaskPacket,oDepthMaskPacket,vInputInfos[nInputDepthMaskStreamIdx].size(),cv::INTER_LINEAR);
-                    oDepthMaskPacket = oDepthMaskPacket>128;
+                    oDepthMaskPacket = oDepthMaskPacket>UCHAR_MAX/2;
                     vInputs[nInputDepthMaskStreamIdx] = oDepthMaskPacket;
                 }
             }
@@ -1161,8 +1161,8 @@ namespace lv {
                 if(bEvalDisparityMaps) {
                     oRGBPacket.create(vOrigGTInfos[nGTLWIRStreamIdx].size(),CV_8UC1);
                     oLWIRPacket.create(vOrigGTInfos[nGTLWIRStreamIdx].size(),CV_8UC1);
-                    oRGBPacket = 255u; // default 'dont care' label (will be overwritten by pts, if available)
-                    oLWIRPacket = 255u;
+                    oRGBPacket = ILITIVStCharles2018Dataset::s_nDontCareDispLabel; // default 'dont care' label (will be overwritten by pts, if available)
+                    oLWIRPacket = ILITIVStCharles2018Dataset::s_nDontCareDispLabel;
                     lvAssert(!vsGTMasksPaths[nGTRGBStreamIdx].empty() && !vsGTMasksPaths[nGTLWIRStreamIdx].empty());
                     cv::FileStorage oRGBFS(vsGTMasksPaths[nGTRGBStreamIdx],cv::FileStorage::READ);
                     lvAssert_(oRGBFS.isOpened(),"could not open rgb gt corresp file storage");
@@ -1194,14 +1194,14 @@ namespace lv {
                         }
                     }
                     if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
-                        lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f),cv::BORDER_CONSTANT,cv::Scalar_<uchar>(255u));
+                        lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f),cv::BORDER_CONSTANT,cv::Scalar_<uchar>((uchar)ILITIVStCharles2018Dataset::s_nDontCareDispLabel));
                     if(oRGBPacket.size()!=vGTInfos[nGTRGBStreamIdx].size())
                         cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBStreamIdx].size(),0,0,cv::INTER_NEAREST);
                     if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
                         cv::resize(oLWIRPacket,oLWIRPacket,vGTInfos[nGTLWIRStreamIdx].size(),0,0,cv::INTER_NEAREST);
                     if(this->m_bLoadDepth) {
                         oDepthPacket.create(vOrigGTInfos[nGTDepthStreamIdx].size(),CV_8UC1);
-                        oDepthPacket = 255u; // default 'dont care' label (no disp gt for depth stream)
+                        oDepthPacket = ILITIVStCharles2018Dataset::s_nDontCareDispLabel; // default 'dont care' label (no disp gt for depth stream)
                         if(oDepthPacket.size()!=vGTInfos[nGTDepthStreamIdx].size())
                             cv::resize(oDepthPacket,oDepthPacket,vGTInfos[nGTDepthStreamIdx].size(),0,0,cv::INTER_NEAREST);
                     }
@@ -1217,7 +1217,7 @@ namespace lv {
                         }
                         if(oRGBPacket.size()!=vGTInfos[nGTRGBStreamIdx].size())
                             cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBStreamIdx].size(),0,0,cv::INTER_LINEAR);
-                        oRGBPacket = oRGBPacket>128;
+                        oRGBPacket = oRGBPacket>UCHAR_MAX/2;
                     }
                     else
                         oRGBPacket = cv::Mat(vGTInfos[nGTRGBStreamIdx].size(),vGTInfos[nGTRGBStreamIdx].type(),cv::Scalar::all(DATASETUTILS_OUTOFSCOPE_VAL));
@@ -1233,7 +1233,7 @@ namespace lv {
                         }
                         if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
                             cv::resize(oLWIRPacket,oLWIRPacket,vGTInfos[nGTLWIRStreamIdx].size(),0,0,cv::INTER_LINEAR);
-                        oLWIRPacket = oLWIRPacket>128;
+                        oLWIRPacket = oLWIRPacket>UCHAR_MAX/2;
                     }
                     else
                         oLWIRPacket = cv::Mat(vGTInfos[nGTLWIRStreamIdx].size(),vGTInfos[nGTLWIRStreamIdx].type(),cv::Scalar::all(DATASETUTILS_OUTOFSCOPE_VAL));
@@ -1262,7 +1262,7 @@ namespace lv {
                             }
                             if(oDepthPacket.size()!=vGTInfos[nGTDepthStreamIdx].size())
                                 cv::resize(oDepthPacket,oDepthPacket,vGTInfos[nGTDepthStreamIdx].size(),0,0,cv::INTER_LINEAR);
-                            oDepthPacket = oDepthPacket>128;
+                            oDepthPacket = oDepthPacket>UCHAR_MAX/2;
                         }
                         else
                             oDepthPacket = cv::Mat(vGTInfos[nGTDepthStreamIdx].size(),vGTInfos[nGTDepthStreamIdx].type(),cv::Scalar::all(DATASETUTILS_OUTOFSCOPE_VAL));
