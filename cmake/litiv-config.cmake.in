@@ -42,6 +42,7 @@
 #    * LITIV_VERSION_MINOR        : Minor version part of LITIV_VERSION (@LITIV_VERSION_MINOR@)
 #    * LITIV_VERSION_PATCH        : Patch version part of LITIV_VERSION (@LITIV_VERSION_PATCH@)
 #    * LITIV_VERSION_SHA1         : Git SHA1 of the HEAD commit of this LITIV build
+#    * LITIV_CUDA_VERSION         : CUDA version used by the framework, likely imported from OpenCV
 #    * LITIV_SHARED               : Defines whether the LITIV framework modules are built as shared libraries or not
 #    * LITIV_INSTALLED            : Defines whether this script is located alongside the install or build directory
 #
@@ -102,6 +103,11 @@ if(@USE_OPENGM@)
     message(STATUS "LITIV Framework searching for OpenGM dependency with external lib...")
     find_package(OpenGM REQUIRED COMPONENTS ext) # not using find_dependency due to component here
     list(APPEND LITIV_EXT_INCLUDE_DIRS "${OpenGM_INCLUDE_DIRS}")
+endif()
+if(@USE_CUDA@)
+    set(LITIV_CUDA_VERSION "@OpenCV_CUDA_VERSION@")
+    find_dependency(CUDA ${LITIV_CUDA_VERSION})
+    list(APPEND LITIV_EXT_INCLUDE_DIRS "${CUDA_INCLUDE_DIRS}")
 endif()
 if(WIN32)
     if(@USE_KINECTSDK@)
