@@ -86,12 +86,21 @@ namespace impl {
             if(nLUTSize==32 && blockDim.x==32) {
                 assert(warpSize==32);
                 float fVal = aTmpDesc[threadIdx.x]*aTmpDesc[threadIdx.x];
+            #if __CUDACC_VER_MAJOR__>=9
+                fVal += __shfl_down_sync(0xFFFFFFFF,fVal,16);
+                fVal += __shfl_down_sync(0xFFFFFFFF,fVal,8);
+                fVal += __shfl_down_sync(0xFFFFFFFF,fVal,4);
+                fVal += __shfl_down_sync(0xFFFFFFFF,fVal,2);
+                fVal += __shfl_down_sync(0xFFFFFFFF,fVal,1);
+                fSum = __shfl_sync(0xFFFFFFFF,fVal,0);
+            #else //__CUDACC_VER_MAJOR__<9
                 fVal += __shfl_down(fVal,16);
                 fVal += __shfl_down(fVal,8);
                 fVal += __shfl_down(fVal,4);
                 fVal += __shfl_down(fVal,2);
                 fVal += __shfl_down(fVal,1);
                 fSum = __shfl(fVal,0);
+            #endif //__CUDACC_VER_MAJOR__<9
             }
             else {
                 volatile float* aTmpLUT = aTmpCommon+nLUTSize;
