@@ -23,10 +23,10 @@
 #define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      0
 ////////////////////////////////
-#define DATASETS_LITIV2018_CALIB_VERSION 4
-#define DATASETS_LITIV2018_DATA_VERSION 4
+#define DATASETS_LITIV2018_USE_LWIR_OFFSET 0
+#define DATASETS_RAW_INPUT_SHIFT 0
 #define DATASETS_START_IDX 0
-#define DATASETS_SCAN_ONLY 0
+#define DATASETS_SCAN_ONLY 1
 #define DATASETS_FLIP_MASKS 1
 #define DATASETS_USE_RAW_MASKS 0
 
@@ -59,7 +59,7 @@ int main(int, char**) {
         DatasetType::Ptr pDataset = DatasetType::create(
                 DATASET_OUTPUT_PATH, // const std::string& sOutputDirName
                 false, //bool bSaveOutput
-                false, //bool bUseEvaluator
+                false, //bool bUseEvaluator // will load all data manually
                 false, //bool bLoadDepth
             #if GEN_REGISTRATION_ANNOT
                 true, //bool bUndistort
@@ -147,6 +147,21 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         oDepthData["min_reliable_dist"] >> nMinDepthVal;
         oDepthData["max_reliable_dist"] >> nMaxDepthVal;
         lvAssert(nMinDepthVal>=0 && nMaxDepthVal>nMinDepthVal);
+        int nMinDisp=0,nMaxDisp=lv::ILITIVStCharles2018Dataset::s_nMaxDisp;
+        bool bFlipDisparitiesInternal = false;
+        std::ifstream oDispRangeFile(oBatch.getDataPath()+"drange.txt");
+        if(oDispRangeFile.is_open() && !oDispRangeFile.eof()) {
+            oDispRangeFile >> nMinDisp;
+            if(!oDispRangeFile.eof())
+                oDispRangeFile >> nMaxDisp;
+        }
+        if(std::abs(nMinDisp)>std::abs(nMaxDisp)) {
+            bFlipDisparitiesInternal = true;
+            std::swap(nMinDisp,nMaxDisp);
+            nMinDisp = -nMinDisp;
+            nMaxDisp = -nMaxDisp;
+        }
+        lvAssert(nMaxDisp>nMinDisp);
         const std::string sGTName = (GEN_REGISTRATION_ANNOT?"gt_disp":(DATASETS_USE_RAW_MASKS?"masks":"gt_masks"));
         const std::string sRGBGTDir = oBatch.getDataPath()+"rgb_"+sGTName+"/";
         const std::string sLWIRGTDir = oBatch.getDataPath()+"lwir_"+sGTName+"/";
@@ -167,13 +182,13 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     #elif GEN_REGISTRATION_ANNOT
         std::array<std::vector<cv::Point2i>,2> avTempPts;
         std::array<std::vector<std::pair<cv::Point2i,int>>,2> avCorrespPts;
+        int nMinDisp_real,nMaxDisp_real;
         bool bDragInProgress = false;
         size_t nSelectedPoint = SIZE_MAX;
         int nSelectedPointTile = -1, nLineCreationStep = 0;
         cv::Point2i vInitDragPt;
         const double dMaxSelectDist = 5.0;
         const int nLineSplitRatio = 5;
-        int nMinDisp=0,nMaxDisp=0;
         std::map<size_t,size_t> mnTotCorresps;
         const std::array<int,2> anMarkerSizes{2,2};
     #endif //GEN_REGISTRATION_ANNOT
@@ -387,8 +402,8 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 oGTMetadataFS["subsetidxs"] >> vnPrevSubsetIdxs;
                 mnSubsetIdxs.insert(vnPrevSubsetIdxs.begin(),vnPrevSubsetIdxs.end());
             #if GEN_REGISTRATION_ANNOT
-                oGTMetadataFS["mindisp"] >> nMinDisp;
-                oGTMetadataFS["maxdisp"] >> nMaxDisp;
+                oGTMetadataFS["mindisp"] >> nMinDisp_real;
+                oGTMetadataFS["maxdisp"] >> nMaxDisp_real;
                 cv::FileNode oCorrespNode = oGTMetadataFS["totcorresp"];
                 lvAssert(!oCorrespNode.empty());
                 for(int nIdx : vnPrevSubsetIdxs) {
@@ -498,9 +513,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                         oPtNode["x"] >> x;
                         oPtNode["y"] >> y;
                         oPtNode["d"] >> d;
+                        if(bFlipDisparitiesInternal) {
+                            x = (vOrigSizes[a].width-1)-x;
+                            d = -d;
+                        }
+                        x += DATASETS_RAW_INPUT_SHIFT;
                         avCorrespPts[a].emplace_back(cv::Point(x,y),d);
-                        if(a==0u)
-                            lvAssert(nMinDisp<=d && nMaxDisp>=d);
                     }
                     lvAssert(mnTotCorresps[nCurrIdx]==(size_t)nPts);
                 }
@@ -529,7 +547,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                             cv::rectangle(vvDisplayPairs[0][a].first,cv::Rect(avCorrespPts[a][nPtIdx].first.x,0,1,vOrigSizes[a].height),cv::Scalar_<uchar>(0,0,172));
                         if(nSelectedPoint==nPtIdx)
                             cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a]*2,cv::Scalar::all(1u),-1);
-                        const cv::Vec3b vColor = lv::getBGRFromHSL(((float(std::min(std::max(avCorrespPts[0][nPtIdx].second,nMinDisp),nMaxDisp))-nMinDisp)/(nMaxDisp-nMinDisp))*240,1.0f,0.5f);
+                        const cv::Vec3b vColor = lv::getBGRFromHSL(((float(std::min(std::max(avCorrespPts[0][nPtIdx].second,nMinDisp_real),nMaxDisp_real))-nMinDisp_real)/(nMaxDisp_real-nMinDisp_real))*240,1.0f,0.5f);
                         cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a],cv::Scalar_<uchar>(vColor),-1);
                     }
                     for(size_t nPtIdx=0u; nPtIdx<avTempPts[a].size(); ++nPtIdx) {
@@ -601,13 +619,20 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                     oGTFS << "nbpts" << (int)avCorrespPts[a].size();
                     for(size_t nPtIdx=0; nPtIdx<avCorrespPts[a].size(); ++nPtIdx) {
                         oGTFS << lv::putf("pt%04d",(int)nPtIdx) << "{";
-                        oGTFS << "x" << avCorrespPts[a][nPtIdx].first.x;
-                        oGTFS << "y" << avCorrespPts[a][nPtIdx].first.y;
-                        oGTFS << "d" << avCorrespPts[a][nPtIdx].second;
+                        if(bFlipDisparitiesInternal) {
+                            oGTFS << "x" << (vOrigSizes[a].width-1)-avCorrespPts[a][nPtIdx].first.x;
+                            oGTFS << "y" << avCorrespPts[a][nPtIdx].first.y;
+                            oGTFS << "d" << -avCorrespPts[a][nPtIdx].second;
+                        }
+                        else {
+                            oGTFS << "x" << avCorrespPts[a][nPtIdx].first.x;
+                            oGTFS << "y" << avCorrespPts[a][nPtIdx].first.y;
+                            oGTFS << "d" << avCorrespPts[a][nPtIdx].second;
+                        }
                         oGTFS << "}";
                         if(a==0u) {
-                            nMinDisp = std::min(nMinDisp,avCorrespPts[a][nPtIdx].second);
-                            nMaxDisp = std::max(nMaxDisp,avCorrespPts[a][nPtIdx].second);
+                            nMinDisp_real = std::min(nMinDisp_real,avCorrespPts[a][nPtIdx].second);
+                            nMaxDisp_real = std::max(nMaxDisp_real,avCorrespPts[a][nPtIdx].second);
                         }
                     }
                     mnTotCorresps[nCurrIdx] = (size_t)avCorrespPts[a].size();
@@ -646,8 +671,8 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             oGTMetadataFS << "npackets" << (int)nTotPacketCount;
             oGTMetadataFS << "subsetidxs" << std::vector<int>(mnSubsetIdxs.begin(),mnSubsetIdxs.end());
         #if GEN_REGISTRATION_ANNOT
-            oGTMetadataFS << "mindisp" << nMinDisp;
-            oGTMetadataFS << "maxdisp" << nMaxDisp;
+            oGTMetadataFS << "mindisp" << nMinDisp_real;
+            oGTMetadataFS << "maxdisp" << nMaxDisp_real;
             const int nTotCorresp = std::accumulate(mnTotCorresps.begin(),mnTotCorresps.end(),0,[](int nSum, const std::pair<size_t,size_t>& p){return nSum+(int)p.second;});
             oGTMetadataFS << "ntotcorresp" << nTotCorresp;
             oGTMetadataFS << "totcorresp" << "{";
