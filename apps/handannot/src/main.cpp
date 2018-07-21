@@ -183,10 +183,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         std::array<std::vector<cv::Point2i>,2> avTempPts;
         std::array<std::vector<std::pair<cv::Point2i,int>>,2> avCorrespPts;
         int nMinDisp_real,nMaxDisp_real;
-        bool bDragInProgress = false;
-        size_t nSelectedPoint = SIZE_MAX;
+        bool bPointDragInProgress=false, bSelectDragInProgress=false, bShiftDragInProgress=false;
+        std::vector<size_t> vnSelectedPoints;
         int nSelectedPointTile = -1, nLineCreationStep = 0;
-        cv::Point2i vInitDragPt;
+        cv::Point2i vInitDragPt,vShiftDragPt,vLatestDragPt;
         const double dMaxSelectDist = 5.0;
         const int nLineSplitRatio = 5;
         std::map<size_t,size_t> mnTotCorresps;
@@ -296,55 +296,122 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 }
             #elif GEN_REGISTRATION_ANNOT
                 const cv::Point2i vCurrPt(int(vMousePos.x*vOrigSizes[nCurrTile].width),int(vMousePos.y*vOrigSizes[nCurrTile].height));
-                if(nLineCreationStep==0 && !bDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONDOWN || oData.nEvent==cv::EVENT_LBUTTONDOWN)) {
-                    lvAssert(nSelectedPoint==SIZE_MAX);
-                    double dMinDist = 9999.;
-                    for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[nCurrTile].size(); ++nPtIdx) {
-                        const double dCurrDist = cv::norm(vCurrPt-avCorrespPts[nCurrTile][nPtIdx].first);
-                        if(dCurrDist<dMaxSelectDist && dCurrDist<dMinDist) {
-                            dMinDist = dCurrDist;
-                            nSelectedPoint = nPtIdx;
+                vLatestDragPt = vCurrPt;
+                if(nLineCreationStep==0 && !bPointDragInProgress && !bSelectDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONDOWN || oData.nEvent==cv::EVENT_LBUTTONDOWN)) {
+                    lvAssert(vnSelectedPoints.empty());
+                    if(!(oData.nFlags&cv::EVENT_FLAG_CTRLKEY)) {
+                        double dMinDist = 9999.;
+                        for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[nCurrTile].size(); ++nPtIdx) {
+                            const double dCurrDist = cv::norm(vCurrPt-avCorrespPts[nCurrTile][nPtIdx].first);
+                            if(dCurrDist<dMaxSelectDist && dCurrDist<dMinDist) {
+                                dMinDist = dCurrDist;
+                                vnSelectedPoints.push_back(nPtIdx);
+                            }
                         }
                     }
                     if(oData.nEvent==cv::EVENT_MBUTTONDOWN) {
-                        if(nSelectedPoint!=SIZE_MAX) {
+                        if(!vnSelectedPoints.empty()) {
+                            lvAssert(vnSelectedPoints.size()==1u);
+                            const size_t nSelectedPoint = vnSelectedPoints.back();
                             avCorrespPts[nCurrTile].erase(avCorrespPts[nCurrTile].begin()+nSelectedPoint);
                             avCorrespPts[nCurrTile^1].erase(avCorrespPts[nCurrTile^1].begin()+nSelectedPoint);
-                            nSelectedPoint = SIZE_MAX;
+                            vnSelectedPoints.pop_back();
                         }
                     }
                     else if(oData.nEvent==cv::EVENT_LBUTTONDOWN) {
-                        if(nSelectedPoint==SIZE_MAX) {
-                            nSelectedPoint = avCorrespPts[nCurrTile].size();
+                        if(oData.nFlags&cv::EVENT_FLAG_CTRLKEY) {
+                            lvAssert(!bSelectDragInProgress && vnSelectedPoints.empty());
+                            nSelectedPointTile = nCurrTile;
+                            vInitDragPt = vCurrPt;
+                            bSelectDragInProgress = true;
+                        }
+                        else if(vnSelectedPoints.empty()) {
+                            vnSelectedPoints.push_back(avCorrespPts[nCurrTile].size());
                             avCorrespPts[nCurrTile].emplace_back(vCurrPt,0);
                             avCorrespPts[nCurrTile^1].emplace_back(vCurrPt,0);
                         }
                     }
-                    if(nSelectedPoint!=SIZE_MAX) {
+                    if(!vnSelectedPoints.empty() && !bSelectDragInProgress) {
+                        lvAssert(vnSelectedPoints.size()==1u);
+                        const size_t nSelectedPoint = vnSelectedPoints.back();
                         lvAssert(nSelectedPoint<avCorrespPts[nCurrTile].size() && nSelectedPoint<avCorrespPts[nCurrTile^1].size());
                         nSelectedPointTile = nCurrTile;
                         vInitDragPt = vCurrPt;
-                        bDragInProgress = true;
+                        bPointDragInProgress = true;
                     }
                 }
-                else if(nLineCreationStep==0 && bDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_MOUSEMOVE)) {
-                    const int nDist = (nSelectedPointTile!=nCurrTile)?0:((vCurrPt.x-vInitDragPt.x)/2);
-                    lvAssert(nSelectedPoint<avCorrespPts[nSelectedPointTile^1].size());
-                    avCorrespPts[nSelectedPointTile][nSelectedPoint].second = nDist;
-                    avCorrespPts[nSelectedPointTile^1][nSelectedPoint].second = -nDist;
-                    avCorrespPts[nSelectedPointTile^1][nSelectedPoint].first.x = avCorrespPts[nSelectedPointTile][nSelectedPoint].first.x+nDist;
-                    if(oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP) {
-                        if(!oDepthFrame.empty()) {
-                            lvAssert(oDepthFrame.size()==vOrigSizes[0] && oDepthFrame.type()==CV_16UC1);
-                            lvLog_(1,"depth @ pt [%d,%d] = %d     (disp = %d)",avCorrespPts[0][nSelectedPoint].first.x,avCorrespPts[0][nSelectedPoint].first.y,
-                                (int)oDepthFrame.at<ushort>(avCorrespPts[0][nSelectedPoint].first.y,avCorrespPts[0][nSelectedPoint].first.x),nDist);
+                else if(nLineCreationStep==0 && (bPointDragInProgress || bSelectDragInProgress) && (oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_MOUSEMOVE)) {
+                    lvAssert(bPointDragInProgress^bSelectDragInProgress);
+                    if(bPointDragInProgress) {
+                        const int nDist = (nSelectedPointTile!=nCurrTile)?0:((vCurrPt.x-vInitDragPt.x)/2);
+                        lvAssert(vnSelectedPoints.size()==1u);
+                        const size_t nPtIdx = vnSelectedPoints.back();
+                        lvAssert(nPtIdx<avCorrespPts[nSelectedPointTile^1].size());
+                        avCorrespPts[nSelectedPointTile][nPtIdx].second = nDist;
+                        avCorrespPts[nSelectedPointTile^1][nPtIdx].second = -nDist;
+                        avCorrespPts[nSelectedPointTile^1][nPtIdx].first.x = avCorrespPts[nSelectedPointTile][nPtIdx].first.x+avCorrespPts[nSelectedPointTile][nPtIdx].second;
+                        if(oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP) {
+                            if(!oDepthFrame.empty()) {
+                                lvAssert(oDepthFrame.size()==vOrigSizes[0] && oDepthFrame.type()==CV_16UC1);
+                                lvLog_(1,"depth @ pt [%d,%d] = %d     (disp = %d)",avCorrespPts[0][nPtIdx].first.x,avCorrespPts[0][nPtIdx].first.y,
+                                       (int)oDepthFrame.at<ushort>(avCorrespPts[0][nPtIdx].first.y,avCorrespPts[0][nPtIdx].first.x),nDist);
+                            }
+                            bPointDragInProgress = false;
+                            nSelectedPointTile = -1;
+                            vnSelectedPoints.pop_back();
                         }
-                        bDragInProgress = false;
-                        nSelectedPointTile = -1;
-                        nSelectedPoint = SIZE_MAX;
+                    }
+                    else if(bSelectDragInProgress) {
+                        if(oData.nEvent==cv::EVENT_LBUTTONUP) {
+                            bSelectDragInProgress = false;
+                            bShiftDragInProgress = false;
+                            nSelectedPointTile = -1;
+                            vnSelectedPoints.clear();
+                        }
+                        else if(oData.nEvent==cv::EVENT_MOUSEMOVE) {
+                            if(!(oData.nFlags&cv::EVENT_FLAG_CTRLKEY)) {
+                                if(bShiftDragInProgress) {
+                                    const int nDist = (nSelectedPointTile!=nCurrTile)?0:((vCurrPt.x-vShiftDragPt.x)/2);
+                                    for(size_t nSelectedPtIdx=0u; nSelectedPtIdx<vnSelectedPoints.size(); ++nSelectedPtIdx) {
+                                        const size_t nPtIdx = vnSelectedPoints[nSelectedPtIdx];
+                                        lvAssert(nPtIdx<avCorrespPts[nSelectedPointTile^1].size());
+                                        if(oData.nFlags&cv::EVENT_FLAG_SHIFTKEY) {
+                                            avCorrespPts[nSelectedPointTile][nPtIdx].second = nDist;
+                                            avCorrespPts[nSelectedPointTile^1][nPtIdx].second = -nDist;
+                                            avCorrespPts[nSelectedPointTile^1][nPtIdx].first.x = avCorrespPts[nSelectedPointTile][nPtIdx].first.x+avCorrespPts[nSelectedPointTile][nPtIdx].second;
+                                        }
+                                        else {
+                                            avCorrespPts[nSelectedPointTile][nPtIdx].second = -nDist;
+                                            avCorrespPts[nSelectedPointTile^1][nPtIdx].second = nDist;
+                                            avCorrespPts[nSelectedPointTile][nPtIdx].first.x = avCorrespPts[nSelectedPointTile^1][nPtIdx].first.x+avCorrespPts[nSelectedPointTile^1][nPtIdx].second;
+                                        }
+                                    }
+                                }
+                                else {
+                                    bShiftDragInProgress = true;
+                                    vShiftDragPt = vCurrPt;
+                                }
+                            }
+                            else {
+                                if(bShiftDragInProgress) {
+                                    bShiftDragInProgress = false;
+                                }
+                                else {
+                                    vnSelectedPoints.clear();
+                                    for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[nCurrTile].size(); ++nPtIdx) {
+                                        const cv::Point2i vTopLeft(std::min(vCurrPt.x,vInitDragPt.x),std::min(vCurrPt.y,vInitDragPt.y));
+                                        const cv::Point2i vBottomRight(std::max(vCurrPt.x,vInitDragPt.x),std::max(vCurrPt.y,vInitDragPt.y));
+                                        const cv::Point2i& vPt = avCorrespPts[nCurrTile][nPtIdx].first;
+                                        if(vPt.x>=vTopLeft.x && vPt.x<=vBottomRight.x && vPt.y>=vTopLeft.y && vPt.y<=vBottomRight.y) {
+                                            vnSelectedPoints.push_back(nPtIdx);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                else if(!bDragInProgress && oData.nEvent==cv::EVENT_RBUTTONDOWN) {
+                else if(!bPointDragInProgress && !bSelectDragInProgress && oData.nEvent==cv::EVENT_RBUTTONDOWN) {
                     if(nLineCreationStep==0 || (nLineCreationStep==2 && nSelectedPointTile==nCurrTile)) {
                         lvAssert(avTempPts[nCurrTile].empty());
                         avTempPts[nCurrTile].push_back(vCurrPt);
@@ -543,9 +610,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 #elif GEN_REGISTRATION_ANNOT
                     aInputs[a].copyTo(vvDisplayPairs[0][a].first);
                     for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[a].size(); ++nPtIdx) {
-                        if(bDragInProgress && nSelectedPoint==nPtIdx)
+                        const bool bCurrPtSelected = std::find(vnSelectedPoints.begin(),vnSelectedPoints.end(),nPtIdx)!=vnSelectedPoints.end();
+                        if(bPointDragInProgress && bCurrPtSelected)
                             cv::rectangle(vvDisplayPairs[0][a].first,cv::Rect(avCorrespPts[a][nPtIdx].first.x,0,1,vOrigSizes[a].height),cv::Scalar_<uchar>(0,0,172));
-                        if(nSelectedPoint==nPtIdx)
+                        if(bSelectDragInProgress && (int)a==nSelectedPointTile)
+                            cv::rectangle(vvDisplayPairs[0][a].first,vInitDragPt,bShiftDragInProgress?vShiftDragPt:vLatestDragPt,cv::Scalar_<uchar>(0,0,255),1);
+                        if(bCurrPtSelected)
                             cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a]*2,cv::Scalar::all(1u),-1);
                         const cv::Vec3b vColor = lv::getBGRFromHSL(((float(std::min(std::max(avCorrespPts[0][nPtIdx].second,nMinDisp_real),nMaxDisp_real))-nMinDisp_real)/(nMaxDisp_real-nMinDisp_real))*240,1.0f,0.5f);
                         cv::circle(vvDisplayPairs[0][a].first,avCorrespPts[a][nPtIdx].first,anMarkerSizes[a],cv::Scalar_<uchar>(vColor),-1);
