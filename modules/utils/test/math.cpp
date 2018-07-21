@@ -365,51 +365,51 @@ namespace {
 TYPED_TEST_CASE(L1dist_fixture,L1dist_types);
 
 TYPED_TEST(L1dist_fixture,regression_mat_1_1) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 1;
     constexpr size_t nChannels = 1;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(1));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(1));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*nChannels));
-    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),double(nCols*nChannels));
+    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*nChannels));
+    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),double(nCols*nChannels));
 }
 
 TYPED_TEST(L1dist_fixture,regression_mat_3_1) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 3;
     constexpr size_t nChannels = 1;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(1));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(1));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*nChannels));
-    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),double(nCols*nChannels));
+    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*nChannels));
+    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),double(nCols*nChannels));
 }
 
 TYPED_TEST(L1dist_fixture,regression_mat_1_4) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 1;
     constexpr size_t nChannels = 4;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(1));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(1));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*nChannels));
-    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),double(nCols*nChannels));
+    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*nChannels));
+    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),double(nCols*nChannels));
 }
 
 TYPED_TEST(L1dist_fixture,regression_mat_500_3) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 500;
     constexpr size_t nChannels = 3;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(1));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(1));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*nChannels));
-    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),double(nCols*nChannels));
+    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*nChannels));
+    EXPECT_DOUBLE_EQ(double(lv::L1dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),double(nCols*nChannels));
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -531,51 +531,51 @@ namespace {
 TYPED_TEST_CASE(L2sqrdist_fixture,L2sqrdist_types);
 
 TYPED_TEST(L2sqrdist_fixture,regression_mat_1_1) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 1;
     constexpr size_t nChannels = 1;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(2));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(2));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),nCols*nCols*nChannels*4.0);
-    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),nCols*nChannels*4.0);
+    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),nCols*nCols*nChannels*4.0);
+    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),nCols*nChannels*4.0);
 }
 
 TYPED_TEST(L2sqrdist_fixture,regression_mat_3_1) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 3;
     constexpr size_t nChannels = 1;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(2));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(2));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),nCols*nCols*nChannels*4.0);
-    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),nCols*nChannels*4.0);
+    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),nCols*nCols*nChannels*4.0);
+    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),nCols*nChannels*4.0);
 }
 
 TYPED_TEST(L2sqrdist_fixture,regression_mat_1_4) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 1;
     constexpr size_t nChannels = 4;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(2));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(2));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),nCols*nCols*nChannels*4.0);
-    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),nCols*nChannels*4.0);
+    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),nCols*nCols*nChannels*4.0);
+    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),nCols*nChannels*4.0);
 }
 
 TYPED_TEST(L2sqrdist_fixture,regression_mat_500_3) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 500;
     constexpr size_t nChannels = 3;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(2));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(2));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),nCols*nCols*nChannels*4.0);
-    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),nCols*nChannels*4.0);
+    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),nCols*nCols*nChannels*4.0);
+    EXPECT_DOUBLE_EQ(double(lv::L2sqrdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),nCols*nChannels*4.0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -673,51 +673,51 @@ namespace {
 TYPED_TEST_CASE(L2dist_fixture,L2dist_types);
 
 TYPED_TEST(L2dist_fixture,regression_mat_1_1) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 1;
     constexpr size_t nChannels = 1;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(2));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(2));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_NEAR(double(lv::L2dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),std::sqrt(nCols*nCols*nChannels*4.0),nCols*L2DIST_EPS);
-    EXPECT_NEAR(double(lv::L2dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),std::sqrt(nCols*nChannels*4.0),nCols*L2DIST_EPS);
+    EXPECT_NEAR(double(lv::L2dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),std::sqrt(nCols*nCols*nChannels*4.0),nCols*L2DIST_EPS);
+    EXPECT_NEAR(double(lv::L2dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),std::sqrt(nCols*nChannels*4.0),nCols*L2DIST_EPS);
 }
 
 TYPED_TEST(L2dist_fixture,regression_mat_3_1) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 3;
     constexpr size_t nChannels = 1;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(2));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(2));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_NEAR(double(lv::L2dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),std::sqrt(nCols*nCols*nChannels*4.0),nCols*L2DIST_EPS);
-    EXPECT_NEAR(double(lv::L2dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),std::sqrt(nCols*nChannels*4.0),nCols*L2DIST_EPS);
+    EXPECT_NEAR(double(lv::L2dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),std::sqrt(nCols*nCols*nChannels*4.0),nCols*L2DIST_EPS);
+    EXPECT_NEAR(double(lv::L2dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),std::sqrt(nCols*nChannels*4.0),nCols*L2DIST_EPS);
 }
 
 TYPED_TEST(L2dist_fixture,regression_mat_1_4) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 1;
     constexpr size_t nChannels = 4;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(2));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(2));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_NEAR(double(lv::L2dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),std::sqrt(nCols*nCols*nChannels*4.0),nCols*L2DIST_EPS);
-    EXPECT_NEAR(double(lv::L2dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),std::sqrt(nCols*nChannels*4.0),nCols*L2DIST_EPS);
+    EXPECT_NEAR(double(lv::L2dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),std::sqrt(nCols*nCols*nChannels*4.0),nCols*L2DIST_EPS);
+    EXPECT_NEAR(double(lv::L2dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),std::sqrt(nCols*nChannels*4.0),nCols*L2DIST_EPS);
 }
 
 TYPED_TEST(L2dist_fixture,regression_mat_500_3) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,int32_t,TypeParam>;
     constexpr int nCols = 500;
     constexpr size_t nChannels = 3;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a = cv::Mat_<cv::Vec<TypeParam,nChannels>>::zeros(nCols,nCols);
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>::all(2));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a = cv::Mat_<cv::Vec<TTypeParam,nChannels>>::zeros(nCols,nCols);
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>::all(2));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    EXPECT_NEAR(double(lv::L2dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),std::sqrt(nCols*nCols*nChannels*4.0),nCols*L2DIST_EPS);
-    EXPECT_NEAR(double(lv::L2dist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),std::sqrt(nCols*nChannels*4.0),nCols*L2DIST_EPS);
+    EXPECT_NEAR(double(lv::L2dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),std::sqrt(nCols*nCols*nChannels*4.0),nCols*L2DIST_EPS);
+    EXPECT_NEAR(double(lv::L2dist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),std::sqrt(nCols*nChannels*4.0),nCols*L2DIST_EPS);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -811,33 +811,33 @@ TYPED_TEST(cdist_fixture,regression_stdarray) {
 }
 
 TYPED_TEST(cdist_fixture,regression_mat_1_4) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,uint16_t,TypeParam>;
     constexpr int nCols = 1;
     constexpr size_t nChannels = 4;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a(nCols,nCols,cv::Vec<TypeParam,nChannels>(0,255,0,255));
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>(255,0,255,0));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a(nCols,nCols,cv::Vec<TTypeParam,nChannels>(0,255,0,255));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>(255,0,255,0));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    typedef decltype(lv::cdist<nChannels>((TypeParam*)0,(TypeParam*)0,size_t(),0)) Tout;
-    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)b.data,(TypeParam*)a.data,a.total(),nullptr)),double(Tout(std::sqrt((255*255)*2.0))));
-    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)b.data,(TypeParam*)a.data,a.total(),m.data)),double(Tout(std::sqrt((255*255)*2.0))));
-    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),double(Tout(std::sqrt((255*255)*2.0))));
-    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),double(Tout(std::sqrt((255*255)*2.0))));
+    typedef decltype(lv::cdist<nChannels>((TTypeParam*)0,(TTypeParam*)0,size_t(),0)) Tout;
+    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TTypeParam*)b.data,(TTypeParam*)a.data,a.total(),nullptr)),double(Tout(std::sqrt((255*255)*2.0))));
+    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TTypeParam*)b.data,(TTypeParam*)a.data,a.total(),m.data)),double(Tout(std::sqrt((255*255)*2.0))));
+    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),double(Tout(std::sqrt((255*255)*2.0))));
+    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),double(Tout(std::sqrt((255*255)*2.0))));
 }
 
 TYPED_TEST(cdist_fixture,regression_mat_500_3) {
-    if(std::is_same<uint32_t,TypeParam>::value)
-        return; // opencv mats do not support uint32_t, throws at runtime
+    // opencv mats do not support uint32_t, throws at runtime, or fails to compile (bypass here)
+    using TTypeParam = std::conditional_t<std::is_same<uint32_t,TypeParam>::value,uint16_t,TypeParam>;
     constexpr int nCols = 500;
     constexpr size_t nChannels = 3;
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> a(nCols,nCols,cv::Vec<TypeParam,nChannels>(255,0,255));
-    const cv::Mat_<cv::Vec<TypeParam,nChannels>> b(a.size(),cv::Vec<TypeParam,nChannels>(0,255,0));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> a(nCols,nCols,cv::Vec<TTypeParam,nChannels>(255,0,255));
+    const cv::Mat_<cv::Vec<TTypeParam,nChannels>> b(a.size(),cv::Vec<TTypeParam,nChannels>(0,255,0));
     const cv::Mat_<uint8_t> m = cv::Mat_<uint8_t>::eye(a.size());
-    typedef decltype(lv::cdist<nChannels>((TypeParam*)0,(TypeParam*)0,size_t(),0)) Tout;
-    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)b.data,(TypeParam*)a.data,a.total(),nullptr)),double(nCols*nCols*255));
-    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)b.data,(TypeParam*)a.data,a.total(),m.data)),double(nCols*255));
-    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*Tout(std::sqrt((255*255)*2.0))));
-    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),double(nCols*Tout(std::sqrt((255*255)*2.0))));
+    typedef decltype(lv::cdist<nChannels>((TTypeParam*)0,(TTypeParam*)0,size_t(),0)) Tout;
+    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TTypeParam*)b.data,(TTypeParam*)a.data,a.total(),nullptr)),double(nCols*nCols*255));
+    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TTypeParam*)b.data,(TTypeParam*)a.data,a.total(),m.data)),double(nCols*255));
+    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*Tout(std::sqrt((255*255)*2.0))));
+    EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TTypeParam*)a.data,(TTypeParam*)b.data,a.total(),m.data)),double(nCols*Tout(std::sqrt((255*255)*2.0))));
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
