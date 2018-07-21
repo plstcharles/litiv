@@ -46,6 +46,9 @@
 #ifndef DATASETS_LITIV2018_REWARP_STRIDE
 #define DATASETS_LITIV2018_REWARP_STRIDE 20
 #endif //DATASETS_LITIV2018_REWARP_STRIDE
+#ifndef DATASETS_LITIV2018_USE_LWIR_OFFSET
+#define DATASETS_LITIV2018_USE_LWIR_OFFSET 1
+#endif //DATASETS_LITIV2018_USE_LWIR_OFFSET
 
 namespace lv {
 
@@ -78,7 +81,8 @@ namespace lv {
             //LITIV2018_Joints,
         };
         /// value used for 'dont care' labeling in disparity maps
-        static constexpr int s_nDontCareDispLabel = 255;
+        static constexpr int s_nDontCareDispLabel = UCHAR_MAX;
+        static constexpr int s_nMaxDisp = ILITIVStCharles2018Dataset::s_nDontCareDispLabel-1;
     };
 
     #define DATASETS_LITIV2018_DATA_VERSION_STR lv::putf("stcharles2018-v%02d",(int)DATASETS_LITIV2018_DATA_VERSION)
@@ -410,8 +414,10 @@ namespace lv {
                 }
                 if(bFlipDisparities_true)
                     cv::flip(oLWIRPacket,oLWIRPacket,1);
+            #if DATASETS_LITIV2018_USE_LWIR_OFFSET
                 if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                     lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(-this->m_nLWIRDispOffset),0.0f));
+            #endif //DATASETS_LITIV2018_USE_LWIR_OFFSET
                 if(oLWIRPacket.size()!=oLWIRSize)
                     cv::resize(oLWIRPacket,oLWIRPacket,oLWIRSize,0,0,cv::INTER_LINEAR);
                 m_oLWIRMapUnwarper.warp(oLWIRPacket,vRemapOutputs[nOutputLWIRStreamIdx]);
@@ -631,7 +637,7 @@ namespace lv {
                 oDepthRemapROI = cv::Mat(oRGBSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_POSITIVE_VAL));
             ////////////////////////////////
             this->m_nMinDisp = 0;
-            this->m_nMaxDisp = 100;
+            this->m_nMaxDisp = ILITIVStCharles2018Dataset::s_nMaxDisp;
             this->m_nLWIRDispOffset = 0;
             this->m_bFlipDisparitiesInternal = false;
             std::ifstream oDispRangeFile(this->getDataPath()+"drange.txt");
@@ -646,11 +652,13 @@ namespace lv {
                 this->m_nMinDisp = -this->m_nMinDisp;
                 this->m_nMaxDisp = -this->m_nMaxDisp;
             }
+        #if DATASETS_LITIV2018_USE_LWIR_OFFSET
             if(this->m_nMinDisp!=0) {
                 this->m_nLWIRDispOffset = -this->m_nMinDisp;
                 this->m_nMaxDisp -= this->m_nMinDisp;
                 this->m_nMinDisp = 0;
             }
+        #endif //DATASETS_LITIV2018_USE_LWIR_OFFSET
             this->m_nLWIRDispOffset = (int)std::round(dScale*this->m_nLWIRDispOffset);
             this->m_nMinDisp = (int)std::round(dScale*this->m_nMinDisp);
             this->m_nMaxDisp = (int)std::round(dScale*this->m_nMaxDisp);
@@ -718,8 +726,10 @@ namespace lv {
                 oRGBROI = oRGBROI>UCHAR_MAX/2;
                 oLWIRROI = oLWIRROI>UCHAR_MAX/2;
                 oDepthRemapROI = oDepthRemapROI>UCHAR_MAX/2;
+            #if DATASETS_LITIV2018_USE_LWIR_OFFSET
                 if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                     lv::shift(oLWIRROI.clone(),oLWIRROI,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
+            #endif //DATASETS_LITIV2018_USE_LWIR_OFFSET
                 cv::erode(oRGBROI,oRGBROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 cv::erode(oLWIRROI,oLWIRROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
                 cv::erode(oDepthRemapROI,oDepthRemapROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
@@ -1043,8 +1053,10 @@ namespace lv {
                 if(this->m_bHorizRectify && oLWIRPacket.size()!=oRectifSize)
                     cv::resize(oLWIRPacket,oLWIRPacket,oRectifSize,0,0,cv::INTER_CUBIC);
                 cv::remap(oLWIRPacket.clone(),oLWIRPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_CUBIC);
+            #if DATASETS_LITIV2018_USE_LWIR_OFFSET
                 if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                     lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
+            #endif //DATASETS_LITIV2018_USE_LWIR_OFFSET
             }
             if(oLWIRPacket.size()!=vInputInfos[nInputLWIRStreamIdx].size())
                 cv::resize(oLWIRPacket,oLWIRPacket,vInputInfos[nInputLWIRStreamIdx].size(),0,0,cv::INTER_CUBIC);
@@ -1058,8 +1070,10 @@ namespace lv {
                     if(this->m_bHorizRectify && oLWIRMaskPacket.size()!=oRectifSize)
                         cv::resize(oLWIRMaskPacket,oLWIRMaskPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                     cv::remap(oLWIRMaskPacket.clone(),oLWIRMaskPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
+                #if DATASETS_LITIV2018_USE_LWIR_OFFSET
                     if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                         lv::shift(oLWIRMaskPacket.clone(),oLWIRMaskPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
+                #endif //DATASETS_LITIV2018_USE_LWIR_OFFSET
                 }
             #endif //DATASETS_LITIV2018_REMAP_MASKS
                 if(oLWIRMaskPacket.size()!=vInputInfos[nInputLWIRMaskStreamIdx].size())
@@ -1185,16 +1199,21 @@ namespace lv {
                         oLWIRPtNode["d"] >> oLWIRCorresp.second;
                         lvAssert(oRGBCorresp.first+cv::Point2i(oRGBCorresp.second,0)==oLWIRCorresp.first);
                         lvAssert(oLWIRCorresp.first+cv::Point2i(oLWIRCorresp.second,0)==oRGBCorresp.first);
-                        static constexpr int nMaxDisp = ILITIVStCharles2018Dataset::s_nDontCareDispLabel-1;
-                        const int nDispValue = (this->m_bFlipDisparitiesInternal?oRGBCorresp.second:-oRGBCorresp.second)+this->m_nLWIRDispOffset;
+                        int nDispValue = (this->m_bFlipDisparitiesInternal?oRGBCorresp.second:-oRGBCorresp.second);
+                    #if DATASETS_LITIV2018_USE_LWIR_OFFSET
+                        nDispValue += this->m_nLWIRDispOffset;
+                    #endif //DATASETS_LITIV2018_USE_LWIR_OFFSET
                         //lvAssert_(nDispValue>=0 && nDispValue<=nMaxDisp,"bad corresp disp offset");
-                        if(nDispValue>=0 && nDispValue<=nMaxDisp) { // @@@ might need to readjust min/max disp ranges for vid07/08 in v06?
+                        if(nDispValue>=0 && nDispValue<=ILITIVStCharles2018Dataset::s_nMaxDisp) {
+                            // @@@ might need to readjust min/max disp ranges for vid07/08 in v06?
                             oRGBPacket.at<uchar>(oRGBCorresp.first) = (uchar)nDispValue;
                             oLWIRPacket.at<uchar>(oLWIRCorresp.first) = (uchar)nDispValue;
                         }
                     }
+                #if DATASETS_LITIV2018_USE_LWIR_OFFSET
                     if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                         lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f),cv::BORDER_CONSTANT,cv::Scalar_<uchar>((uchar)ILITIVStCharles2018Dataset::s_nDontCareDispLabel));
+                #endif //DATASETS_LITIV2018_USE_LWIR_OFFSET
                     if(oRGBPacket.size()!=vGTInfos[nGTRGBStreamIdx].size())
                         cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBStreamIdx].size(),0,0,cv::INTER_NEAREST);
                     if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
@@ -1228,8 +1247,10 @@ namespace lv {
                             if(this->m_bHorizRectify && oLWIRPacket.size()!=oRectifSize)
                                 cv::resize(oLWIRPacket,oLWIRPacket,oRectifSize,0,0,cv::INTER_LINEAR);
                             cv::remap(oLWIRPacket.clone(),oLWIRPacket,this->m_oLWIRCalibMap1,this->m_oLWIRCalibMap2,cv::INTER_LINEAR);
+                        #if DATASETS_LITIV2018_USE_LWIR_OFFSET
                             if(this->m_bHorizRectify && this->m_nLWIRDispOffset!=0)
                                 lv::shift(oLWIRPacket.clone(),oLWIRPacket,cv::Point2f(float(this->m_nLWIRDispOffset),0.0f));
+                        #endif //DATASETS_LITIV2018_USE_LWIR_OFFSET
                         }
                         if(oLWIRPacket.size()!=vGTInfos[nGTLWIRStreamIdx].size())
                             cv::resize(oLWIRPacket,oLWIRPacket,vGTInfos[nGTLWIRStreamIdx].size(),0,0,cv::INTER_LINEAR);
