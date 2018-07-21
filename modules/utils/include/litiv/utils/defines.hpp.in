@@ -326,6 +326,8 @@
 
     #define HAVE_CUDA                      @USE_CUDA@
     #if HAVE_CUDA
+        #define LITIV_CUDA_VERSION_MAJOR   @CUDA_VERSION_MAJOR@
+        #define LITIV_CUDA_VERSION_MINOR   @CUDA_VERSION_MINOR@
         #define LITIV_CUDA_VERSION         XSTR(@CUDA_VERSION@)
         #define LITIV_CUDA_MIN_COMPUTE_CAP cv::cuda::FEATURE_SET_COMPUTE_35
         #define CUDA_64_BIT_DEVICE_CODE    @CUDA_64_BIT_DEVICE_CODE@
