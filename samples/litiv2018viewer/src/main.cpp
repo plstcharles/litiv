@@ -28,9 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#define DATASETS_LITIV2018_CALIB_VERSION 4 // used internally by the dataset interface
-#define DATASETS_LITIV2018_DATA_VERSION 4 // used internally by the dataset interface
-#define BATCH_START_IDX 500 // will be used below to skip empty frames at the beginning of each sequence
+#define BATCH_START_IDX 508 // will be used below to skip empty frames at the beginning of each sequence
 
 #include "litiv/datasets.hpp"
 
@@ -153,8 +151,8 @@ int main(int, char**) {
                                     }
                                 }
                             }
-                            cv::dilate(oColorMap,oColorMap,cv::Mat(),cv::Point(-1,-1),3);
-                            cv::dilate(oLUMap,oLUMap,cv::Mat(),cv::Point(-1,-1),3);
+                            cv::dilate(oColorMap,oColorMap,cv::Mat(),cv::Point(-1,-1),2);
+                            cv::dilate(oLUMap,oLUMap,cv::Mat(),cv::Point(-1,-1),2);
                             oColorMap.copyTo(aInputs[a],oLUMap!=0);
                         }
                         else
