@@ -300,12 +300,13 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 if(nLineCreationStep==0 && !bPointDragInProgress && !bSelectDragInProgress && (oData.nEvent==cv::EVENT_MBUTTONDOWN || oData.nEvent==cv::EVENT_LBUTTONDOWN)) {
                     lvAssert(vnSelectedPoints.empty());
                     if(!(oData.nFlags&cv::EVENT_FLAG_CTRLKEY)) {
+                        vnSelectedPoints.clear();
                         double dMinDist = 9999.;
                         for(size_t nPtIdx=0u; nPtIdx<avCorrespPts[nCurrTile].size(); ++nPtIdx) {
                             const double dCurrDist = cv::norm(vCurrPt-avCorrespPts[nCurrTile][nPtIdx].first);
                             if(dCurrDist<dMaxSelectDist && dCurrDist<dMinDist) {
                                 dMinDist = dCurrDist;
-                                vnSelectedPoints.push_back(nPtIdx);
+                                vnSelectedPoints = std::vector<size_t>{nPtIdx};
                             }
                         }
                     }
@@ -315,7 +316,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                             const size_t nSelectedPoint = vnSelectedPoints.back();
                             avCorrespPts[nCurrTile].erase(avCorrespPts[nCurrTile].begin()+nSelectedPoint);
                             avCorrespPts[nCurrTile^1].erase(avCorrespPts[nCurrTile^1].begin()+nSelectedPoint);
-                            vnSelectedPoints.pop_back();
+                            vnSelectedPoints.clear();
                         }
                     }
                     else if(oData.nEvent==cv::EVENT_LBUTTONDOWN) {
@@ -331,7 +332,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                             avCorrespPts[nCurrTile^1].emplace_back(vCurrPt,0);
                         }
                     }
-                    if(!vnSelectedPoints.empty() && !bSelectDragInProgress) {
+                    if(!vnSelectedPoints.empty() && oData.nEvent==cv::EVENT_LBUTTONDOWN) {
                         lvAssert(vnSelectedPoints.size()==1u);
                         const size_t nSelectedPoint = vnSelectedPoints.back();
                         lvAssert(nSelectedPoint<avCorrespPts[nCurrTile].size() && nSelectedPoint<avCorrespPts[nCurrTile^1].size());
@@ -347,9 +348,16 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                         lvAssert(vnSelectedPoints.size()==1u);
                         const size_t nPtIdx = vnSelectedPoints.back();
                         lvAssert(nPtIdx<avCorrespPts[nSelectedPointTile^1].size());
-                        avCorrespPts[nSelectedPointTile][nPtIdx].second = nDist;
-                        avCorrespPts[nSelectedPointTile^1][nPtIdx].second = -nDist;
-                        avCorrespPts[nSelectedPointTile^1][nPtIdx].first.x = avCorrespPts[nSelectedPointTile][nPtIdx].first.x+avCorrespPts[nSelectedPointTile][nPtIdx].second;
+                        if(oData.nFlags&cv::EVENT_FLAG_SHIFTKEY) {
+                            avCorrespPts[nSelectedPointTile][nPtIdx].second = nDist;
+                            avCorrespPts[nSelectedPointTile^1][nPtIdx].second = -nDist;
+                            avCorrespPts[nSelectedPointTile^1][nPtIdx].first.x = avCorrespPts[nSelectedPointTile][nPtIdx].first.x+avCorrespPts[nSelectedPointTile][nPtIdx].second;
+                        }
+                        else {
+                            avCorrespPts[nSelectedPointTile][nPtIdx].second = -nDist;
+                            avCorrespPts[nSelectedPointTile^1][nPtIdx].second = nDist;
+                            avCorrespPts[nSelectedPointTile][nPtIdx].first.x = avCorrespPts[nSelectedPointTile^1][nPtIdx].first.x+avCorrespPts[nSelectedPointTile^1][nPtIdx].second;
+                        }
                         if(oData.nEvent==cv::EVENT_MBUTTONUP || oData.nEvent==cv::EVENT_LBUTTONUP) {
                             if(!oDepthFrame.empty()) {
                                 lvAssert(oDepthFrame.size()==vOrigSizes[0] && oDepthFrame.type()==CV_16UC1);
@@ -358,10 +366,10 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                             }
                             bPointDragInProgress = false;
                             nSelectedPointTile = -1;
-                            vnSelectedPoints.pop_back();
+                            vnSelectedPoints.clear();
                         }
                     }
-                    else if(bSelectDragInProgress) {
+                    else if(bSelectDragInProgress && (oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_MOUSEMOVE)) {
                         if(oData.nEvent==cv::EVENT_LBUTTONUP) {
                             bSelectDragInProgress = false;
                             bShiftDragInProgress = false;
@@ -587,8 +595,15 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                         x += DATASETS_RAW_INPUT_SHIFT;
                         avCorrespPts[a].emplace_back(cv::Point(x,y),d);
                     }
-                    lvAssert(mnTotCorresps[nCurrIdx]==(size_t)nPts);
+                    //lvAssert(mnTotCorresps[nCurrIdx]==(size_t)nPts);
                 }
+            }
+            lvAssert(avCorrespPts[0].size()==avCorrespPts[1].size());
+            for(size_t nPtIdx=0; nPtIdx<avCorrespPts[0].size(); ++nPtIdx) {
+                lvAssert(avCorrespPts[0][nPtIdx].first.y==avCorrespPts[1][nPtIdx].first.y);
+                lvAssert(avCorrespPts[0][nPtIdx].second==-avCorrespPts[1][nPtIdx].second);
+                lvAssert(avCorrespPts[0][nPtIdx].first.x+avCorrespPts[0][nPtIdx].second==avCorrespPts[1][nPtIdx].first.x);
+                lvAssert(avCorrespPts[1][nPtIdx].first.x+avCorrespPts[1][nPtIdx].second==avCorrespPts[0][nPtIdx].first.x);
             }
         #endif //GEN_REGISTRATION_ANNOT
             lvLog_(1,"\t annot @ #%d ('%s') of %d",int(nCurrIdx),sPacketName.c_str(),int(nTotPacketCount));
@@ -662,7 +677,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 nKeyPressed = 13;
                 break;
             #endif //DATASETS_SCAN_ONLY>1
-            #endif //GEN_SEGMENTATION_ANNOT
+            #elif GEN_REGISTRATION_ANNOT
+                if(nKeyPressed=='d')
+                    for(size_t a=0u; a<2u; ++a)
+                        avCorrespPts[a].clear();
+            #endif //GEN_REGISTRATION_ANNOT
+
             }
         #if !DATASETS_SCAN_ONLY
         #if GEN_SEGMENTATION_ANNOT
@@ -681,6 +701,12 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             const bool bCurrFrameValid = (!avCorrespPts[0].empty() || !avCorrespPts[1].empty());
             if(bCurrFrameValid) {
                 lvAssert(avCorrespPts[0].size()==avCorrespPts[1].size());
+                for(size_t nPtIdx=0; nPtIdx<avCorrespPts[0].size(); ++nPtIdx) {
+                    lvAssert(avCorrespPts[0][nPtIdx].first.y==avCorrespPts[1][nPtIdx].first.y);
+                    lvAssert(avCorrespPts[0][nPtIdx].second==-avCorrespPts[1][nPtIdx].second);
+                    lvAssert(avCorrespPts[0][nPtIdx].first.x+avCorrespPts[0][nPtIdx].second==avCorrespPts[1][nPtIdx].first.x);
+                    lvAssert(avCorrespPts[1][nPtIdx].first.x+avCorrespPts[1][nPtIdx].second==avCorrespPts[0][nPtIdx].first.x);
+                }
                 for(size_t a=0u; a<2u; ++a) {
                     cv::FileStorage oGTFS(((a==0u)?sRGBGTDir:sLWIRGTDir)+lv::putf("%05d.yml",(int)nCurrIdx),cv::FileStorage::WRITE);
                     lvAssert(oGTFS.isOpened());
