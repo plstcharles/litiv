@@ -106,7 +106,6 @@ int main(int, char**) {
             const std::string sGTName = bDisplayDisparityGT?"gt_disp":"gt_masks";
             const std::string sRGBGTDir = oBatch.getDataPath()+"rgb_"+sGTName+"/";
             const std::string sLWIRGTDir = oBatch.getDataPath()+"lwir_"+sGTName+"/";
-            int nMinDisp=0,nMaxDisp=0;
             {
                 cv::FileStorage oGTMetadataFS(oBatch.getDataPath()+sGTName+"_metadata.yml",cv::FileStorage::READ);
                 if(oGTMetadataFS.isOpened()) {
@@ -114,13 +113,16 @@ int main(int, char**) {
                     oGTMetadataFS["npackets"] >> nPrevPacketCount;
                     lvAssert(nPrevPacketCount==(int)nTotPacketCount);
                     if(bDisplayDisparityGT) {
+                        int nMinDisp,nMaxDisp;
                         oGTMetadataFS["mindisp"] >> nMinDisp;
                         oGTMetadataFS["maxdisp"] >> nMaxDisp;
-                        lvLog_(1,"min disparity = %d",nMinDisp);
-                        lvLog_(1,"max disparity = %d",nMaxDisp);
+                        lvLog_(1,"min disparity (real) = %d",nMinDisp);
+                        lvLog_(1,"max disparity (real) = %d",nMaxDisp);
+                        // the 'real' values above might not have been pre-offset to get rid of negatives
                     }
                 }
             }
+            int nMinDisp=oBatch.getMinDisparity(),nMaxDisp=oBatch.getMaxDisparity(); // this range is the possibly offset value range
             // below is the main loop where we visualize all frame pairs (starting at some offset) in the sequence
             while(nCurrIdx<nTotPacketCount) {
                 // this call returns the frame array for the current packet index (with all required preprocessing already completed)
