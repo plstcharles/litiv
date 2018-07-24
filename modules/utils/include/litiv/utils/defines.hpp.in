@@ -146,9 +146,7 @@
         #else //ndef(LITIV_BUILD)
             #ifndef LITIV_DEBUG
                 #define LITIV_DEBUG 1
-            #elif !LITIV_DEBUG
-                #error "Current build config mismatch with LITIV external build config."
-            #endif //!LITIV_DEBUG
+            #endif //ndef(LITIV_DEBUG)
         #endif //ndef(LITIV_BUILD)
         #ifdef __cplusplus
             #define lvDbgExec(expr) do {expr;} while(false)
@@ -172,9 +170,7 @@
         #else //ndef(LITIV_BUILD)
             #ifndef LITIV_DEBUG
                 #define LITIV_DEBUG 0
-            #elif LITIV_DEBUG
-                #error "Current build config mismatch with LITIV external build config."
-            #endif //LITIV_DEBUG
+            #endif //ndef(LITIV_DEBUG)
         #endif //ndef(LITIV_BUILD)
         #ifdef __cplusplus
             #define lvDbgExec(expr) ((void)0)
