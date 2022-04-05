@@ -1466,7 +1466,7 @@ namespace lv {
         template<typename T2>
         this_type& operator=(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {return *this;}
         virtual ~AlignedMatAllocator() noexcept {}; // NOLINT
-        cv::UMatData* allocate(int dims, const int* sizes, int type, void* data, size_t* step, int /*flags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
+        cv::UMatData* allocate(int dims, const int* sizes, int type, void* data, size_t* step, cv::AccessFlag /*flags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
             step[dims-1] = bAlignSingleElem?cv::alignSize(CV_ELEM_SIZE(type),nByteAlign):CV_ELEM_SIZE(type);
             for(int d=dims-2; d>=0; --d)
                 step[d] = cv::alignSize(step[d+1]*sizes[d+1],nByteAlign);
@@ -1480,7 +1480,7 @@ namespace lv {
                 u->data = u->origdata = lv::AlignedMemAllocator<uint8_t,nByteAlign,true>::allocate(u->size);
             return u;
         }
-        bool allocate(cv::UMatData* data, int /*accessFlags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
+        bool allocate(cv::UMatData* data, cv::AccessFlag /*accessFlags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
             return (data!=nullptr);
         }
         void deallocate(cv::UMatData* data) const override {

@@ -123,8 +123,9 @@ TEST(sc,regression_full_compute_abs) {
     ASSERT_EQ(oOutputDescs.rows,(int)vTargetPts.size());
     ASSERT_EQ(oOutputDescs.cols,oOutputDescMap.size[2]);
     const int nDescSize = oOutputDescMap.size[2];
-    if(std::any_of(oOutputDescs.begin(),oOutputDescs.end(),[](float f){return f>0.001f;}))
+    if(std::any_of(oOutputDescs.begin(),oOutputDescs.end(),[](float f){return f>0.001f;})) {
         ASSERT_TRUE(std::any_of(oOutputDescMap.begin(),oOutputDescMap.end(),[](float f){return f>0.001f;}));
+    }
     for(int i=0; i<(int)vTargetPts.size(); ++i) {
         const float* aDesc1 = oOutputDescs.ptr<float>(i);
         ASSERT_EQ(aDesc1,((float*)oOutputDescs.data)+nDescSize*i);

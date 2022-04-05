@@ -75,7 +75,7 @@ namespace lv {
             std::unique_ptr<T[]> v(new T[n]);
             for(size_t i=0; i<n; ++i)
                 v[i] = (T)uniform_dist(gen);
-            return std::move(v);
+            return v;
         }
 
         /// fills a data array with random values between 'min' and 'max'

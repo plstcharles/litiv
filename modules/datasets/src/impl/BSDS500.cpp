@@ -618,7 +618,7 @@ void lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::wr
     std::ofstream oImageScoresOutput(sOutputPath+"/eval_bdry_img.txt");
     if(oImageScoresOutput.is_open())
         for(size_t n=0; n<oMetrics.voBestImageScores.size(); ++n)
-            oImageScoresOutput << cv::format("%10d %10g %10g %10g %10g\n",n+1,oMetrics.voBestImageScores[n].dThreshold,oMetrics.voBestImageScores[n].dRecall,oMetrics.voBestImageScores[n].dPrecision,oMetrics.voBestImageScores[n].dFMeasure);
+            oImageScoresOutput << cv::format("%10d %10g %10g %10g %10g\n",int(n+1),oMetrics.voBestImageScores[n].dThreshold,oMetrics.voBestImageScores[n].dRecall,oMetrics.voBestImageScores[n].dPrecision,oMetrics.voBestImageScores[n].dFMeasure);
     std::ofstream oThresholdMetricsOutput(sOutputPath+"/eval_bdry_thr.txt");
     if(oThresholdMetricsOutput.is_open())
         for(size_t n=0; n<oMetrics.voThresholdScores.size(); ++n)
