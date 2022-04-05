@@ -113,7 +113,10 @@ mark_as_advanced(
 )
 
 ### OPENCV CHECK
-find_package(OpenCV 3.0 REQUIRED)
+find_package(OpenCV 4.0)
+if(NOT ${OpenCV_FOUND})
+    find_package(OpenCV 3.0 REQUIRED)
+endif()
 message(STATUS "Found OpenCV >=3.0 at '${OpenCV_DIR}'")
 
 ### GLSL CHECK
