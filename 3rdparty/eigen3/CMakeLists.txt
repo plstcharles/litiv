@@ -33,7 +33,7 @@ if((NOT DEFINED eigen3_SOURCE_DIR) OR (NOT EXISTS ${eigen3_SOURCE_DIR}))
         PREFIX
             "${CMAKE_CURRENT_BINARY_DIR}"
         URL
-            "http://bitbucket.org/eigen/eigen/get/3.3.4.zip"
+            "https://gitlab.com/libeigen/eigen/-/archive/3.3.4/eigen-3.3.4.zip"
         QUIET
     #    ${UPDATE_DISCONNECTED_IF_AVAILABLE} # bugged in some cmake versions, needs patch
     )
