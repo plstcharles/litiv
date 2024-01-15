@@ -21,7 +21,7 @@ namespace ofdis {
     private:
         void setOpPointParams(const cv::Size& oImageSize);
         template<FlowInputType eInput, FlowOutputType eOutput>
-        friend void computeFlow(const cv::Mat&,const cv::Mat&,cv::Mat&,FlowParams=FlowParams());
+        friend void computeFlow(const cv::Mat&,const cv::Mat&,cv::Mat&,FlowParams);
     };
 
     /// ofdis algorithm interface, with all specialized input/output combos pre-instantiated
